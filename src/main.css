@@ -1,0 +1,15 @@
+/*
+ * Styles for the explorer itself. The layer order puts MUI's styles under Tailwind's
+ * utilities, so a Tailwind class on an MUI component wins.
+ */
+
+@layer theme, base, mui, components, utilities;
+@import "tailwindcss";
+
+body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-md);
+}

@@ -1,0 +1,32 @@
+{
+    "name": "graft-style-guide",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "bun node_modules/vite/bin/vite.js",
+        "compile": "bun node_modules/typescript/bin/tsc --noEmit",
+        "build": "bun node_modules/typescript/bin/tsc --noEmit && bun node_modules/vite/bin/vite.js build",
+        "test:e2e": "bun node_modules/@playwright/test/cli.js test"
+    },
+    "dependencies": {
+        "@emotion/react": "11.14.0",
+        "@emotion/styled": "11.14.1",
+        "@fortawesome/fontawesome-svg-core": "7.3.1",
+        "@fortawesome/free-solid-svg-icons": "7.3.1",
+        "@fortawesome/react-fontawesome": "3.5.0",
+        "@mui/material": "9.5.0",
+        "@tanstack/react-router": "1.170.46",
+        "react": "19.3.1",
+        "react-dom": "19.3.1"
+    },
+    "devDependencies": {
+        "@playwright/test": "1.65.1",
+        "@tailwindcss/vite": "4.3.3",
+        "@types/bun": "1.4.4",
+        "@types/react": "19.3.0",
+        "@types/react-dom": "19.3.0",
+        "tailwindcss": "4.3.3",
+        "typescript": "5.9.3",
+        "vite": "5.4.21"
+    }
+}

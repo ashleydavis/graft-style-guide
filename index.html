@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Graft style explorer</title>
+        <!--
+            Sets the explorer theme from ?explorer= in the URL before the first paint, so a
+            refresh in the dark theme draws dark from the start.
+        -->
+        <script>
+            document.documentElement.dataset.theme =
+                new URLSearchParams(window.location.search).get("explorer") === "dark" ? "dark" : "light";
+        </script>
+        <!--
+            Loads the tokens before the first paint, and paints the page background from them
+            while the app's script loads.
+        -->
+        <link rel="stylesheet" href="/graft.css" />
+        <style>
+            html {
+                background: var(--color-bg);
+            }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>
