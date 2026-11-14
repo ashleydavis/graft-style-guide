@@ -88,6 +88,11 @@ export function ButtonPage(): ReactNode {
                             <FontAwesomeIcon icon={faCopy} />
                         </IconButton>
                     </Tooltip>
+                    <Tooltip title={<Tip title="Discard this change" detail="A danger icon button: the icon and border in the danger colour." />}>
+                        <IconButton aria-label="Discard this change" size="small" color="error">
+                            <FontAwesomeIcon icon={faTrash} />
+                        </IconButton>
+                    </Tooltip>
                     <Tooltip title={<Tip title="Delete branch" detail="main is protected, so it cannot be deleted." />}>
                         <span>
                             <IconButton aria-label="Delete branch (protected)" size="small" disabled>

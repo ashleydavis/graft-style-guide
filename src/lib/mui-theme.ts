@@ -272,6 +272,30 @@ export const graftTheme: Theme = createTheme({
                     fontSize: "var(--icon-md)",
                 },
             },
+            variants: [
+                {
+                    //
+                    // A danger icon button, such as Discard, looks like the danger button: the icon
+                    // and the border in the danger colour, the border thickening on hover.
+                    //
+                    props: {
+                        color: "error",
+                    },
+                    style: {
+                        color: "var(--color-danger)",
+                        boxShadow: "inset 0 0 0 1px var(--color-danger)",
+                        "&:hover": {
+                            backgroundColor: "transparent",
+                            color: "var(--color-danger)",
+                            boxShadow: "inset 0 0 0 2px var(--color-danger)",
+                        },
+                        "&.Mui-disabled": {
+                            color: "var(--color-text-disabled)",
+                            boxShadow: "inset 0 0 0 1px var(--color-border)",
+                        },
+                    },
+                },
+            ],
         },
         MuiLink: {
             styleOverrides: {
@@ -357,6 +381,7 @@ export const graftTheme: Theme = createTheme({
         },
         MuiDialog: {
             defaultProps: {
+                disableScrollLock: true,
                 slotProps: {
                     paper: {
                         variant: "dialog",
@@ -422,6 +447,11 @@ export const graftTheme: Theme = createTheme({
         MuiPopover: {
             defaultProps: {
                 disablePortal: true,
+                //
+                // The page keeps its scrollbar while a popover, menu or dropdown dialog is open,
+                // so the page does not jump as it opens and closes.
+                //
+                disableScrollLock: true,
             },
             styleOverrides: {
                 paper: {
@@ -444,6 +474,9 @@ export const graftTheme: Theme = createTheme({
         // each side.
         //
         MuiMenu: {
+            defaultProps: {
+                disableScrollLock: true,
+            },
             styleOverrides: {
                 list: {
                     padding: "var(--space-2) var(--space-1)",

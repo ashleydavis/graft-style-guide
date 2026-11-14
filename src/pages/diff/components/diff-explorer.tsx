@@ -108,6 +108,12 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
     }
 
     function onKeyDown(event: KeyboardEvent): void {
+        const keyTarget = event.target;
+        const isInField = keyTarget instanceof HTMLElement && keyTarget.closest('input, textarea, select, [role="menu"], [role="dialog"], [role="listbox"]') !== null;
+        if (!isInField && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && cardRefs.current[position.file]?.handleOptionKey(event.key)) {
+            event.preventDefault();
+            return;
+        }
         if ((event.key !== "ArrowUp" && event.key !== "ArrowDown" && event.key !== " ") || event.ctrlKey || event.altKey || event.metaKey) {
             return;
         }

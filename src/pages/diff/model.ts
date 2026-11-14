@@ -334,3 +334,133 @@ export function gapBefore(hunks: IHunk[], index: number, oldFileLength: number |
     }
     return { oldStart, count: oldFileLength === undefined ? 0 : Math.max(oldFileLength - oldStart + 1, 0), shift: previousShift };
 }
+
+//
+// Returns the hunk's lines as `git diff` writes them: a "+", "-" or space before each line's
+// text, and Git's note after a line that ends with no line break.
+//
+function hunkLineTexts(lines: IDiffLine[]): string[] {
+    return lines.flatMap(line => {
+        const marker = line.kind === "added" ? "+" : line.kind === "deleted" ? "-" : " ";
+        return line.hasNoNewline ? [marker + line.text, "\\ No newline at end of file"] : [marker + line.text];
+    });
+}
+
+//
+// Returns a hunk as `git diff` writes it, with a header that counts its lines afresh from
+// `oldStart` and `newStart` and keeps the original header's function or section name.
+//
+export function hunkText(hunk: IHunk, oldStart: number, newStart: number, lines: IDiffLine[]): string[] {
+    const oldCount = lines.filter(line => line.kind !== "added").length;
+    const newCount = lines.filter(line => line.kind !== "deleted").length;
+    const context = hunk.header.replace(/^@@[^@]*@@/, "");
+    return [`@@ -${oldStart},${oldCount} +${newStart},${newCount} @@${context}`, ...hunkLineTexts(lines)];
+}
+
+//
+// One side of a file's change once some of it is staged: its diff, the position each of its hunks
+// has in the whole file's diff, and for each of its hunks the position each line has in that
+// hunk's lines in the whole file's diff.
+//
+export interface ISectionDiff {
+    diff: string;
+    hunkIndexes: number[];
+    lineIndexes: number[][];
+}
+
+//
+// Returns the staged or the unstaged side of `diff`, as `git diff --cached` and `git diff` show
+// them once the lines `stagedLines` gives are staged. `stagedLines` returns a hunk's staged line
+// positions. The staged side keeps the staged lines as changes, turns the unstaged deleted lines
+// into kept lines and leaves the unstaged added lines out. The unstaged side keeps the unstaged
+// lines as changes, turns the staged added lines into kept lines and leaves the staged deleted
+// lines out. A hunk with no changes on a side drops out of it, and the line numbers follow the
+// index, which sits between the last commit and the working tree.
+//
+export function sectionDiff(diff: string, stagedLines: (hunk: IHunk, index: number) => ReadonlySet<number>, section: "staged" | "unstaged"): ISectionDiff {
+    const texts: string[] = [];
+    const hunkIndexes: number[] = [];
+    const lineIndexes: number[][] = [];
+    let shift = 0;
+    parseHunks(diff).forEach((hunk, index) => {
+        const staged = stagedLines(hunk, index);
+        const lines: IDiffLine[] = [];
+        const map: number[] = [];
+        let stagedShift = 0;
+        hunk.lines.forEach((line, position) => {
+            const isStaged = staged.has(position);
+            if (line.kind !== "context" && isStaged) {
+                stagedShift += line.kind === "added" ? 1 : -1;
+            }
+            if (line.kind === "context" || (section === "staged") === isStaged) {
+                lines.push(line);
+                map.push(position);
+            }
+            else if ((section === "staged" && line.kind === "deleted") || (section === "unstaged" && line.kind === "added")) {
+                lines.push({ ...line, kind: "context" });
+                map.push(position);
+            }
+        });
+        if (lines.some(line => line.kind !== "context")) {
+            const oldStart = section === "staged" ? hunk.oldStart : hunk.oldStart + shift;
+            const newStart = section === "staged" ? hunk.oldStart + shift : hunk.newStart;
+            texts.push(...hunkText(hunk, oldStart, newStart === 0 && lines.some(line => line.kind !== "deleted") ? 1 : newStart, lines));
+            hunkIndexes.push(index);
+            lineIndexes.push(map);
+        }
+        shift += stagedShift;
+    });
+    return { diff: texts.join("\n"), hunkIndexes, lineIndexes };
+}
+
+//
+// What is left of a diff once some lines of one hunk are discarded: the diff, and for that hunk
+// each old line position's new one, or -1 for a line that went. `lineMap` is undefined when the
+// hunk had no changes left and dropped out.
+//
+export interface ILinesDiscarded {
+    diff: string;
+    lineMap: number[] | undefined;
+}
+
+//
+// Returns `diff` with the lines at `lineIndexes` of hunk `index` discarded, put back as they were
+// in the last commit: a discarded added line goes and a discarded deleted line stays as a kept
+// line. The hunks after it start as many lines earlier or later in the new file as the change
+// added or took away there.
+//
+export function withLinesDiscarded(diff: string, index: number, lineIndexes: ReadonlySet<number>): ILinesDiscarded {
+    const hunks = parseHunks(diff);
+    const hunk = hunks[index];
+    if (!hunk) {
+        return { diff, lineMap: undefined };
+    }
+    const lines: IDiffLine[] = [];
+    const lineMap: number[] = [];
+    hunk.lines.forEach((line, position) => {
+        if (!lineIndexes.has(position) || line.kind === "context") {
+            lineMap.push(lines.length);
+            lines.push(line);
+        }
+        else if (line.kind === "deleted") {
+            lineMap.push(lines.length);
+            lines.push({ ...line, kind: "context" });
+        }
+        else {
+            lineMap.push(-1);
+        }
+    });
+    if (!lines.some(line => line.kind !== "context")) {
+        return { diff: withHunkDiscarded(diff, index), lineMap: undefined };
+    }
+    const newLinesBefore = hunk.lines.filter(line => line.kind !== "deleted").length;
+    const newLinesAfter = lines.filter(line => line.kind !== "deleted").length;
+    const shift = newLinesAfter - newLinesBefore;
+    const texts = hunks.flatMap((each, position) => {
+        if (position === index) {
+            return hunkText(each, each.oldStart, each.newStart, lines);
+        }
+        return hunkText(each, each.oldStart, position > index ? each.newStart + shift : each.newStart, each.lines);
+    });
+    return { diff: texts.join("\n"), lineMap };
+}

@@ -184,6 +184,11 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             toggleMaximise(state.activePaneIndex);
             return;
         }
+        if (state.activePaneIndex === 2 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key) && fileCardRef.current?.handleOptionKey(event.key)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
         if (event.key === " " && state.activePaneIndex === 2 && currentStop?.kind === "gap" && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
             event.preventDefault();
             event.stopPropagation();

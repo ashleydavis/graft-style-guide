@@ -10,7 +10,8 @@ import ButtonBase from "@mui/material/ButtonBase";
 import Tooltip from "@mui/material/Tooltip";
 import { Tip } from "../../../components/tip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsUpDown, faCompress, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { faArrowsUpDown, faCheck, faCompress, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import Checkbox from "@mui/material/Checkbox";
 import { changePartners, gapBefore, parseHunks, splitRows, wordPieces, type IDiffLine, type IGap, type IHunk } from "../model";
 
 //
@@ -77,6 +78,19 @@ export interface IDiffViewProps {
     // Called with a run's position when its bar is clicked, so the click makes it the current stop.
     //
     onSelectGap?: (gapIndex: number) => void;
+
+    //
+    // The line selection, which turns on the line selection mode: a box before each changed line.
+    // Absent outside the mode.
+    //
+    lineSelection?: Omit<ILineSelection, "idOf">;
+
+    //
+    // For each hunk of `diff`, the position each of its lines has in that hunk's lines in the
+    // whole file's diff, for a diff that shows one side of a change staged in part. Absent when
+    // the lines are the whole file's.
+    //
+    lineIndexes?: number[][];
 
     //
     // True to show every unchanged line of the file, false to fold the runs between hunks away
@@ -174,6 +188,92 @@ export interface IDiffSearch {
 // Holds the diff view's search for the lines it draws.
 //
 export const DiffSearchContext = createContext<IDiffSearch>({ needle: "", current: undefined, firstMatch: new Map() });
+
+//
+// The line selection of a diff in its line selection mode: a line's id from the line, which lines
+// are selected and staged, and what a click on a line's box does. Absent outside the mode.
+//
+export interface ILineSelection {
+    //
+    // Returns a changed line's id, "hunk:line" with the hunk's and the line's positions in the
+    // whole file's diff, or undefined for a line that cannot be selected.
+    //
+    idOf: (line: IDiffLine) => string | undefined;
+
+    //
+    // The ids of the selected lines.
+    //
+    selected: ReadonlySet<string>;
+
+    //
+    // The ids of the staged lines, marked beside their boxes, or undefined where the card's own
+    // section says it.
+    //
+    staged: ReadonlySet<string> | undefined;
+
+    //
+    // Called with a line's id when its box is clicked, and whether Shift was held, which selects
+    // every line from the last one clicked.
+    //
+    onToggle: (id: string, isRange: boolean) => void;
+}
+
+//
+// Holds the diff view's line selection for the lines it draws.
+//
+export const LineSelectionContext = createContext<ILineSelection | undefined>(undefined);
+
+//
+// Renders a line's selection box in the line selection mode: a checkbox for a changed line, with a
+// mark for a staged line, and an empty cell of the same width for a kept line, so the columns line
+// up. Renders nothing outside the mode.
+//
+export function LineSelectCell({ line }: { line: IDiffLine | undefined }): ReactNode {
+    const selection = useContext(LineSelectionContext);
+    if (!selection) {
+        return undefined;
+    }
+    const id = line ? selection.idOf(line) : undefined;
+    const isStaged = id !== undefined && selection.staged?.has(id) === true;
+    return (
+        <span className="flex flex-none select-none items-center" style={{ width: "calc(var(--space-8) + var(--space-2))", gap: "var(--space-1)", paddingLeft: "var(--space-1)" }}>
+            {id !== undefined ? (
+                <>
+                    <Checkbox
+                        size="small"
+                        checked={selection.selected.has(id)}
+                        onClick={event => {
+                            event.stopPropagation();
+                            selection.onToggle(id, event.shiftKey);
+                        }}
+                        slotProps={{ input: { "aria-label": `Select line ${line?.newNumber ?? line?.oldNumber}` } }}
+                        sx={{ padding: 0, "& .MuiSvgIcon-root": { fontSize: "var(--icon-md)" } }}
+                    />
+                    {isStaged ? (
+                        <Tooltip title="Staged">
+                            <span aria-label="Staged" style={{ color: "var(--color-success)", fontSize: "var(--icon-sm)" }}>
+                                <FontAwesomeIcon icon={faCheck} />
+                            </span>
+                        </Tooltip>
+                    ) : undefined}
+                </>
+            ) : undefined}
+        </span>
+    );
+}
+
+//
+// Returns the background of a selected line in the line selection mode: the selected wash laid
+// over the line's own colour. Returns the line's own colour for a line that is not selected.
+//
+function useLineBackground(line: IDiffLine | undefined, background: string): string {
+    const selection = useContext(LineSelectionContext);
+    const id = line && selection ? selection.idOf(line) : undefined;
+    if (id !== undefined && selection?.selected.has(id)) {
+        return `linear-gradient(var(--color-selected), var(--color-selected)), ${background}`;
+    }
+    return background;
+}
 
 //
 // Counts the matches of `needle`, already in lower case, in `text`, ignoring case.
@@ -324,8 +424,10 @@ export function Marker({ line }: { line: IDiffLine }): ReactNode {
 // Renders one row of the unified view: both line numbers, the marker and the text.
 //
 export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: IDiffLine | undefined; wrap: boolean }): ReactNode {
+    const background = useLineBackground(line, lineStyles[line.kind].background);
     return (
-        <div role="row" data-line={line.kind} className="flex" style={{ background: lineStyles[line.kind].background }}>
+        <div role="row" data-line={line.kind} className="flex" style={{ background }}>
+            <LineSelectCell line={line} />
             <Gutter number={line.oldNumber} />
             <Gutter number={line.newNumber} />
             <Marker line={line} />
@@ -339,11 +441,13 @@ export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: 
 // and its text, or the striped fill where the side has no line.
 //
 export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | undefined; side: "old" | "new"; partner: IDiffLine | undefined; wrap: boolean }): ReactNode {
+    const background = useLineBackground(line, line ? lineStyles[line.kind].background : EMPTY_SIDE);
     if (!line) {
         return <div className="min-w-0 flex-1" data-side={side} data-empty="true" style={{ background: EMPTY_SIDE }} />;
     }
     return (
-        <div className="flex min-w-0 flex-1" data-side={side} data-line={line.kind} style={{ background: lineStyles[line.kind].background }}>
+        <div className="flex min-w-0 flex-1" data-side={side} data-line={line.kind} style={{ background }}>
+            <LineSelectCell line={line.kind === "context" && side === "new" ? undefined : line} />
             <Gutter number={side === "old" ? line.oldNumber : line.newNumber} />
             <Marker line={line} />
             <LineText line={line} partner={partner} wrap={wrap} />
@@ -445,6 +549,7 @@ export function GapRows({
         <div role="rowgroup" data-gap-index={position} data-current={isCurrent} onClick={lines ? onSelect : undefined} style={{ position: "relative", cursor: lines && onSelect ? "pointer" : undefined }}>
             {isCurrent ? <CurrentBorder /> : undefined}
             <div role="row" data-line="gap" className="flex items-center" style={{ gap: "var(--space-3)", minHeight: "calc(var(--space-6) + var(--space-1))", background: "var(--color-raised)", color: "var(--color-text-muted)" }}>
+                <LineSelectCell line={undefined} />
                 {lines ? (
                     isShown ? (
                         <GapButton layout={layout} label={`Hide ${count}`} detail="Folds these lines away again." icon={faCompress} onClick={onToggle} />
@@ -487,6 +592,7 @@ export function HunkHeader({ hunk, layout, action }: { hunk: IHunk; layout: Diff
             className="flex items-center"
             style={{ gap: "var(--space-3)", minHeight: "calc(var(--space-6) + var(--space-1))", background: "var(--color-raised)", color: "var(--color-text-muted)" }}
         >
+            <LineSelectCell line={undefined} />
             <span className="flex-none" style={{ width: `calc(${GUTTER_WIDTH} * ${layout === "unified" ? 2 : 1})` }} />
             <span style={{ whiteSpace: "pre" }}>
                 {range}
@@ -539,8 +645,21 @@ export function DiffView({
     onMatchCount,
     onSelectHunk,
     onSelectGap,
+    lineSelection,
+    lineIndexes,
 }: IDiffViewProps): ReactNode {
     const hunks = useMemo(() => parseHunks(diff), [diff]);
+    const lineIds = useMemo(() => {
+        const ids = new Map<IDiffLine, string>();
+        hunks.forEach((hunk, position) => {
+            hunk.lines.forEach((line, index) => {
+                if (line.kind !== "context") {
+                    ids.set(line, `${hunkIndexes?.[position] ?? position}:${lineIndexes?.[position]?.[index] ?? index}`);
+                }
+            });
+        });
+        return ids;
+    }, [hunks, hunkIndexes, lineIndexes]);
     const gapCount = hunks.length + 1;
     const gaps = useMemo(() => Array.from({ length: gapCount }, (_, position) => gapBefore(hunks, position, oldFileLines?.length)), [hunks, gapCount, oldFileLines]);
     const allGapLines = useMemo(() => gaps.map(gap => (oldFileLines && gap.count > 0 ? gapLines(gap, oldFileLines) : undefined)), [gaps, oldFileLines]);
@@ -588,6 +707,7 @@ export function DiffView({
 
     return (
         <DiffSearchContext.Provider value={{ needle: search.trim(), current: currentMatch, firstMatch }}>
+        <LineSelectionContext.Provider value={lineSelection ? { ...lineSelection, idOf: line => lineIds.get(line) } : undefined}>
         <div
             role="table"
             aria-label={layout === "unified" ? "Unified diff" : "Side-by-side diff"}
@@ -627,6 +747,7 @@ export function DiffView({
             })}
             {gapRows(hunks.length)}
         </div>
+        </LineSelectionContext.Provider>
         </DiffSearchContext.Provider>
     );
 }

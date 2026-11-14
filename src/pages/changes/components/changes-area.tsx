@@ -33,8 +33,8 @@ import { FilePath } from "../../commit-explorer/components/file-path";
 import { LineCounts } from "../../commit-explorer/components/line-counts";
 import { Pane } from "../../commit-explorer/components/pane";
 import { countLines, FileDiffCard, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
-import { parseHunks, withHunkDiscarded as withHunkRemoved, withoutHunks } from "../../diff/model";
-import { initialStaging, isFileStaged, withFileToggled, withHunkDiscarded as withStagedHunkDiscarded, withHunkToggled, type IStaging } from "../../diff/staging";
+import { parseHunks, sectionDiff, withHunkDiscarded as withHunkRemoved, withLinesDiscarded, type ISectionDiff } from "../../diff/model";
+import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withLinesRenumbered, withFileToggled, withHunkDiscarded as withStagedHunkDiscarded, withHunkToggled, type IStaging } from "../../diff/staging";
 import { StatusLetter } from "../../tree";
 import { withViewTransition } from "../../../lib/view-transition";
 
@@ -80,13 +80,21 @@ export interface IListEntry {
 }
 
 //
-// Returns how much of a file is staged: all of it, some of its hunks, or none.
+// Returns how much of a file is staged: all of it, some of its hunks or lines, or none.
 //
 export function stagedState(staging: IStaging, hunkCount: number): "all" | "some" | "none" {
     if (isFileStaged(staging, hunkCount)) {
         return "all";
     }
-    return staging.hunks.size > 0 ? "some" : "none";
+    return isAnythingStaged(staging) ? "some" : "none";
+}
+
+//
+// Returns one side of a file's change as the split view shows it: the staged part or the unstaged
+// part, as `sectionDiff` works it out from the file's staging.
+//
+export function fileSectionDiff(file: IFileDiff, staging: IStaging, section: "staged" | "unstaged"): ISectionDiff {
+    return sectionDiff(file.diff ?? "", (hunk, index) => stagedLinesOf(staging, hunk, index), section);
 }
 //
 // The name of the card that shows the whole diff, as the runs of unchanged lines in it are named.
@@ -111,8 +119,8 @@ interface ISplitSection {
 export function splitSections(file: IFileDiff, staging: IStaging): ISplitSection[] {
     const all = Array.from({ length: parseHunks(file.diff ?? "").length }, (_unused, index) => index);
     return [
-        { title: "Staged", card: "Staged diff", hunks: all.filter(index => staging.hunks.has(index)), action: "unstage", empty: "Nothing in this file is staged." },
-        { title: "Unstaged", card: "Unstaged diff", hunks: all.filter(index => !staging.hunks.has(index)), action: "stage", empty: "Everything in this file is staged." },
+        { title: "Staged", card: "Staged diff", hunks: all.filter(index => hunkStagedState(staging, index) !== "none"), action: "unstage", empty: "Nothing in this file is staged." },
+        { title: "Unstaged", card: "Unstaged diff", hunks: all.filter(index => hunkStagedState(staging, index) !== "all"), action: "stage", empty: "Everything in this file is staged." },
     ];
 }
 
@@ -134,6 +142,7 @@ export function SplitDiff({
     cardRef,
     onDiscardFile,
     onDiscardHunk,
+    onDiscardLines,
     isMaximised,
     onToggleMaximise,
 }: {
@@ -147,6 +156,7 @@ export function SplitDiff({
     cardRef: (card: string) => Ref<IFileDiffCardHandle>;
     onDiscardFile: () => void;
     onDiscardHunk: (hunkIndex: number) => void;
+    onDiscardLines: (lines: ReadonlyMap<number, ReadonlySet<number>>) => void;
     isMaximised: boolean;
     onToggleMaximise: () => void;
 }): ReactNode {
@@ -170,8 +180,8 @@ export function SplitDiff({
                                 ref={cardRef(section.card)}
                                 file={file}
                                 label={section.card}
-                                onlyHunks={section.hunks}
-                                fileAction={section.action}
+                                section={section.action === "unstage" ? "staged" : "unstaged"}
+                                onDiscardLines={onDiscardLines}
                                 isCurrent={isCurrent && ((currentHunk !== undefined && section.hunks.includes(currentHunk)) || (currentStop?.kind === "gap" && currentStop.card === section.card))}
                                 currentHunk={currentHunk}
                                 currentGap={currentStop?.kind === "gap" && currentStop.card === section.card ? currentStop.gap : undefined}
@@ -255,7 +265,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [diffMode, setDiffMode] = useState<"one" | "split">("one");
     const [maximised, setMaximised] = useState<0 | 1 | 2 | undefined>(undefined);
     const [fileSearch, setFileSearch] = useState("");
-    const [pendingDiscard, setPendingDiscard] = useState<{ path: string; hunk?: number } | undefined>(undefined);
+    const [pendingDiscard, setPendingDiscard] = useState<{ path: string; hunk?: number; lines?: ReadonlyMap<number, ReadonlySet<number>> } | undefined>(undefined);
     const areaRef = useRef<HTMLDivElement>(null);
     const shownFiles = files.filter(file => `${file.oldPath ?? ""} ${file.path}`.toLowerCase().includes(fileSearch.trim().toLowerCase()));
     const selectedFile = files.find(file => file.path === selectedPath);
@@ -304,18 +314,14 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Returns the hunks a row leaves out of its line counts: the unstaged hunks for a row under
-    // Staged, the staged hunks for a row under Unstaged, and none in one diff.
+    // Returns the diff a row counts its lines from: the staged part for a row under Staged, the
+    // unstaged part for a row under Unstaged, and the whole change in one diff.
     //
-    function sectionHunksOf(file: IFileDiff, section: ListSection): ReadonlySet<number> | undefined {
-        if (section === "all") {
-            return undefined;
+    function rowDiffOf(file: IFileDiff, section: ListSection): string | undefined {
+        if (section === "all" || file.diff === undefined) {
+            return file.diff;
         }
-        const staged = stagingOf(file).hunks;
-        if (section === "unstaged") {
-            return staged;
-        }
-        return new Set(Array.from({ length: hunkCountOf(file) }, (_unused, index) => index).filter(index => !staged.has(index)));
+        return fileSectionDiff(file, stagingOf(file), section).diff;
     }
 
     //
@@ -324,10 +330,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     //
     function toggleEntry(entry: IListEntry): void {
         if (entry.section === "staged") {
-            setStaging(entry.file.path, { hunks: new Set(), isWholeFile: false });
+            setStaging(entry.file.path, emptyStaging());
         }
         else if (entry.section === "unstaged") {
-            setStaging(entry.file.path, withFileToggled({ hunks: new Set(), isWholeFile: false }, hunkCountOf(entry.file)));
+            setStaging(entry.file.path, withFileToggled(emptyStaging(), hunkCountOf(entry.file)));
         }
         else {
             toggleFile(entry.file);
@@ -346,14 +352,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         if (diffMode === "one" || hunkCountOf(selectedFile) === 0) {
             return diffStops(selectedFile.diff, selectedFile.oldFileLines, undefined, ONE_DIFF_CARD);
         }
-        const diff = selectedFile.diff;
-        const count = hunkCountOf(selectedFile);
         return splitSections(selectedFile, stagingOf(selectedFile)).flatMap(section => {
             if (section.hunks.length === 0) {
                 return [];
             }
-            const dropped = new Set(Array.from({ length: count }, (_unused, index) => index).filter(index => !section.hunks.includes(index)));
-            return diffStops(withoutHunks(diff, dropped), selectedFile.oldFileLines, section.hunks, section.card);
+            const side = fileSectionDiff(selectedFile, stagingOf(selectedFile), section.action === "unstage" ? "staged" : "unstaged");
+            return diffStops(side.diff, selectedFile.oldFileLines, side.hunkIndexes, section.card);
         });
     }
 
@@ -380,7 +384,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             const staging = stagingOf(file);
             const state = stagedState(staging, hunkCountOf(file));
             if (state === "some" && file.diff !== undefined) {
-                left.push({ ...file, diff: withoutHunks(file.diff, staging.hunks), stagedHunks: undefined });
+                left.push({ ...file, diff: fileSectionDiff(file, staging, "unstaged").diff, stagedHunks: undefined });
             }
             else if (state === "none") {
                 left.push(file);
@@ -406,10 +410,14 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         if (!pendingDiscard) {
             return;
         }
-        const { path, hunk } = pendingDiscard;
+        const { path, hunk, lines } = pendingDiscard;
         setPendingDiscard(undefined);
         const file = files.find(candidate => candidate.path === path);
         if (!file) {
+            return;
+        }
+        if (lines) {
+            discardLines(file, lines);
             return;
         }
         const isLastChange = hunk === undefined || hunkCountOf(file) <= 1;
@@ -435,6 +443,46 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         }
     }
 
+    //
+    // Throws away the picked lines of `file`, `lines` giving each hunk's line positions, last hunk
+    // first so the earlier hunks keep their positions. A hunk with no changes left drops out, and a
+    // file with no hunks left leaves the list. The staging of the lines that stay follows them.
+    //
+    function discardLines(file: IFileDiff, lines: ReadonlyMap<number, ReadonlySet<number>>): void {
+        let diff = file.diff ?? "";
+        let staging = stagingOf(file);
+        for (const hunk of [...lines.keys()].sort((a, b) => b - a)) {
+            const before = parseHunks(diff);
+            const result = withLinesDiscarded(diff, hunk, lines.get(hunk) ?? new Set());
+            diff = result.diff;
+            staging = result.lineMap === undefined ? withStagedHunkDiscarded(staging, hunk) : withLinesRenumbered(staging, before[hunk], hunk, result.lineMap, parseHunks(diff)[hunk]);
+        }
+        if (parseHunks(diff).length === 0) {
+            const index = files.indexOf(file);
+            const left = files.filter(candidate => candidate !== file);
+            setFiles(left);
+            if (selectedPath === file.path) {
+                setSelectedPath(left[Math.min(index, left.length - 1)]?.path);
+            }
+        }
+        else {
+            setFiles(files.map(candidate => (candidate === file ? { ...file, diff, stagedHunks: undefined } : candidate)));
+            setStaging(file.path, staging);
+        }
+        setCurrentHunk(undefined);
+    }
+
+    //
+    // Returns the discard dialog's title for what waits to be discarded: a file, a change or lines.
+    //
+    function discardTitle(): string {
+        if (pendingDiscard?.lines) {
+            const count = [...pendingDiscard.lines.values()].reduce((total, lines) => total + lines.size, 0);
+            return `Discard ${count} ${count === 1 ? "line" : "lines"}?`;
+        }
+        return pendingDiscard?.hunk === undefined ? "Discard the file's changes?" : "Discard this change?";
+    }
+
     function onKeyDown(event: KeyboardEvent): void {
         if (event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target, event.key)) {
             return;
@@ -444,6 +492,14 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             event.preventDefault();
             toggleMaximise(activePane);
             return;
+        }
+        if (activePane === 1 && !event.shiftKey) {
+            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
+            const handled = cards.map(card => cardRefs.current.get(card)?.handleOptionKey(key) === true);
+            if (handled.includes(true)) {
+                event.preventDefault();
+                return;
+            }
         }
         if (activePane === 2 || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Escape", " "].includes(key)) {
             return;
@@ -589,8 +645,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     {entries.map((entry, index) => {
                                         const { file, section } = entry;
                                         const state = stagedState(stagingOf(file), hunkCountOf(file));
-                                        const sectionHunks = sectionHunksOf(file, section);
-                                        const counts = countLines(sectionHunks === undefined || file.diff === undefined ? file.diff : withoutHunks(file.diff, sectionHunks));
+                                        const counts = countLines(rowDiffOf(file, section));
                                         const heading = section !== "all" && entries[index - 1]?.section !== section;
                                         const isChecked = section === "staged" ? true : section === "unstaged" ? false : state === "all";
                                         const isPartial = section === "all" && state === "some";
@@ -655,6 +710,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 }}
                                 onDiscardFile={() => setPendingDiscard({ path: selectedFile.path })}
                                 onDiscardHunk={hunk => setPendingDiscard({ path: selectedFile.path, hunk })}
+                                onDiscardLines={lines => setPendingDiscard({ path: selectedFile.path, lines })}
                                 isMaximised={maximised === 1}
                                 onToggleMaximise={() => toggleMaximise(1)}
                                 onSelectHunk={hunk => {
@@ -681,6 +737,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     answersKeys={false}
                                     onDiscardFile={() => setPendingDiscard({ path: selectedFile.path })}
                                     onDiscardHunk={hunk => setPendingDiscard({ path: selectedFile.path, hunk })}
+                                    onDiscardLines={lines => setPendingDiscard({ path: selectedFile.path, lines })}
                                     isMaximised={maximised === 1}
                                     onToggleMaximise={() => toggleMaximise(1)}
                                     onSelectHunk={hunk => {
@@ -789,12 +846,14 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 ))}
             </div>
             <Dialog open={pendingDiscard !== undefined} onClose={() => setPendingDiscard(undefined)} container={() => areaRef.current} maxWidth="xs" fullWidth={true}>
-                <DialogTitle>{pendingDiscard?.hunk === undefined ? "Discard the file's changes?" : "Discard this change?"}</DialogTitle>
+                <DialogTitle>{discardTitle()}</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        {pendingDiscard?.hunk === undefined
-                            ? `Puts ${pendingDiscard?.path ?? ""} back as it was in the last commit.`
-                            : `Puts this part of ${pendingDiscard.path} back as it was in the last commit.`}{" "}
+                        {pendingDiscard?.lines
+                            ? `Puts these lines of ${pendingDiscard.path} back as they were in the last commit.`
+                            : pendingDiscard?.hunk === undefined
+                              ? `Puts ${pendingDiscard?.path ?? ""} back as it was in the last commit.`
+                              : `Puts this part of ${pendingDiscard.path} back as it was in the last commit.`}{" "}
                         Discarded changes are gone for good.
                     </DialogContentText>
                 </DialogContent>

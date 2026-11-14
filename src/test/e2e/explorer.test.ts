@@ -723,7 +723,9 @@ test.describe("Diff", () => {
     test("the layout switch shows the old and new files side by side, striping a side with no line", async ({ page }) => {
         await page.goto("/page/diff?components=light");
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
-        await card.getByRole("button", { name: "Side by side" }).click();
+        await card.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Side by side" }).click();
+        await page.keyboard.press("Escape");
         const diff = card.getByRole("table", { name: "Side-by-side diff" });
         await expect(diff.locator('[data-side="old"][data-line="deleted"]')).toHaveCount(3);
         await expect(diff.locator('[data-side="new"][data-line="added"]')).toHaveCount(5);
@@ -735,7 +737,9 @@ test.describe("Diff", () => {
         const card = page.locator("main section.mb-10").filter({ has: page.getByRole("heading", { name: "Long lines" }) }).getByRole("region", { name: "docs/user-guide.md" }).first();
         const row = card.locator('[data-line="added"]');
         const oneRowHeight = (await row.boundingBox())!.height;
-        await card.getByRole("button", { name: "Wrap long lines" }).click();
+        await card.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByLabel("Wrap long lines").click();
+        await page.keyboard.press("Escape");
         await expect.poll(async () => (await row.boundingBox())!.height).toBeGreaterThan(oneRowHeight * 1.5);
     });
 
@@ -904,26 +908,34 @@ test.describe("File paths, staging and tooltips", () => {
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         const context = card.locator('[data-line="context"]');
         const before = await context.count();
-        await card.getByRole("button", { name: "Show the whole file" }).click();
+        await card.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Show the whole file" }).click();
+        await page.keyboard.press("Escape");
         await expect(context).toHaveCount(before + 30);
-        await card.getByRole("button", { name: "Show the whole file" }).click();
+        await card.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Show only the changes" }).click();
+        await page.keyboard.press("Escape");
         await expect(context).toHaveCount(before);
     });
 
-    test("line counts and status letters explain themselves in a tooltip", async ({ page }) => {
+    test("the info button lists the change's stats with labels", async ({ page }) => {
         await page.goto("/page/diff?components=light");
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
-        await card.getByLabel("5 lines added, 3 lines deleted").hover();
-        await expect(page.getByRole("tooltip").filter({ hasText: "5 lines added, 3 lines deleted" })).toBeVisible();
-        await card.getByLabel("modified").hover();
-        await expect(page.getByRole("tooltip").filter({ hasText: "Modified" })).toBeVisible();
+        await card.getByRole("button", { name: "Change details" }).click();
+        const info = page.getByRole("dialog", { name: "Change details" });
+        await expect(info).toContainText("ChangeModified");
+        await expect(info).toContainText("Lines added5");
+        await expect(info).toContainText("Lines deleted3");
+        await expect(info).toContainText("Changes2 hunks");
     });
 
     test("the commit explorer's file pane switches to side by side", async ({ page }) => {
         await page.goto("/page/commit-explorer?components=light");
         const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
         const file = explorer.getByRole("region", { name: "File diff" });
-        await file.getByRole("button", { name: "Side by side" }).click();
+        await file.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Side by side" }).click();
+        await page.keyboard.press("Escape");
         await expect(file.getByRole("table", { name: "Side-by-side diff" })).toBeVisible();
     });
 });
@@ -1042,7 +1054,9 @@ test.describe("Whole file, search in shown lines and clicking panes", () => {
         const find = card.getByRole("textbox", { name: "Find in this diff" });
         await find.fill("zoomIn");
         await expect(card).toContainText("No matches");
-        await card.getByRole("button", { name: "Show the whole file" }).click();
+        await card.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Show the whole file" }).click();
+        await page.keyboard.press("Escape");
         await expect(card).toContainText("1 of 1");
         await expect(card.locator('[data-search-match="0"]')).toBeVisible();
     });
@@ -1052,10 +1066,12 @@ test.describe("Whole file, search in shown lines and clicking panes", () => {
         const section = page.locator("section", { has: page.getByRole("heading", { name: "A file with several changes" }) });
         const explorer = section.getByRole("application", { name: "Commit explorer" }).first();
         const pane = explorer.getByRole("region", { name: "File diff" });
-        const toggle = pane.getByRole("button", { name: "Show the whole file" });
-        await expect(toggle).toBeEnabled();
         const before = await pane.locator('[role="row"]').count();
+        await pane.getByRole("button", { name: "Diff options" }).click();
+        const toggle = page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Show the whole file" });
+        await expect(toggle).toBeEnabled();
         await toggle.click();
+        await page.keyboard.press("Escape");
         await expect.poll(() => pane.locator('[role="row"]').count()).toBeGreaterThan(before);
     });
 
@@ -1082,7 +1098,8 @@ test.describe("Discarding changes", () => {
         await card.getByRole("button", { name: "Discard this hunk" }).last().click();
         await dialog.getByRole("button", { name: "Discard" }).click();
         await expect(card.locator("[data-hunk-index]")).toHaveCount(1);
-        await expect(card).toContainText("+3−2");
+        await expect(card.locator('[data-line="added"]')).toHaveCount(3);
+        await expect(card.locator('[data-line="deleted"]')).toHaveCount(2);
     });
 
     test("discarding a file takes it out of the list", async ({ page }) => {
@@ -1134,5 +1151,79 @@ test.describe("Runs of unchanged lines and the full commit details", () => {
         await expect(full).toContainText("The help panel in the right sidebar lists the commands");
         await expect(full.getByRole("button", { name: "Copy summary" })).toBeVisible();
         await expect(full.getByRole("button", { name: "Copy description" })).toBeVisible();
+    });
+});
+
+test.describe("Diff options and picking lines", () => {
+    test("the options dialog names every option with its key, and the keys work", async ({ page }) => {
+        await page.goto("/page/diff?components=light");
+        const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
+        await card.getByRole("button", { name: "Diff options" }).click();
+        const dialog = page.getByRole("dialog", { name: "Diff options" });
+        for (const label of ["Lines shown", "Layout", "Wrap long lines", "Stage and discard"]) {
+            await expect(dialog).toContainText(label);
+        }
+        await page.keyboard.press("Escape");
+        await card.focus();
+        await page.keyboard.press("l");
+        await expect(card.getByRole("table", { name: "Side-by-side diff" })).toBeVisible();
+    });
+
+    test("picked lines stage on their own and show apart in the split view", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" });
+        await area.getByRole("button", { name: ".gitignore", exact: true }).click();
+        const diff = area.getByRole("region", { name: "File diff" });
+        await diff.getByRole("button", { name: "Pick lines" }).click();
+        await diff.getByLabel("Select line 3").click();
+        await diff.getByRole("button", { name: "Stage lines", exact: true }).click();
+        await expect(diff.getByLabel("Staged")).toHaveCount(1);
+        await area.getByRole("button", { name: "Staged and unstaged" }).click();
+        const staged = area.getByRole("region", { name: "Staged diff", exact: true });
+        await expect(staged.locator('[data-line="added"]')).toHaveCount(1);
+        await expect(staged).toContainText("tmp/");
+        const unstaged = area.getByRole("region", { name: "Unstaged diff" });
+        await expect(unstaged.locator('[data-line="added"]')).toHaveCount(1);
+        await expect(unstaged.locator('[data-line="deleted"]')).toHaveCount(1);
+    });
+
+    test("discarding picked lines asks first, then puts them back", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" });
+        const diff = area.getByRole("region", { name: "File diff" });
+        await diff.getByRole("button", { name: "Pick lines" }).click();
+        await diff.getByLabel("Select line 8").click();
+        await diff.getByRole("button", { name: "Discard lines" }).click();
+        await area.getByRole("dialog", { name: "Discard 1 line?" }).getByRole("button", { name: "Discard" }).click();
+        await expect(diff).not.toContainText("DEFAULT_LEVEL = 1");
+        await expect(diff.locator('[data-line="added"]')).toHaveCount(4);
+    });
+});
+
+test.describe("Popups and the page scrollbar", () => {
+    test("opening a dropdown dialog leaves the page free to scroll", async ({ page }) => {
+        await page.goto("/page/diff?components=light");
+        const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
+        await card.getByRole("button", { name: "Change details" }).click();
+        await expect(page.getByRole("dialog", { name: "Change details" })).toBeVisible();
+        expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe("visible");
+    });
+});
+
+test.describe("Danger icon buttons", () => {
+    test("the Discard icon buttons draw their icon and border in the danger colour", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const button = page.getByRole("application", { name: "Changes" }).getByRole("button", { name: "Discard this file" });
+        const colours = await button.evaluate(element => {
+            const style = getComputedStyle(element);
+            const probe = document.createElement("span");
+            probe.style.color = "var(--color-danger)";
+            element.parentElement!.appendChild(probe);
+            const danger = getComputedStyle(probe).color;
+            probe.remove();
+            return { color: style.color, shadow: style.boxShadow, danger };
+        });
+        expect(colours.color).toBe(colours.danger);
+        expect(colours.shadow).toContain(colours.danger);
     });
 });
