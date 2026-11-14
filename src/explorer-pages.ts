@@ -8,7 +8,9 @@ import { ButtonPage } from "./pages/button";
 import { TextBoxPage } from "./pages/text-box";
 import { DialogPage } from "./pages/dialog";
 import { ChoicesPage } from "./pages/choices";
+import { choices } from "./pages/choices/options";
 import { FontsPage } from "./pages/fonts";
+import { CommitGraphPage } from "./pages/commit-graph";
 
 //
 // One page in the explorer.
@@ -37,7 +39,7 @@ export interface IExplorerPage {
 
 //
 // Every page in the explorer, in sidebar order. The overview comes first because it is the
-// page the explorer opens on.
+// page the explorer opens on. The choices page is listed only while a choice is open.
 //
 export const explorerPages: IExplorerPage[] = [
     {
@@ -53,11 +55,21 @@ export const explorerPages: IExplorerPage[] = [
         component: FontsPage,
     },
     {
-        id: "choices",
-        title: "Choices",
-        keywords: ["options", "pick", "decide", "grey", "accent", "status", "git", "fonts"],
-        component: ChoicesPage,
+        id: "commit-graph",
+        title: "Commit graph",
+        keywords: ["lanes", "branch", "merge", "history", "commits"],
+        component: CommitGraphPage,
     },
+    ...(choices.length > 0
+        ? [
+              {
+                  id: "choices",
+                  title: "Choices",
+                  keywords: ["options", "pick", "decide"],
+                  component: ChoicesPage,
+              },
+          ]
+        : []),
     {
         id: "button",
         title: "Button",

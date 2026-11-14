@@ -13,19 +13,22 @@ The work to flesh out the Graft style guide, in the order of `process.md`. Each 
 - [x] Status colours: success, warning, danger and info.
 - [x] Git colours: diff added, diff removed, conflict and the branch lane colours of the commit graph.
 - [x] Fonts: the UI font and the monospace font for code, hashes and diffs.
-- [ ] Type scale, weights and line heights.
-- [ ] Spacing scale and how dense the UI is.
-- [ ] Corner radius.
-- [ ] Shadows for raised panels and overlays.
-- [ ] Animation durations and easing.
-- [ ] Icon sizes.
+- [x] Type scale, weights and line heights.
+- [x] Spacing scale and how dense the UI is.
+- [x] Corner radius.
+- [x] Shadows for raised panels and overlays.
+- [x] Animation durations and easing.
+- [x] Icon sizes.
 
 ## Role tokens
 
-- [ ] Light and dark values for every role token: background, panel, raised, border, text, muted text, accent, focus, the status colours and the Git colours.
-- [ ] Focus ring: colour, width and offset.
-- [ ] Hover, selected and disabled colours for lists, rows and controls.
-- [ ] Contrast check of every text and control colour against WCAG 2.2 AA, with the ratios recorded.
+- [x] Light and dark values for every role token: background, panel, raised, border, text, muted text, accent, focus, the status colours and the Git colours.
+- [x] Focus ring: colour, width and offset.
+- [x] Hover colour for rows and menu items.
+- [x] Selected colour for rows.
+- [x] Disabled colours for controls.
+- [x] Control border colour.
+- [x] Contrast check of every text and control colour against WCAG 2.2 AA, with the ratios recorded.
 
 ## Components
 

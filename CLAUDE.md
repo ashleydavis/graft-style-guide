@@ -6,7 +6,7 @@ Follow [process.md](process.md), one step per message.
 - `graft.css` is the only source of token values. `style-guide.md` and `areas/*.md` refer to tokens by name and never repeat a value.
 - Raw palette tokens hold values. Role tokens point at raw palette tokens. Components and rules use role tokens only.
 - Every style has a light and a dark version: every role token (colours, shadows, borders, focus rings and every other value components use) has a light and a dark value, even when the two are the same. Every option, preview and rule covers both themes.
-- At each choice, offer two or three options on the style explorer and let the developer pick. Never pick for them.
+- At each choice, offer two or three options on the style explorer and let the developer pick. Never pick for them. Every choice also has a last option, "Spot it", that paints the choice's tokens bright red to show where they appear. One choice decides one thing the preview shows plainly.
 - Anchor every rule to a token or a number, never to an adjective alone.
 - Check text and control contrast against WCAG 2.2 AA by computing the ratio, and report the figure.
 - `graft.css` needs no build step. No JSON token files.
@@ -15,7 +15,7 @@ Follow [process.md](process.md), one step per message.
 - A component outside MUI's set is built in React, HTML and TypeScript, styled with Tailwind first and raw CSS where Tailwind fails.
 - A component made of other components follows the same order for each part: styled MUI components first, then Tailwind, then raw CSS.
 - `docs/` holds the built site for GitHub Pages, written by `bun run build`. Rebuild it after every change to `graft.css` or `src/`, so the committed site matches the source.
-- While working with the developer, keep the dev server running (`bun run dev`, port 5199) and the explorer open in Chrome at http://localhost:5199/. At the start of a session, start the server if it is down and open the page with `google-chrome --new-window`. After any change to `vite.config.ts`, stop the dev server process and start a new one: Vite's restart inside the same process leaves open browser connections on the closed server, which answers "The server is being restarted or closed". After moving or renaming a file under `src/`, do the same, then load the pages that import it on port 5199 and check they render.
+- While working with the developer, keep the dev server running (`bun run dev`, port 5199) and the explorer open in Chrome at http://localhost:5199/. At the start of a session, start the server if it is down and open the page with `google-chrome --new-window`. After any change to `vite.config.ts`, stop the dev server process and start a new one: Vite's restart inside the same process leaves open browser connections on the closed server, which answers "The server is being restarted or closed". After moving, renaming or deleting a file under `src/`, do the same, then load the pages that import it on port 5199 and check they render.
 - The pre-commit hook runs `scripts/test-everything.sh`. Install it in every new clone or worktree with `./scripts/install-hooks.sh`, and never commit with `--no-verify`. When the hook refuses a commit, fix the cause and commit again.
 - Keep updating `how-we-built-it.md` as the style guide work continues: after every pick, setup change, new tool or problem solved, add it there in simple terms, in the same reply as the change.
 - Run commands through mise. The explorer's dev server is `bun run dev` on port 5199.

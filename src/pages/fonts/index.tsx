@@ -1,6 +1,6 @@
 //
-// The fonts page: the UI font and the monospace font in use, at every size and weight in
-// graft.css, with the characters that are easy to mix up in hashes and code.
+// The fonts page: the UI font and the monospace font in use, at every size, weight and line
+// height in graft.css, with the characters that are easy to mix up in hashes and code.
 //
 
 import type { ReactNode } from "react";
@@ -116,6 +116,33 @@ export function FontsPage(): ReactNode {
                                 >
                                     e4f5a6b
                                 </span>
+                            </div>
+                            <TokenLabel name={name} />
+                        </div>
+                    ))}
+                </div>
+            </Section>
+
+            <Section
+                title="Line heights"
+                description="Tight for headings and single lines such as list rows, normal for running text such as commit descriptions."
+            >
+                <div
+                    className="flex flex-col"
+                    style={{
+                        gap: "var(--space-4)",
+                    }}
+                >
+                    {["--leading-tight", "--leading-normal"].map(name => (
+                        <div key={name}>
+                            <div
+                                style={{
+                                    lineHeight: `var(${name})`,
+                                    maxWidth: "420px",
+                                }}
+                            >
+                                Walks both parents to find the nearest common ancestor instead of stopping at the first
+                                match, so a merge of two long-lived branches finds the right base.
                             </div>
                             <TokenLabel name={name} />
                         </div>

@@ -4,17 +4,41 @@
 // it, so each option is seen in use and not only as swatches.
 //
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import TextField from "@mui/material/TextField";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faArrowsRotate, faCodeBranch, faEllipsis } from "@fortawesome/free-solid-svg-icons";
 
 //
-// Renders the screen. Tokens that are still open choices, such as --color-info and the lane
-// colours, fall back to existing role tokens until the choice is made.
+// Renders the screen. The commit menu starts open when `menuStartsOpen` is true, so its overlay
+// shadow shows straight away, and the "More actions" button closes and opens it with the motion
+// tokens. Commit rows
+// highlight on hover with the fast duration. The Push button in the status bar is disabled.
+// With `showFocus` the Fetch button is drawn with the focus ring, as it looks when reached with
+// the keyboard. With `showHover` the first commit row and the first menu item are drawn with the
+// hover background, as they look under the pointer. `lanes` names the three lane colours the
+// commit graph draws, from left to right.
 //
-export function MiniGraft(): ReactNode {
+export function MiniGraft({
+    showFocus = false,
+    showHover = false,
+    menuStartsOpen = true,
+    lanes = [1, 2, 3],
+}: {
+    showFocus?: boolean;
+    showHover?: boolean;
+    menuStartsOpen?: boolean;
+    lanes?: number[];
+}): ReactNode {
+    const [isMenuOpen, setIsMenuOpen] = useState(menuStartsOpen);
+
     return (
         <div
+            className="relative"
             style={{
+                lineHeight: "var(--leading-normal)",
                 background: "var(--color-bg)",
                 color: "var(--color-text)",
                 border: "1px solid var(--color-border)",
@@ -25,9 +49,7 @@ export function MiniGraft(): ReactNode {
             }}
         >
             <div
-                className="flex items-center"
                 style={{
-                    gap: "var(--space-2)",
                     padding: "var(--space-2) var(--space-3)",
                     background: "var(--color-panel)",
                     borderBottom: "1px solid var(--color-border)",
@@ -36,12 +58,16 @@ export function MiniGraft(): ReactNode {
                 <span
                     style={{
                         fontWeight: "var(--weight-bold)",
+                        fontSize: "var(--text-lg)",
+                        lineHeight: "var(--leading-tight)",
                     }}
                 >
                     graft
                 </span>
                 <span
+                    className="inline-flex items-center"
                     style={{
+                        gap: "var(--space-1)",
                         padding: "0 var(--space-2)",
                         borderRadius: "var(--radius-full)",
                         background: "var(--color-accent)",
@@ -50,12 +76,46 @@ export function MiniGraft(): ReactNode {
                         fontFamily: "var(--font-mono)",
                     }}
                 >
+                    <FontAwesomeIcon
+                        icon={faCodeBranch}
+                        style={{
+                            fontSize: "var(--icon-sm)",
+                        }}
+                    />
                     main
                 </span>
                 <span className="flex-1" />
-                <Button variant="contained" size="small">
+                <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<FontAwesomeIcon icon={faArrowsRotate} />}
+                    style={
+                        showFocus
+                            ? {
+                                  outline: "var(--focus-ring-width) solid var(--color-focus)",
+                                  outlineOffset: "var(--focus-ring-offset)",
+                              }
+                            : undefined
+                    }
+                >
                     Fetch
                 </Button>
+                <IconButton size="small" aria-label="More actions" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                    <FontAwesomeIcon icon={faEllipsis} />
+                </IconButton>
+            </div>
+            <CommitMenu isOpen={isMenuOpen} showHover={showHover} />
+
+            <div
+                className="flex items-center"
+                style={{
+                    gap: "var(--space-2)",
+                    padding: "var(--space-2) var(--space-3)",
+                    background: "var(--color-panel)",
+                    borderBottom: "1px solid var(--color-border)",
+                }}
+            >
+                <TextField size="small" fullWidth placeholder="Filter commits" />
             </div>
 
             <div
@@ -82,28 +142,54 @@ export function MiniGraft(): ReactNode {
                         lane: 3,
                         isSelected: false,
                     },
-                ].map(commit => (
+                ].map((commit, commitIndex) => (
                     <div
                         key={commit.hash}
-                        className="flex items-center"
+                        className={commit.isSelected ? "flex" : "flex hover:bg-(color:--color-hover)"}
                         style={{
                             gap: "var(--space-2)",
-                            padding: "var(--space-1) var(--space-3)",
-                            background: commit.isSelected ? "var(--color-raised)" : "transparent",
+                            padding: "0 var(--space-3)",
+                            background: commit.isSelected ? "var(--color-selected)" : showHover && commitIndex === 0 ? "var(--color-hover)" : undefined,
                             borderLeft: commit.isSelected ? "2px solid var(--color-accent)" : "2px solid transparent",
+                            boxShadow: commit.isSelected ? "var(--shadow-raised)" : "none",
+                            transition: "background-color var(--duration-fast) var(--ease-standard)",
                         }}
                     >
-                        <LaneMarks activeLane={commit.lane} />
-                        <span className="flex-1 truncate">{commit.message}</span>
-                        <span
+                        <LaneMarks lanes={lanes} activeLane={commit.lane} ringColour={commit.isSelected ? "var(--color-selected)" : "var(--color-panel)"} />
+                        <div
+                            className="min-w-0 flex-1"
                             style={{
-                                fontFamily: "var(--font-mono)",
-                                fontSize: "var(--text-sm)",
-                                color: "var(--color-text-muted)",
+                                padding: "var(--space-1) 0",
                             }}
                         >
-                            {commit.hash}
-                        </span>
+                            <div
+                                className="flex items-center"
+                                style={{
+                                    gap: "var(--space-2)",
+                                }}
+                            >
+                                <span className="flex-1 truncate">{commit.message}</span>
+                                <span
+                                    style={{
+                                        fontFamily: "var(--font-mono)",
+                                        fontSize: "var(--text-sm)",
+                                        color: "var(--color-text-muted)",
+                                    }}
+                                >
+                                    {commit.hash}
+                                </span>
+                            </div>
+                            {commit.isSelected ? (
+                                <div
+                                    style={{
+                                        fontSize: "var(--text-sm)",
+                                        color: "var(--color-text-muted)",
+                                    }}
+                                >
+                                    Walks both parents to find the nearest common ancestor instead of stopping at the first match.
+                                </div>
+                            ) : undefined}
+                        </div>
                     </div>
                 ))}
             </div>
@@ -148,44 +234,113 @@ export function MiniGraft(): ReactNode {
                 <StatusItem colour="var(--color-warning)" label="2 behind" />
                 <StatusItem colour="var(--color-danger)" label="1 conflict" />
                 <StatusItem colour="var(--color-info, var(--color-accent))" label="Fetching" />
+                <span className="flex-1" />
+                <Button variant="contained" size="small" disabled>
+                    Push
+                </Button>
             </div>
         </div>
     );
 }
 
 //
-// Renders three graph lanes with a dot on `activeLane`, coloured by the lane tokens.
+// Renders the commit menu below the "More actions" button, on the overlay shadow. Opening and
+// closing fade and slide it with the normal duration and the standard easing. With `showHover`
+// the first item is drawn with the hover background.
 //
-export function LaneMarks({ activeLane }: { activeLane: number }): ReactNode {
+export function CommitMenu({ isOpen, showHover }: { isOpen: boolean; showHover: boolean }): ReactNode {
     return (
-        <svg width="36" height="18" viewBox="0 0 36 18" aria-hidden="true">
-            {[1, 2, 3].map(lane => (
-                <g key={lane}>
-                    <line
-                        x1={lane * 10}
-                        y1="0"
-                        x2={lane * 10}
-                        y2="18"
-                        strokeWidth="2"
-                        style={{
-                            stroke: `var(--color-lane-${lane}, var(--color-accent))`,
-                        }}
-                    />
-                    {lane === activeLane ? (
-                        <circle
-                            cx={lane * 10}
-                            cy="9"
-                            r="4"
-                            style={{
-                                fill: `var(--color-lane-${lane}, var(--color-accent))`,
-                                stroke: "var(--color-panel)",
-                                strokeWidth: 2,
-                            }}
-                        />
-                    ) : undefined}
-                </g>
+        <div
+            role="menu"
+            aria-hidden={!isOpen}
+            className="absolute flex flex-col"
+            style={{
+                top: "calc(var(--space-2) * 2 + 28px)",
+                right: "var(--space-2)",
+                zIndex: 1,
+                padding: "var(--space-1)",
+                background: "var(--color-panel)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-overlay)",
+                fontSize: "var(--text-sm)",
+                opacity: isOpen ? 1 : 0,
+                transform: isOpen ? "none" : "translateY(calc(var(--space-2) * -1)) scale(0.96)",
+                transformOrigin: "top right",
+                pointerEvents: isOpen ? "auto" : "none",
+                transition: "opacity var(--duration-normal) var(--ease-standard), transform var(--duration-normal) var(--ease-standard)",
+            }}
+        >
+            {["Check out", "Cherry-pick", "Copy hash"].map((item, itemIndex) => (
+                <div
+                    key={item}
+                    role="menuitem"
+                    className="hover:bg-(color:--color-hover)"
+                    style={{
+                        background: showHover && itemIndex === 0 ? "var(--color-hover)" : undefined,
+                        padding: "var(--space-1) var(--space-3)",
+                        borderRadius: "var(--radius-sm)",
+                        transition: "background-color var(--duration-fast) var(--ease-standard)",
+                    }}
+                >
+                    {item}
+                </div>
             ))}
-        </svg>
+            <div
+                role="menuitem"
+                aria-disabled="true"
+                style={{
+                    padding: "var(--space-1) var(--space-3)",
+                    color: "var(--color-text-disabled)",
+                }}
+            >
+                Revert (uncommitted changes)
+            </div>
+        </div>
+    );
+}
+
+//
+// Renders a graph lane for each lane colour in `lanes`, with a dot on the lane at position
+// `activeLane`, from 1, coloured by the lane tokens. The lanes
+// run the full height of the row, so they join the lanes of the rows above and below without a
+// break. The dot sits on the middle of the commit message line, with a ring in `ringColour`,
+// the row's background, so it stands clear of the lane line.
+//
+export function LaneMarks({ lanes, activeLane, ringColour }: { lanes: number[]; activeLane: number; ringColour: string }): ReactNode {
+    return (
+        <div
+            aria-hidden="true"
+            className="relative shrink-0"
+            style={{
+                width: "36px",
+            }}
+        >
+            {lanes.map((lane, laneIndex) => (
+                <div
+                    key={lane}
+                    data-lane={lane}
+                    className="absolute top-0 bottom-0"
+                    style={{
+                        left: `${(laneIndex + 1) * 10 - 1}px`,
+                        width: "2px",
+                        background: `var(--color-lane-${lane}, var(--color-accent))`,
+                    }}
+                />
+            ))}
+            <div
+                className="absolute"
+                style={{
+                    left: `${activeLane * 10 - 5}px`,
+                    top: "calc(var(--space-1) + var(--text-md) * var(--leading-normal) / 2 - 5px)",
+                    width: "10px",
+                    height: "10px",
+                    borderRadius: "var(--radius-full)",
+                    background: `var(--color-lane-${lanes[activeLane - 1]}, var(--color-accent))`,
+                    boxShadow: `0 0 0 2px ${ringColour}`,
+                }}
+            />
+        </div>
     );
 }
 

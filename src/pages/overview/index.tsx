@@ -4,6 +4,8 @@
 //
 
 import type { ReactNode } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCodeBranch } from "@fortawesome/free-solid-svg-icons";
 import { Section } from "../../components/section";
 import { Swatch } from "./components/swatch";
 import { TokenLabel } from "../../components/token-label";
@@ -20,14 +22,14 @@ export function OverviewPage(): ReactNode {
             >
                 <div className="flex flex-col gap-4">
                     {[
-                        ["--gray-0", "--gray-50", "--gray-100", "--gray-200", "--gray-300", "--gray-400"],
-                        ["--gray-500", "--gray-600", "--gray-700", "--gray-800", "--gray-900", "--gray-950"],
+                        ["--gray-0", "--gray-50", "--gray-100", "--gray-200", "--gray-300", "--gray-400", "--gray-450"],
+                        ["--gray-500", "--gray-550", "--gray-600", "--gray-700", "--gray-750", "--gray-800", "--gray-900", "--gray-950"],
                         ["--violet-300", "--violet-400", "--violet-500", "--violet-600", "--violet-700", "--violet-950"],
-                        ["--green-100", "--green-400", "--green-600", "--green-700", "--green-950"],
+                        ["--green-100", "--green-400", "--green-600", "--green-650", "--green-700", "--green-950"],
                         ["--red-100", "--red-400", "--red-600", "--red-950", "--red-975"],
-                        ["--amber-400", "--amber-600", "--amber-700"],
+                        ["--amber-400", "--amber-600", "--amber-650", "--amber-700"],
                         ["--blue-400", "--blue-600"],
-                        ["--cyan-400", "--cyan-600"],
+                        ["--cyan-400", "--cyan-600", "--cyan-650"],
                         ["--black-40", "--black-60"],
                     ].map(names => (
                         <div key={names[0]} className="flex flex-wrap gap-3">
@@ -49,8 +51,13 @@ export function OverviewPage(): ReactNode {
                         "--color-panel",
                         "--color-raised",
                         "--color-border",
+                        "--color-border-control",
                         "--color-text",
                         "--color-text-muted",
+                        "--color-text-disabled",
+                        "--color-hover",
+                        "--color-selected",
+                        "--color-disabled",
                         "--color-accent",
                         "--color-accent-hover",
                         "--color-on-accent",
@@ -79,7 +86,7 @@ export function OverviewPage(): ReactNode {
                 <RoleColourExample />
             </Section>
 
-            <Section title="Typography" description="Font families, sizes and weights.">
+            <Section title="Typography" description="Font families, sizes, weights and line heights.">
                 <div className="flex flex-col gap-3">
                     {["--text-2xl", "--text-xl", "--text-lg", "--text-md", "--text-sm", "--text-xs"].map(name => (
                         <div key={name}>
@@ -101,6 +108,19 @@ export function OverviewPage(): ReactNode {
                                 }}
                             >
                                 Fetch from origin
+                            </div>
+                            <TokenLabel name={name} />
+                        </div>
+                    ))}
+                    {["--leading-tight", "--leading-normal"].map(name => (
+                        <div key={name}>
+                            <div
+                                style={{
+                                    lineHeight: `var(${name})`,
+                                    maxWidth: "320px",
+                                }}
+                            >
+                                Walks both parents to find the nearest common ancestor instead of stopping at the first match.
                             </div>
                             <TokenLabel name={name} />
                         </div>
@@ -168,6 +188,41 @@ export function OverviewPage(): ReactNode {
                             <TokenLabel name={name} />
                         </div>
                     ))}
+                </div>
+            </Section>
+
+            <Section title="Icons" description="Small for icons inside text, medium for buttons and small icon buttons, large for full-size icon buttons.">
+                <div className="flex flex-wrap items-end gap-6">
+                    {["--icon-sm", "--icon-md", "--icon-lg"].map(name => (
+                        <div key={name} className="flex flex-col gap-2">
+                            <FontAwesomeIcon
+                                icon={faCodeBranch}
+                                style={{
+                                    fontSize: `var(${name})`,
+                                }}
+                            />
+                            <TokenLabel name={name} />
+                        </div>
+                    ))}
+                </div>
+            </Section>
+
+            <Section title="Focus ring" description="The ring around whatever the keyboard is on: its colour, width and distance from the control.">
+                <div className="flex flex-col gap-3">
+                    <div
+                        className="self-start"
+                        style={{
+                            padding: "var(--space-2) var(--space-4)",
+                            borderRadius: "var(--radius-md)",
+                            border: "1px solid var(--color-border-control)",
+                            outline: "var(--focus-ring-width) solid var(--color-focus)",
+                            outlineOffset: "var(--focus-ring-offset)",
+                        }}
+                    >
+                        Focused control
+                    </div>
+                    <TokenLabel name="--focus-ring-width" />
+                    <TokenLabel name="--focus-ring-offset" />
                 </div>
             </Section>
 

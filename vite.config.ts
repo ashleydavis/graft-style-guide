@@ -60,5 +60,14 @@ export default defineConfig(({ command, isPreview }) => ({
         //
         port: 5199,
         strictPort: true,
+        //
+        // The dev server checks files for changes by polling every 300ms, which uses no inotify
+        // file watches. Other programs on the machine can use up every watch the system allows,
+        // and Vite then stops with ENOSPC.
+        //
+        watch: {
+            usePolling: true,
+            interval: 300,
+        },
     },
 }));

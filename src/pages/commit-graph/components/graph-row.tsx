@@ -1,0 +1,216 @@
+//
+// One row of a commit list with its graph lanes: the lanes passing through, the commit's dot on
+// its own lane and the curves where a branch leaves or joins that lane.
+//
+
+import type { ReactNode } from "react";
+
+//
+// The space between two lanes, in pixels.
+//
+const LANE_GAP = 12;
+
+//
+// Where the first lane sits from the left edge of the graph, in pixels.
+//
+const FIRST_LANE_X = 7;
+
+//
+// One commit and the lanes drawn beside it.
+//
+export interface IGraphRow {
+    //
+    // The commit message.
+    //
+    message: string;
+
+    //
+    // The short hash.
+    //
+    hash: string;
+
+    //
+    // The lane the commit sits on, from 1.
+    //
+    lane: number;
+
+    //
+    // True when the commit's lane continues up to the row above.
+    //
+    joinsAbove: boolean;
+
+    //
+    // True when the commit's lane continues down to the row below.
+    //
+    joinsBelow: boolean;
+
+    //
+    // Other lanes that pass straight through this row.
+    //
+    through: number[];
+
+    //
+    // Lanes that come down from the row above and end at this commit, as a branch does at the
+    // commit it started from.
+    //
+    endsHere: number[];
+
+    //
+    // Lanes that start at this commit and go down to the row below, as the second parent of a
+    // merge commit does.
+    //
+    startsHere: number[];
+}
+
+//
+// Returns the x position of `lane` in the graph.
+//
+export function laneX(lane: number): number {
+    return FIRST_LANE_X + (lane - 1) * LANE_GAP;
+}
+
+//
+// Returns the width of a graph with `laneCount` lanes.
+//
+export function graphWidth(laneCount: number): number {
+    return laneX(laneCount) + FIRST_LANE_X;
+}
+
+//
+// Returns the colour token of `lane`. Lanes after the sixth reuse the six lane colours in order.
+//
+export function laneColour(lane: number): string {
+    return `var(--color-lane-${((lane - 1) % 6) + 1})`;
+}
+
+//
+// Renders the row. The graph is drawn on a 100-unit-high canvas stretched to the row's height,
+// so every line meets the lines of the rows above and below whatever height the row has. Lines
+// keep their width as the canvas stretches.
+//
+export function GraphRow({ row, laneCount }: { row: IGraphRow; laneCount: number }): ReactNode {
+    const width = graphWidth(laneCount);
+    const commitX = laneX(row.lane);
+
+    return (
+        <div
+            className="flex"
+            style={{
+                gap: "var(--space-2)",
+                padding: "0 var(--space-3)",
+            }}
+        >
+            <div
+                aria-hidden="true"
+                className="relative shrink-0"
+                style={{
+                    width: `${width}px`,
+                }}
+            >
+                <svg
+                    className="absolute inset-0 h-full w-full"
+                    viewBox={`0 0 ${width} 100`}
+                    preserveAspectRatio="none"
+                >
+                    {row.through.map(lane => (
+                        <line
+                            key={`through-${lane}`}
+                            data-lane={lane}
+                            x1={laneX(lane)}
+                            y1="0"
+                            x2={laneX(lane)}
+                            y2="100"
+                            strokeWidth="2"
+                            vectorEffect="non-scaling-stroke"
+                            style={{
+                                stroke: laneColour(lane),
+                            }}
+                        />
+                    ))}
+                    {row.joinsAbove ? (
+                        <line
+                            data-lane={row.lane}
+                            x1={commitX}
+                            y1="0"
+                            x2={commitX}
+                            y2="50"
+                            strokeWidth="2"
+                            vectorEffect="non-scaling-stroke"
+                            style={{
+                                stroke: laneColour(row.lane),
+                            }}
+                        />
+                    ) : undefined}
+                    {row.joinsBelow ? (
+                        <line
+                            data-lane={row.lane}
+                            x1={commitX}
+                            y1="50"
+                            x2={commitX}
+                            y2="100"
+                            strokeWidth="2"
+                            vectorEffect="non-scaling-stroke"
+                            style={{
+                                stroke: laneColour(row.lane),
+                            }}
+                        />
+                    ) : undefined}
+                    {row.endsHere.map(lane => (
+                        <path
+                            key={`ends-${lane}`}
+                            d={`M ${laneX(lane)} 0 C ${laneX(lane)} 35, ${commitX} 20, ${commitX} 50`}
+                            fill="none"
+                            strokeWidth="2"
+                            vectorEffect="non-scaling-stroke"
+                            style={{
+                                stroke: laneColour(lane),
+                            }}
+                        />
+                    ))}
+                    {row.startsHere.map(lane => (
+                        <path
+                            key={`starts-${lane}`}
+                            d={`M ${commitX} 50 C ${commitX} 80, ${laneX(lane)} 65, ${laneX(lane)} 100`}
+                            fill="none"
+                            strokeWidth="2"
+                            vectorEffect="non-scaling-stroke"
+                            style={{
+                                stroke: laneColour(lane),
+                            }}
+                        />
+                    ))}
+                </svg>
+                <div
+                    className="absolute"
+                    style={{
+                        left: `${commitX - 5}px`,
+                        top: "calc(50% - 5px)",
+                        width: "10px",
+                        height: "10px",
+                        borderRadius: "var(--radius-full)",
+                        background: laneColour(row.lane),
+                        boxShadow: "0 0 0 2px var(--color-panel)",
+                    }}
+                />
+            </div>
+            <div
+                className="flex min-w-0 flex-1 items-center"
+                style={{
+                    gap: "var(--space-2)",
+                    padding: "var(--space-1) 0",
+                }}
+            >
+                <span className="flex-1 truncate">{row.message}</span>
+                <span
+                    style={{
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "var(--text-sm)",
+                        color: "var(--color-text-muted)",
+                    }}
+                >
+                    {row.hash}
+                </span>
+            </div>
+        </div>
+    );
+}

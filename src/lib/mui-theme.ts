@@ -52,11 +52,21 @@ export const graftTheme: Theme = createTheme({
                     fontFamily: "var(--font-sans)",
                     fontSize: "var(--text-md)",
                     fontWeight: "var(--weight-medium)",
+                    lineHeight: "var(--leading-normal)",
+                    padding: "var(--space-2) var(--space-4)",
                     borderRadius: "var(--radius-md)",
                     transition: "background-color var(--duration-fast) var(--ease-standard)",
                     "&:focus-visible": {
-                        outline: "2px solid var(--color-focus)",
-                        outlineOffset: "2px",
+                        outline: "var(--focus-ring-width) solid var(--color-focus)",
+                        outlineOffset: "var(--focus-ring-offset)",
+                    },
+                },
+                sizeSmall: {
+                    padding: "var(--space-1) var(--space-3)",
+                },
+                startIcon: {
+                    "& > *:nth-of-type(1)": {
+                        fontSize: "var(--icon-md)",
                     },
                 },
                 contained: {
@@ -66,29 +76,29 @@ export const graftTheme: Theme = createTheme({
                         backgroundColor: "var(--color-accent-hover)",
                     },
                     "&.Mui-disabled": {
-                        backgroundColor: "var(--color-raised)",
-                        color: "var(--color-text-muted)",
+                        backgroundColor: "var(--color-disabled)",
+                        color: "var(--color-text-disabled)",
                     },
                 },
                 outlined: {
-                    borderColor: "var(--color-border)",
+                    borderColor: "var(--color-border-control)",
                     color: "var(--color-text)",
                     "&:hover": {
                         borderColor: "var(--color-text-muted)",
-                        backgroundColor: "var(--color-raised)",
+                        backgroundColor: "var(--color-hover)",
                     },
                     "&.Mui-disabled": {
                         borderColor: "var(--color-border)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--color-text-disabled)",
                     },
                 },
                 text: {
                     color: "var(--color-accent)",
                     "&:hover": {
-                        backgroundColor: "var(--color-raised)",
+                        backgroundColor: "var(--color-hover)",
                     },
                     "&.Mui-disabled": {
-                        color: "var(--color-text-muted)",
+                        color: "var(--color-text-disabled)",
                     },
                 },
             },
@@ -102,7 +112,7 @@ export const graftTheme: Theme = createTheme({
                     fontSize: "var(--text-md)",
                     borderRadius: "var(--radius-md)",
                     "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "var(--color-border)",
+                        borderColor: "var(--color-border-control)",
                     },
                     "&:hover .MuiOutlinedInput-notchedOutline": {
                         borderColor: "var(--color-text-muted)",
@@ -114,7 +124,7 @@ export const graftTheme: Theme = createTheme({
                         borderColor: "var(--color-danger)",
                     },
                     "&.Mui-disabled": {
-                        backgroundColor: "var(--color-raised)",
+                        backgroundColor: "var(--color-disabled)",
                     },
                     "&.Mui-disabled .MuiOutlinedInput-notchedOutline": {
                         borderColor: "var(--color-border)",
@@ -126,7 +136,7 @@ export const graftTheme: Theme = createTheme({
                         opacity: 1,
                     },
                     "&.Mui-disabled": {
-                        WebkitTextFillColor: "var(--color-text-muted)",
+                        WebkitTextFillColor: "var(--color-text-disabled)",
                     },
                 },
             },
@@ -143,7 +153,7 @@ export const graftTheme: Theme = createTheme({
                         color: "var(--color-danger)",
                     },
                     "&.Mui-disabled": {
-                        color: "var(--color-text-muted)",
+                        color: "var(--color-text-disabled)",
                     },
                 },
             },
@@ -180,16 +190,20 @@ export const graftTheme: Theme = createTheme({
         MuiIconButton: {
             styleOverrides: {
                 root: {
+                    fontSize: "var(--icon-lg)",
                     color: "var(--color-text-muted)",
                     borderRadius: "var(--radius-md)",
                     "&:hover": {
-                        backgroundColor: "var(--color-raised)",
+                        backgroundColor: "var(--color-hover)",
                         color: "var(--color-text)",
                     },
                     "&:focus-visible": {
-                        outline: "2px solid var(--color-focus)",
-                        outlineOffset: "2px",
+                        outline: "var(--focus-ring-width) solid var(--color-focus)",
+                        outlineOffset: "var(--focus-ring-offset)",
                     },
+                },
+                sizeSmall: {
+                    fontSize: "var(--icon-md)",
                 },
             },
         },
@@ -202,8 +216,8 @@ export const graftTheme: Theme = createTheme({
                         color: "var(--color-accent-hover)",
                     },
                     "&:focus-visible": {
-                        outline: "2px solid var(--color-focus)",
-                        outlineOffset: "2px",
+                        outline: "var(--focus-ring-width) solid var(--color-focus)",
+                        outlineOffset: "var(--focus-ring-offset)",
                     },
                 },
             },
@@ -215,9 +229,9 @@ export const graftTheme: Theme = createTheme({
                     fontFamily: "var(--font-sans)",
                     fontSize: "var(--text-md)",
                     color: "var(--color-text-muted)",
-                    borderColor: "var(--color-border)",
+                    borderColor: "var(--color-border-control)",
                     "&:hover": {
-                        backgroundColor: "var(--color-raised)",
+                        backgroundColor: "var(--color-hover)",
                     },
                     "&.Mui-selected": {
                         backgroundColor: "var(--color-accent)",

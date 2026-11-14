@@ -9,11 +9,25 @@ import type { ITokenOption } from "../options";
 import { MiniGraft } from "./mini-graft";
 
 //
-// Renders the option. Its tokens are set on the card for the theme of the panel it sits in,
-// so everything inside the card uses the option's values and the rest of the page stays as
-// graft.css sets it.
+// Renders the option, with the focus ring drawn on the preview when `showFocus` is true and the
+// hover background drawn when `showHover` is true, and the commit menu closed at first when
+// `menuStartsOpen` is false. `lanes` names the lane colours the commit graph draws. Its tokens are set on the card for the theme
+// of the panel it sits in, so everything inside the card uses the option's values and the rest
+// of the page stays as graft.css sets it.
 //
-export function OptionCard({ option }: { option: ITokenOption }): ReactNode {
+export function OptionCard({
+    option,
+    showFocus = false,
+    showHover = false,
+    menuStartsOpen = true,
+    lanes,
+}: {
+    option: ITokenOption;
+    showFocus?: boolean;
+    showHover?: boolean;
+    menuStartsOpen?: boolean;
+    lanes?: number[];
+}): ReactNode {
     const theme = useContext(PanelThemeContext);
     const tokens = theme === "dark" ? option.dark : option.light;
 
@@ -50,7 +64,7 @@ export function OptionCard({ option }: { option: ITokenOption }): ReactNode {
                     {option.description}
                 </div>
             </div>
-            <MiniGraft />
+            <MiniGraft showFocus={showFocus} showHover={showHover} menuStartsOpen={menuStartsOpen} lanes={lanes} />
         </div>
     );
 }

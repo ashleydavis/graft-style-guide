@@ -311,7 +311,7 @@ test.describe("About", () => {
     });
 
     test("the info button stays in the same place on a short page and a long page", async ({ page }) => {
-        await page.goto("/page/choices");
+        await page.goto("/page/no-such-component");
         const shortPageBox = await page.getByRole("button", { name: "About" }).boundingBox();
         await page.goto("/page/overview");
         const longPageBox = await page.getByRole("button", { name: "About" }).boundingBox();
@@ -347,14 +347,85 @@ test.describe("Choices", () => {
         }
     });
 
-    test("the page says so when every choice is made", async ({ page }) => {
+    test("the choices page is listed only while a choice is open", async ({ page }) => {
+        await page.goto("/page/overview");
+        const choicesLink = page.getByRole("navigation").getByRole("link", { name: "Choices" });
         await page.goto("/page/choices");
         if (choices.length === 0) {
-            await expect(page.getByText("Every choice is made.")).toBeVisible();
+            await expect(choicesLink).toHaveCount(0);
+            await expect(page.getByText('There is no page called "choices".')).toBeVisible();
         }
         else {
-            await expect(page.getByText("Every choice is made.")).toHaveCount(0);
+            await expect(choicesLink).toBeVisible();
+            await expect(page.getByRole("heading", { level: 1, name: "Choices" })).toBeVisible();
         }
+    });
+});
+
+test.describe("Tokens", () => {
+    test("every role token has a light and a dark value", async ({ page }) => {
+        await page.goto("/page/overview");
+        const tokens = await page.evaluate(() => {
+            const light = new Set<string>();
+            const dark = new Set<string>();
+            for (const sheet of Array.from(document.styleSheets)) {
+                if (!sheet.href?.includes("graft.css")) {
+                    continue;
+                }
+                for (const rule of Array.from(sheet.cssRules)) {
+                    if (!(rule instanceof CSSStyleRule)) {
+                        continue;
+                    }
+                    const target = rule.selectorText.includes('[data-theme="dark"]') ? dark : rule.selectorText.includes('[data-theme="light"]') ? light : undefined;
+                    for (const name of Array.from(rule.style)) {
+                        target?.add(name);
+                    }
+                }
+            }
+            return {
+                light: [...light].sort(),
+                dark: [...dark].sort(),
+            };
+        });
+        expect(tokens.light.length).toBeGreaterThan(0);
+        expect(tokens.dark).toEqual(tokens.light);
+    });
+});
+
+test.describe("Commit graph", () => {
+    test("every lane runs unbroken from one commit row to the next", async ({ page }) => {
+        await page.goto("/page/commit-graph?components=dark");
+        const graph = page.locator('main [data-theme="dark"] [data-graph="Every lane colour"]');
+        for (const lane of [1, 2, 3, 4, 5, 6]) {
+            const segments = graph.locator(`line[data-lane="${lane}"]`);
+            const boxes = [];
+            for (let index = 0; index < (await segments.count()); index++) {
+                boxes.push((await segments.nth(index).boundingBox())!);
+            }
+            expect(boxes.length).toBeGreaterThan(1);
+            boxes.sort((a, b) => a.y - b.y);
+            for (let index = 1; index < boxes.length; index++) {
+                const previousBottom = boxes[index - 1].y + boxes[index - 1].height;
+                expect(boxes[index].y).toBeLessThanOrEqual(previousBottom + 0.5);
+            }
+            expect(new Set(boxes.map(box => Math.round(box.x))).size).toBe(1);
+        }
+    });
+
+    test("the page shows each history with every lane colour", async ({ page }) => {
+        await page.goto("/page/commit-graph?components=light");
+        for (const title of ["Straight history", "Feature branch merged", "Branch not merged yet", "Two branches at once", "Every lane colour"]) {
+            await expect(page.locator(`main [data-graph="${title}"]`)).toBeVisible();
+        }
+        const lastLane = page.locator('main [data-graph="Every lane colour"] line[data-lane="6"]').first();
+        expect(await computedStyle(lastLane, "stroke")).toBe(await page.evaluate(() => {
+            const probe = document.createElement("div");
+            probe.style.color = "var(--color-lane-6)";
+            document.querySelector('main [data-theme="light"]')!.appendChild(probe);
+            const colour = getComputedStyle(probe).color;
+            probe.remove();
+            return colour;
+        }));
     });
 });
 

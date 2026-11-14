@@ -83,7 +83,44 @@ Picks so far:
 - **Git colours:** Green and red for added and removed lines, amber for conflicts and a balanced set of six graph lane colours.
 - **Fonts:** Mona Sans for the interface and Monaspace Neon for code. You asked for fonts close to GitHub so Graft feels familiar, so the options were GitHub's own system font list, GitHub's open-source Mona Sans and Monaspace Neon, and Noto Sans, the font GitHub shows on Linux. The chosen fonts ship with the explorer as packages (`@fontsource/mona-sans` and `@fontsource/monaspace-neon`), so they look the same on every computer. A Fonts page in the explorer shows both in use, with every size and weight and the characters that are easy to mix up in hashes.
 
-With these picks made, the choices page is empty until the next set of choices is ready.
+- **Type scale:** Familiar, GitHub's sizes with 14px body text, weights of 400, 500 and 600, and line heights of 1.25 for headings and single lines and 1.5 for running text.
+- **Spacing:** Standard, steps of 4px (4, 8, 12, 16, 24 and 32).
+- **Corner radius:** Crisp, 2px, 4px and 6px, nearly square and tool-like.
+- **Shadows:** Lifted, a clear shadow under raised things and a deep one under menus, much darker in the dark theme so it still shows.
+- **Animation:** Smooth, 150ms, 250ms and 400ms, easing in and out.
+
+That round was the first to choose sizes and timing instead of colours. Those values are the same in both themes, apart from shadows. To judge them, the small Graft screen gained a commit menu that opens and closes (showing the shadow and the timing), a highlight on commit rows under the pointer and a description under the selected commit (showing the line height). The type choice added two tokens, `--leading-tight` and `--leading-normal`, and the MUI buttons now take their padding and line height from the tokens, so the options changed them too.
+
+With the spacing pick you pointed out breaks in the graph lines between commit rows. Each row drew its lanes at a fixed height shorter than the row. The lanes now run the full height of every row, so the lines join up.
+
+To see the lanes outside the Choices page, a Commit graph page shows them in the shapes a history takes: a straight history, a feature branch merged back, a branch not merged yet, two branches at once and all six lane colours side by side. Each lane is drawn on a canvas that stretches to the row's height, so lines always meet the rows above and below, with curves where a branch starts or merges. A test checks that every lane runs without a gap.
+
+With every open choice made, the Choices page leaves the sidebar. It returns as soon as the next set of choices is added.
+
+The next round covers icon sizes, the focus ring and the hover, selected and disabled colours. New tokens for them went into `graft.css` with values matching what the explorer already drew, and the MUI theme now uses them, so a pick changes every button, text box and row at once. The small Graft screen gained what each choice needs to be judged: a branch icon and a Fetch icon, a Filter commits box, a disabled menu item, and a focus ring drawn on the Fetch button for the focus choice.
+
+Running the contrast check on graft.css before showing these options found two failures already in place: muted text, such as commit hashes, at 4.4 to 1 on hover and selected rows in light (text needs 4.5 to 1), and the borders of text boxes and outlined buttons at 1.2 to 1 (a control's edge needs 3 to 1). Rather than change your earlier picks quietly, each became a choice of its own: three darker muted greys for light, and a new `--color-border-control` token in three strengths, which keeps the soft border for dividers. Every option in the round passes. Once these are picked, the contrast ratios of every text and control colour get recorded.
+
+A test now checks that every role token has a light and a dark value, which ticks off that todo item.
+
+From that round:
+
+- **Icon sizes:** Matched, 12px, 14px and 18px, each icon the size of the text beside it.
+- **Focus ring:** Ink, a 2px ring in the text colour, 2px out from the control. It has the most contrast of the options: 17.7 to 1 in light and 17 to 1 in dark.
+- **Muted text:** Darker, a new grey between two steps of the ramp for the light theme, at 6.3 to 1 on the panel.
+
+The hover, selected and disabled choice was hard to read, because one option changed three things at once and hover only showed under the pointer. It is now three choices, one per colour. The hover choice draws the first commit row and menu item as hovered, and the small Graft screen gained a disabled Push button in the status bar. Every choice now also ends with a "Spot it" option that paints its tokens bright red, so you can find what it changes before judging the real options.
+
+From the split choices:
+
+- **Hover:** Grey, a light grey in light and a lifted grey in dark.
+- **Selected:** Grey, a darker grey than hover, with the violet bar marking the row. Dark needed a new grey between two steps of the ramp.
+- **Disabled:** Readable, faded text you can still read on a light grey block.
+- **Control borders:** Light touch, a new mid grey in light at 3.3 to 1 on the panel, just past the 3 to 1 a control's edge needs.
+
+With those in place, a contrast check ran over every text and control colour against every background it sits on, in both themes. Everything passed except three graph lanes in light: green, amber and cyan were too faint on the new selected grey. That became one last colour choice, with a preview that runs those three lanes through the selected row.
+
+You could not see a difference between the options and asked Claude to choose. Claude took Just past, the smallest change that meets 3 to 1, as three new in-between shades used by the light lanes only. Every ratio is now recorded in the Contrast section of `style-guide.md`, which finishes the colours and other values in `graft.css`.
 
 The rest of the work, in order, is in `todo.md`.
 

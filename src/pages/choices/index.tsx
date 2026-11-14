@@ -22,11 +22,8 @@ export function ChoicesPage(): ReactNode {
                     maxWidth: "720px",
                 }}
             >
-                Each choice shows its options on the same small Graft screen. An option changes only the tokens of its own choice, and the rest of the screen uses graft.css as it stands. Pick a letter for each choice.
+                Each choice shows its options on the same small Graft screen. An option changes only the tokens of its own choice, and the rest of the screen uses graft.css as it stands. The last option of each choice paints the choice's tokens bright red to show where they appear on the screen, and is not a candidate. Pick a letter for each choice.
             </p>
-            {choices.length === 0 ? (
-                <p>Every choice is made. The next set of choices appears here when it is ready.</p>
-            ) : undefined}
             {choices.map(choice => (
                 <Section key={choice.title} title={choice.title} description={choice.description}>
                     <div
@@ -37,7 +34,7 @@ export function ChoicesPage(): ReactNode {
                         }}
                     >
                         {choice.options.map(option => (
-                            <OptionCard key={option.id} option={option} />
+                            <OptionCard key={option.id} option={option} showFocus={choice.showFocus} showHover={choice.showHover} menuStartsOpen={!choice.menuStartsClosed} lanes={choice.lanes} />
                         ))}
                     </div>
                 </Section>
