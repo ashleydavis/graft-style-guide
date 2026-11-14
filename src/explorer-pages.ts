@@ -27,6 +27,8 @@ import { CommandPalettePage } from "./pages/command-palette";
 import { ShortcutsPage } from "./pages/shortcuts";
 import { CommitExplorerPage } from "./pages/commit-explorer";
 import { GitCommandsPanelPage } from "./pages/git-commands-panel";
+import { DiffPage } from "./pages/diff";
+import { ChangesPage } from "./pages/changes";
 
 //
 // One page in the explorer.
@@ -75,6 +77,18 @@ export const explorerPages: IExplorerPage[] = [
         title: "Commit explorer",
         keywords: ["commits", "history", "log", "diff", "panes", "columns", "keys"],
         component: CommitExplorerPage,
+    },
+    {
+        id: "changes",
+        title: "Changes and commit",
+        keywords: ["staging", "stage", "unstage", "commit", "working tree", "amend", "no-verify"],
+        component: ChangesPage,
+    },
+    {
+        id: "diff",
+        title: "Diff",
+        keywords: ["changes", "unified", "side by side", "split", "hunk", "patch", "word"],
+        component: DiffPage,
     },
     {
         id: "git-commands-panel",

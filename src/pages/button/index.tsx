@@ -22,6 +22,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Section } from "../../components/section";
 import { CopyButton } from "../../components/copy-button";
+import { Tip } from "../../components/tip";
 import { DropDownDialogButton } from "./components/drop-down-dialog-button";
 import { DropDownMenuButton } from "./components/drop-down-menu-button";
 
@@ -87,9 +88,13 @@ export function ButtonPage(): ReactNode {
                             <FontAwesomeIcon icon={faCopy} />
                         </IconButton>
                     </Tooltip>
-                    <IconButton aria-label="Delete branch (protected)" size="small" disabled>
-                        <FontAwesomeIcon icon={faTrash} />
-                    </IconButton>
+                    <Tooltip title={<Tip title="Delete branch" detail="main is protected, so it cannot be deleted." />}>
+                        <span>
+                            <IconButton aria-label="Delete branch (protected)" size="small" disabled>
+                                <FontAwesomeIcon icon={faTrash} />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
                 </div>
             </Section>
 

@@ -35,11 +35,11 @@ export function GitCommandsPanelPage(): ReactNode {
                 <PanelFrame commands={["git log --max-count=50"]} />
             </Section>
 
-            <Section title="Two commands" description="An open commit, read by a git log of the commit and a git diff-tree of its files, the most recent first. Each copy button turns into a tick for a moment once it has copied.">
+            <Section title="Two commands" description="An open commit, read by a git log of the commit and a git diff-tree of its files. Each copy button turns into a tick for a moment once it has copied.">
                 <PanelFrame
                     commands={[
-                        "git diff-tree -r --root --no-commit-id --name-status a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
                         "git log --max-count=1 a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+                        "git diff-tree -r --root --no-commit-id --name-status a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
                     ]}
                 />
             </Section>

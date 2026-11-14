@@ -7,6 +7,7 @@
 import { useState, type ReactNode } from "react";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import TextField from "@mui/material/TextField";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowsRotate, faCodeBranch, faEllipsis } from "@fortawesome/free-solid-svg-icons";
@@ -100,9 +101,11 @@ export function MiniGraft({
                 >
                     Fetch
                 </Button>
-                <IconButton size="small" aria-label="More actions" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-                    <FontAwesomeIcon icon={faEllipsis} />
-                </IconButton>
+                <Tooltip title="More actions">
+                    <IconButton size="small" aria-label="More actions" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                        <FontAwesomeIcon icon={faEllipsis} />
+                    </IconButton>
+                </Tooltip>
             </div>
             <CommitMenu isOpen={isMenuOpen} showHover={showHover} />
 
@@ -337,7 +340,7 @@ export function LaneMarks({ lanes, activeLane, ringColour }: { lanes: number[]; 
                     height: "10px",
                     borderRadius: "var(--radius-full)",
                     background: `var(--color-lane-${lanes[activeLane - 1]}, var(--color-accent))`,
-                    boxShadow: `0 0 0 2px ${ringColour}`,
+                    boxShadow: `0 0 0 2px ${ringColour}, 0 0 0 2px var(--color-panel)`,
                 }}
             />
         </div>

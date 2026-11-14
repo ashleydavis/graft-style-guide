@@ -51,6 +51,24 @@ export interface ILaneShape {
     // merge commit does.
     //
     startsHere: number[];
+
+    //
+    // Lanes of branches not merged yet, such as an open pull request, whose lines through this row
+    // and curves into the commit are dotted. Absent when every lane here is merged.
+    //
+    dottedLanes?: number[];
+
+    //
+    // True when the commit's lane above its dot belongs to a branch not merged yet, so that half
+    // is dotted.
+    //
+    dottedAbove?: boolean;
+
+    //
+    // True when the commit itself is on a branch not merged yet, so its lane below its dot and any
+    // curve out of it are dotted.
+    //
+    dottedBelow?: boolean;
 }
 
 //
@@ -90,15 +108,28 @@ export function laneColour(lane: number): string {
 }
 
 //
+// Returns the stroke settings of a lane line: solid, or dotted for a branch not merged yet, as a
+// row of round dots.
+//
+export function lineStyle(isDotted: boolean): { strokeDasharray?: string; strokeLinecap?: "round" } {
+    return isDotted ? { strokeDasharray: "0.01 5", strokeLinecap: "round" } : {};
+}
+
+//
 // Renders the lanes of one row, stretched to the row's full height. The graph is drawn on a
 // 100-unit-high canvas stretched to the row's height, so every line meets the lines of the rows
 // above and below whatever height the row has. Lines keep their width as the canvas stretches.
 // The commit's dot sits in the middle of the row, with a ring in `ringColour`, the row's
-// background, so it stands clear of the lines.
+// background, laid over the panel colour so a see-through background still hides the lines
+// under the ring, so the dot stands clear of them.
 //
 export function GraphLanes({ shape, laneCount, ringColour = "var(--color-panel)" }: { shape: ILaneShape; laneCount: number; ringColour?: string }): ReactNode {
     const width = graphWidth(laneCount);
     const commitX = laneX(shape.lane);
+
+    function isDotted(lane: number): boolean {
+        return shape.dottedLanes?.includes(lane) === true;
+    }
 
     return (
         <div
@@ -117,12 +148,14 @@ export function GraphLanes({ shape, laneCount, ringColour = "var(--color-panel)"
                     <line
                         key={`through-${lane}`}
                         data-lane={lane}
+                        data-dotted={isDotted(lane)}
                         x1={laneX(lane)}
                         y1="0"
                         x2={laneX(lane)}
                         y2="100"
                         strokeWidth="2"
                         vectorEffect="non-scaling-stroke"
+                        {...lineStyle(isDotted(lane))}
                         style={{
                             stroke: laneColour(lane),
                         }}
@@ -131,12 +164,14 @@ export function GraphLanes({ shape, laneCount, ringColour = "var(--color-panel)"
                 {shape.joinsAbove ? (
                     <line
                         data-lane={shape.lane}
+                        data-dotted={shape.dottedAbove === true}
                         x1={commitX}
                         y1="0"
                         x2={commitX}
                         y2="50"
                         strokeWidth="2"
                         vectorEffect="non-scaling-stroke"
+                        {...lineStyle(shape.dottedAbove === true)}
                         style={{
                             stroke: laneColour(shape.lane),
                         }}
@@ -145,12 +180,14 @@ export function GraphLanes({ shape, laneCount, ringColour = "var(--color-panel)"
                 {shape.joinsBelow ? (
                     <line
                         data-lane={shape.lane}
+                        data-dotted={shape.dottedBelow === true}
                         x1={commitX}
                         y1="50"
                         x2={commitX}
                         y2="100"
                         strokeWidth="2"
                         vectorEffect="non-scaling-stroke"
+                        {...lineStyle(shape.dottedBelow === true)}
                         style={{
                             stroke: laneColour(shape.lane),
                         }}
@@ -159,10 +196,12 @@ export function GraphLanes({ shape, laneCount, ringColour = "var(--color-panel)"
                 {shape.endsHere.map(lane => (
                     <path
                         key={`ends-${lane}`}
+                        data-dotted={isDotted(lane)}
                         d={`M ${laneX(lane)} 0 C ${laneX(lane)} 35, ${commitX} 20, ${commitX} 50`}
                         fill="none"
                         strokeWidth="2"
                         vectorEffect="non-scaling-stroke"
+                        {...lineStyle(isDotted(lane))}
                         style={{
                             stroke: laneColour(lane),
                         }}
@@ -171,10 +210,12 @@ export function GraphLanes({ shape, laneCount, ringColour = "var(--color-panel)"
                 {shape.startsHere.map(lane => (
                     <path
                         key={`starts-${lane}`}
+                        data-dotted={shape.dottedBelow === true}
                         d={`M ${commitX} 50 C ${commitX} 80, ${laneX(lane)} 65, ${laneX(lane)} 100`}
                         fill="none"
                         strokeWidth="2"
                         vectorEffect="non-scaling-stroke"
+                        {...lineStyle(shape.dottedBelow === true)}
                         style={{
                             stroke: laneColour(lane),
                         }}
@@ -190,7 +231,7 @@ export function GraphLanes({ shape, laneCount, ringColour = "var(--color-panel)"
                     height: "10px",
                     borderRadius: "var(--radius-full)",
                     background: laneColour(shape.lane),
-                    boxShadow: `0 0 0 2px ${ringColour}`,
+                    boxShadow: `0 0 0 2px ${ringColour}, 0 0 0 2px var(--color-panel)`,
                 }}
             />
         </div>

@@ -135,7 +135,7 @@ export const choices: IChoice[] = [
     {
         title: "Status colours as text",
         description:
-            "The new file tree and menus put status colours on rows as words: the M, A and D letters and the danger item of a menu. In light they fall to 3.8 to 1 on the selected row and 4.4 to 1 on the hover row, under the 4.5 to 1 text needs. Each option darkens the success, warning and danger colours in light, which also darkens their dots, icons and the danger button. Dark stays as it is, at 4.6 to 1 or more.",
+            "The new file tree and menus put status colours on rows as words: the M, A, D and R letters and the danger item of a menu. In light they fall to 3.8 to 1 on the selected row and 4.4 to 1 on the hover row, under the 4.5 to 1 text needs. Each option darkens the success, warning, danger and info colours in light, which also darkens their dots, icons and the danger button. Dark stays as it is, at 4.6 to 1 or more.",
         Preview: StatusTextPreview,
         options: [
             {
@@ -146,11 +146,13 @@ export const choices: IChoice[] = [
                     "--color-success": "#157439",
                     "--color-warning": "#a54a0b",
                     "--color-danger": "#c51f1f",
+                    "--color-info": "#2159e2",
                 },
                 dark: {
                     "--color-success": "#4ade80",
                     "--color-warning": "#fbbf24",
                     "--color-danger": "#f87171",
+                    "--color-info": "#60a5fa",
                 },
             },
             {
@@ -161,14 +163,16 @@ export const choices: IChoice[] = [
                     "--color-success": "#166534",
                     "--color-warning": "#92400e",
                     "--color-danger": "#b91c1c",
+                    "--color-info": "#1d4ed8",
                 },
                 dark: {
                     "--color-success": "#4ade80",
                     "--color-warning": "#fbbf24",
                     "--color-danger": "#f87171",
+                    "--color-info": "#60a5fa",
                 },
             },
-            spotIt(["--color-success", "--color-warning", "--color-danger"]),
+            spotIt(["--color-success", "--color-warning", "--color-danger", "--color-info"]),
         ],
     },
     {

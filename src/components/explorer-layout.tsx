@@ -10,6 +10,7 @@ import { Link, Outlet, useNavigate, useParams, useSearch } from "@tanstack/react
 import TextField from "@mui/material/TextField";
 import InputAdornment from "@mui/material/InputAdornment";
 import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -127,14 +128,11 @@ export function ExplorerLayout(): ReactNode {
     }
 
     const aboutButton = (
-        <IconButton
-            onClick={() => setAboutOpen(true)}
-            aria-label="About"
-            title="About"
-            className="fixed top-2 right-2 z-10"
-        >
-            <FontAwesomeIcon icon={faCircleInfo} />
-        </IconButton>
+        <Tooltip title="About this style guide" placement="left">
+            <IconButton onClick={() => setAboutOpen(true)} aria-label="About" className="fixed top-2 right-2 z-10">
+                <FontAwesomeIcon icon={faCircleInfo} />
+            </IconButton>
+        </Tooltip>
     );
     const aboutDialog = <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />;
 
@@ -149,14 +147,11 @@ export function ExplorerLayout(): ReactNode {
                 >
                     Graft Style Explorer
                 </div>
-                <IconButton
-                    aria-label="Minimise sidebar"
-                    title="Minimise sidebar"
-                    size="small"
-                    onClick={() => setSidebar("minimised")}
-                >
-                    <FontAwesomeIcon icon={faAnglesLeft} />
-                </IconButton>
+                <Tooltip title="Minimise sidebar">
+                    <IconButton aria-label="Minimise sidebar" size="small" onClick={() => setSidebar("minimised")}>
+                        <FontAwesomeIcon icon={faAnglesLeft} />
+                    </IconButton>
+                </Tooltip>
             </div>
             <TextField
                 placeholder="Search components"
@@ -250,9 +245,11 @@ export function ExplorerLayout(): ReactNode {
     );
 
     const restoreButton = (
-        <IconButton aria-label="Restore sidebar" title="Restore sidebar" onClick={() => setSidebar("open")}>
-            <FontAwesomeIcon icon={narrow ? faBars : faAnglesRight} />
-        </IconButton>
+        <Tooltip title={narrow ? "Show the page list" : "Restore sidebar"} placement="right">
+            <IconButton aria-label="Restore sidebar" onClick={() => setSidebar("open")}>
+                <FontAwesomeIcon icon={narrow ? faBars : faAnglesRight} />
+            </IconButton>
+        </Tooltip>
     );
 
     if (narrow) {

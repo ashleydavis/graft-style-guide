@@ -8,6 +8,7 @@ import Dialog from "@mui/material/Dialog";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import Link from "@mui/material/Link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
@@ -36,9 +37,11 @@ export function AboutDialog({ open, onClose }: IAboutDialogProps): ReactNode {
         <Dialog open={open} onClose={onClose} maxWidth="sm" disableScrollLock>
             <DialogTitle className="flex items-center justify-between gap-4">
                 About
-                <IconButton aria-label="Close" title="Close" size="small" onClick={onClose}>
-                    <FontAwesomeIcon icon={faXmark} />
-                </IconButton>
+                <Tooltip title="Close">
+                    <IconButton aria-label="Close" size="small" onClick={onClose}>
+                        <FontAwesomeIcon icon={faXmark} />
+                    </IconButton>
+                </Tooltip>
             </DialogTitle>
             <DialogContent
                 className="flex flex-col"

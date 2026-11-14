@@ -5,6 +5,10 @@
 
 import { useState, type ReactNode } from "react";
 import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
 import List from "@mui/material/List";
 import Paper from "@mui/material/Paper";
 import ListItemButton from "@mui/material/ListItemButton";
@@ -19,7 +23,9 @@ import {
     faCloud,
     faCodeBranch,
     faCodeCompare,
+    faMagnifyingGlass,
     faTag,
+    faXmark,
     type IconDefinition,
 } from "@fortawesome/free-solid-svg-icons";
 import { Section } from "../../components/section";
@@ -87,11 +93,20 @@ export function GroupHeading({ group, isOpen, onToggle }: { group: ISidebarGroup
 
 //
 // Renders the sidebar with every group open and "main" as the current item. Clicking an item
-// makes it current, and clicking a heading opens or closes its group.
+// makes it current, and clicking a heading opens or closes its group. The search box at the top
+// narrows every group to the items whose names contain what is typed, ignoring case: groups with
+// no match are left out, groups with a match open whatever their state, and the counts show the
+// matches.
 //
 export function RepositorySidebar(): ReactNode {
     const [current, setCurrent] = useState("Branches/main");
     const [closedGroups, setClosedGroups] = useState(new Set<string>());
+    const [search, setSearch] = useState("");
+    const needle = search.trim().toLowerCase();
+    const isSearching = needle !== "";
+    const shownGroups = groups
+        .map(group => ({ ...group, items: group.items.filter(item => item.toLowerCase().includes(needle)) }))
+        .filter(group => group.items.length > 0);
 
     function toggle(title: string): void {
         const next = new Set(closedGroups);
@@ -106,7 +121,39 @@ export function RepositorySidebar(): ReactNode {
 
     return (
         <Paper component="nav" aria-label="Repository" variant="outlined" sx={{ width: "260px", maxWidth: "100%", padding: "var(--space-2)" }}>
-            <List disablePadding>
+            <TextField
+                size="small"
+                fullWidth
+                placeholder="Search branches, tags…"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+                sx={{ marginBottom: "var(--space-2)" }}
+                slotProps={{
+                    htmlInput: {
+                        "aria-label": "Search the repository",
+                    },
+                    input: {
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: "var(--icon-md)" }} />
+                            </InputAdornment>
+                        ),
+                        endAdornment: isSearching ? (
+                            <InputAdornment position="end">
+                                <Tooltip title="Clear the search">
+                                    <IconButton size="small" aria-label="Clear search" onClick={() => setSearch("")} edge="end">
+                                        <FontAwesomeIcon icon={faXmark} />
+                                    </IconButton>
+                                </Tooltip>
+                            </InputAdornment>
+                        ) : undefined,
+                    },
+                }}
+            />
+            {isSearching && shownGroups.length === 0 ? (
+                <p style={{ padding: "var(--space-2) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Nothing matches "{search.trim()}".</p>
+            ) : undefined}
+            <List disablePadding sx={isSearching ? { display: "none" } : undefined}>
                 <ListItemButton selected={current === "Changes"} onClick={() => setCurrent("Changes")}>
                     <ListItemIcon>
                         <FontAwesomeIcon icon={faCodeCompare} />
@@ -115,8 +162,8 @@ export function RepositorySidebar(): ReactNode {
                     <Chip variant="count" label={3} component="span" />
                 </ListItemButton>
             </List>
-            {groups.map(group => {
-                const isOpen = !closedGroups.has(group.title);
+            {shownGroups.map(group => {
+                const isOpen = isSearching || !closedGroups.has(group.title);
                 return (
                     <List key={group.title} disablePadding subheader={<GroupHeading group={group} isOpen={isOpen} onToggle={() => toggle(group.title)} />}>
                         {isOpen
@@ -158,7 +205,7 @@ export function SidebarPage(): ReactNode {
         <div>
             <Section
                 title="Repository sidebar"
-                description="The views of a repository by group. Group headings are small capitals in muted text and open or close their group. The current item has the selected background."
+                description="The views of a repository by group. Group headings are small capitals in muted text and open or close their group. The current item has the selected background. Type in the search box to narrow every group to the matching names."
             >
                 <RepositorySidebar />
             </Section>

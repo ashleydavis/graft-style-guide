@@ -8,6 +8,7 @@ import { useContext, useEffect, useRef, useState, type ReactNode, type Ref } fro
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
 import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import InputBase from "@mui/material/InputBase";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -136,9 +137,11 @@ export function ShortcutsList({ onClose, inputRef }: { onClose?: () => void; inp
                     Keyboard shortcuts
                 </span>
                 {onClose ? (
-                    <IconButton aria-label="Close" size="small" onClick={onClose}>
-                        <FontAwesomeIcon icon={faXmark} />
-                    </IconButton>
+                    <Tooltip title="Close">
+                        <IconButton aria-label="Close" size="small" onClick={onClose}>
+                            <FontAwesomeIcon icon={faXmark} />
+                        </IconButton>
+                    </Tooltip>
                 ) : undefined}
             </div>
             <div

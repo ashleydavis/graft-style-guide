@@ -9,6 +9,7 @@ import Alert, { type AlertColor } from "@mui/material/Alert";
 import AlertTitle from "@mui/material/AlertTitle";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
 import Slide from "@mui/material/Slide";
 import Stack from "@mui/material/Stack";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -81,9 +82,11 @@ const TOAST_DURATION = 4000;
 //
 export function CloseButton({ onClick }: { onClick?: () => void }): ReactNode {
     return (
-        <IconButton aria-label="Dismiss" size="small" onClick={onClick}>
-            <FontAwesomeIcon icon={faXmark} />
-        </IconButton>
+        <Tooltip title="Dismiss">
+            <IconButton aria-label="Dismiss" size="small" onClick={onClick}>
+                <FontAwesomeIcon icon={faXmark} />
+            </IconButton>
+        </Tooltip>
     );
 }
 

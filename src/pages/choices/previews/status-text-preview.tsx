@@ -38,6 +38,11 @@ const files: { name: string; status: FileStatus; state: "plain" | "hover" | "sel
         status: "M",
         state: "plain",
     },
+    {
+        name: "themes.ts",
+        status: "R",
+        state: "selected",
+    },
 ];
 
 //

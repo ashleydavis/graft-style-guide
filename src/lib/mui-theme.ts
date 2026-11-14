@@ -712,17 +712,34 @@ export const graftTheme: Theme = createTheme({
                 },
             },
         },
+        //
+        // Every tooltip points at its control with an arrow and waits a moment before it shows,
+        // so moving the pointer across a toolbar does not flash a tooltip at each button.
+        //
         MuiTooltip: {
+            defaultProps: {
+                arrow: true,
+                enterDelay: 400,
+                enterNextDelay: 150,
+            },
             styleOverrides: {
+                //
+                // A tooltip mounts next to the control it labels, so it sets every text style of
+                // its own instead of taking the control's, such as a heading's capitals.
+                //
                 tooltip: {
+                    maxWidth: "280px",
                     backgroundColor: "var(--color-text)",
                     color: "var(--color-bg)",
                     fontFamily: "var(--font-sans)",
-                    fontSize: "var(--text-xs)",
-                    fontWeight: "var(--weight-normal)",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: "var(--weight-medium)",
+                    textTransform: "none",
+                    letterSpacing: "normal",
                     lineHeight: "var(--leading-tight)",
                     padding: "var(--space-1) var(--space-2)",
                     borderRadius: "var(--radius-md)",
+                    boxShadow: "var(--shadow-overlay)",
                 },
                 arrow: {
                     color: "var(--color-text)",

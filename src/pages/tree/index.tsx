@@ -18,12 +18,15 @@ import {
     faFolder,
     faFolderOpen,
 } from "@fortawesome/free-solid-svg-icons";
+import Tooltip from "@mui/material/Tooltip";
+import { FilePathMenu } from "../../components/file-path-menu";
+import { Tip } from "../../components/tip";
 import { Section } from "../../components/section";
 
 //
 // How a file differs from the last commit, as Git's one-letter status.
 //
-export type FileStatus = "M" | "A" | "D";
+export type FileStatus = "M" | "A" | "D" | "R";
 
 //
 // One file or folder in the tree.
@@ -82,7 +85,8 @@ export const fileTree: ITreeNode[] = [
 ];
 
 //
-// Returns the colour token of a file status.
+// Returns the colour token of a file status: success for added, danger for deleted, info for
+// renamed and warning for modified.
 //
 export function statusColour(status: FileStatus): string {
     if (status === "A") {
@@ -91,25 +95,49 @@ export function statusColour(status: FileStatus): string {
     if (status === "D") {
         return "var(--color-danger)";
     }
+    if (status === "R") {
+        return "var(--color-info)";
+    }
     return "var(--color-warning)";
 }
 
 //
-// Renders a file's status letter in its status colour.
+// The name and meaning of each file status, for the status letter's tooltip.
+//
+const statusTips: Record<FileStatus, { title: string; detail: string }> = {
+    M: { title: "Modified", detail: "The file's lines changed." },
+    A: { title: "Added", detail: "The file is new." },
+    D: { title: "Deleted", detail: "The file was removed." },
+    R: { title: "Renamed", detail: "The file moved to a new path." },
+};
+
+//
+// Renders a file's status letter in its status colour inside a thin border, like the line counts
+// beside it, with space to its right and a tooltip naming the change.
 //
 export function StatusLetter({ status }: { status: FileStatus }): ReactNode {
     return (
-        <span
-            aria-label={{ M: "modified", A: "added", D: "deleted" }[status]}
-            style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "var(--text-sm)",
-                fontWeight: "var(--weight-bold)",
-                color: statusColour(status),
-            }}
-        >
-            {status}
-        </span>
+        <Tooltip title={<Tip title={statusTips[status].title} detail={statusTips[status].detail} />}>
+            <span
+                aria-label={{ M: "modified", A: "added", D: "deleted", R: "renamed" }[status]}
+                className="inline-flex flex-none items-center justify-center"
+                style={{
+                    minWidth: "calc(var(--space-4) + var(--space-2))",
+                    marginRight: "var(--space-1)",
+                    padding: "calc(var(--space-1) * 0.75) var(--space-1) 0",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: "var(--weight-bold)",
+                    lineHeight: "var(--leading-normal)",
+                    color: statusColour(status),
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    cursor: "default",
+                }}
+            >
+                {status}
+            </span>
+        </Tooltip>
     );
 }
 
@@ -164,6 +192,7 @@ export function TreeRows({
                             },
                         }}
                     />
+                    {isFolder ? undefined : <FilePathMenu path={nodePath.slice(1)} />}
                     {node.status ? <StatusLetter status={node.status} /> : undefined}
                 </ListItemButton>
                 {isFolder && isOpen ? (

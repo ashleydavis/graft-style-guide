@@ -5,6 +5,8 @@
 
 import type { ReactNode } from "react";
 import Chip from "@mui/material/Chip";
+import Tooltip from "@mui/material/Tooltip";
+import { Tip } from "../../components/tip";
 import Paper from "@mui/material/Paper";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCloud, faCodeBranch, faLocationDot, faTag, faXmark, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
@@ -27,19 +29,32 @@ export const refIcons: Record<RefKind, IconDefinition> = {
 };
 
 //
+// What each kind of ref is, for its badge's tooltip.
+//
+const refTips: Record<RefKind, { title: string; detail: (name: string) => string }> = {
+    current: { title: "Checked-out branch", detail: name => `HEAD is on ${name}, so new commits go here.` },
+    branch: { title: "Local branch", detail: name => `${name} points at this commit.` },
+    remote: { title: "Remote branch", detail: name => `${name} was here when you last fetched.` },
+    tag: { title: "Tag", detail: name => `${name} names this commit for good, as for a release.` },
+    head: { title: "HEAD", detail: () => "The commit your working tree is on." },
+};
+
+//
 // Renders a badge for a ref on the Chip variant of its kind: the checked-out branch filled with
 // the accent colour, and every other ref on the raised background with its icon in the colour
 // of its kind. With `onDelete` the badge has a remove button.
 //
 export function RefBadge({ kind, name, onDelete }: { kind: RefKind; name: string; onDelete?: () => void }): ReactNode {
     return (
-        <Chip
-            variant={kind}
-            icon={<FontAwesomeIcon icon={refIcons[kind]} />}
-            label={name}
-            onDelete={onDelete}
-            deleteIcon={onDelete ? <FontAwesomeIcon icon={faXmark} aria-label={`Remove ${name}`} /> : undefined}
-        />
+        <Tooltip title={<Tip title={refTips[kind].title} detail={refTips[kind].detail(name)} />}>
+            <Chip
+                variant={kind}
+                icon={<FontAwesomeIcon icon={refIcons[kind]} />}
+                label={name}
+                onDelete={onDelete}
+                deleteIcon={onDelete ? <FontAwesomeIcon icon={faXmark} aria-label={`Remove ${name}`} /> : undefined}
+            />
+        </Tooltip>
     );
 }
 

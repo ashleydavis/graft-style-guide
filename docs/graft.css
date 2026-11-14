@@ -8,6 +8,14 @@
  * The greys, accent, status colours, Git colours, fonts, type scale, spacing, corner radius,
  * shadows, animation timing, icon sizes, focus ring, muted text, hover, selected and disabled
  * colours and control borders are the developer's picks.
+ *
+ * Hover and selected are see-through washes of --violet-500, the active pane's colour, so they
+ * tint whatever they sit on.
+ *
+ * Selections nested inside each other step through violet: --color-select-pane marks the active
+ * pane, --color-select-item a selection inside it, such as the current hunk, and --color-focus
+ * the keyboard focus inside that, such as a focused text box. Each step inward stands further from
+ * the background.
  */
 
 /* Raw palette: the same in both themes. */
@@ -28,23 +36,33 @@
     --gray-900: #18181b;
     --gray-950: #09090b;
 
+    --violet-100: #ede9fe;
     --violet-300: #c4b5fd;
     --violet-400: #a78bfa;
     --violet-500: #8b5cf6;
     --violet-600: #7c3aed;
+    --violet-500-a08: rgb(139 92 246 / 0.08);
+    --violet-500-a14: rgb(139 92 246 / 0.14);
+    --violet-500-a16: rgb(139 92 246 / 0.16);
+    --violet-500-a26: rgb(139 92 246 / 0.26);
     --violet-700: #6d28d9;
+    --violet-900: #4c1d95;
     --violet-950: #150c2e;
 
     --green-100: #dcfce7;
+    --green-200: #bbf7d0;
     --green-400: #4ade80;
     --green-600: #16a34a;
     --green-650: #169344;
     --green-700: #15803d;
+    --green-900: #14532d;
     --green-950: #0f2e1a;
 
     --red-100: #fee2e2;
+    --red-200: #fecaca;
     --red-400: #f87171;
     --red-600: #dc2626;
+    --red-900: #7f1d1d;
     --red-950: #3b1215;
     --red-975: #1a0505;
 
@@ -115,14 +133,16 @@
     --color-border-control: var(--gray-450);
     --color-text: var(--gray-900);
     --color-text-muted: var(--gray-550);
-    --color-hover: var(--gray-100);
-    --color-selected: var(--gray-200);
+    --color-hover: var(--violet-500-a08);
+    --color-selected: var(--violet-500-a16);
     --color-disabled: var(--gray-100);
     --color-text-disabled: var(--gray-500);
     --color-accent: var(--violet-600);
     --color-accent-hover: var(--violet-700);
     --color-on-accent: var(--gray-0);
-    --color-focus: var(--gray-900);
+    --color-focus: var(--violet-900);
+    --color-select-pane: var(--violet-500);
+    --color-select-item: var(--violet-700);
     --color-success: var(--green-700);
     --color-warning: var(--amber-700);
     --color-danger: var(--red-600);
@@ -131,8 +151,10 @@
     --color-scrim: var(--black-40);
     --color-diff-added: var(--green-100);
     --color-diff-added-line: var(--green-600);
+    --color-diff-added-word: var(--green-200);
     --color-diff-removed: var(--red-100);
     --color-diff-removed-line: var(--red-600);
+    --color-diff-removed-word: var(--red-200);
     --color-conflict: var(--amber-600);
     --color-lane-1: var(--blue-600);
     --color-lane-2: var(--green-650);
@@ -153,14 +175,16 @@
     --color-border-control: var(--gray-500);
     --color-text: var(--gray-50);
     --color-text-muted: var(--gray-400);
-    --color-hover: var(--gray-800);
-    --color-selected: var(--gray-750);
+    --color-hover: var(--violet-500-a14);
+    --color-selected: var(--violet-500-a26);
     --color-disabled: var(--gray-800);
     --color-text-disabled: var(--gray-500);
     --color-accent: var(--violet-400);
     --color-accent-hover: var(--violet-300);
     --color-on-accent: var(--violet-950);
-    --color-focus: var(--gray-50);
+    --color-focus: var(--violet-100);
+    --color-select-pane: var(--violet-500);
+    --color-select-item: var(--violet-300);
     --color-success: var(--green-400);
     --color-warning: var(--amber-400);
     --color-danger: var(--red-400);
@@ -169,8 +193,10 @@
     --color-scrim: var(--black-60);
     --color-diff-added: var(--green-950);
     --color-diff-added-line: var(--green-400);
+    --color-diff-added-word: var(--green-900);
     --color-diff-removed: var(--red-950);
     --color-diff-removed-line: var(--red-400);
+    --color-diff-removed-word: var(--red-900);
     --color-conflict: var(--amber-400);
     --color-lane-1: var(--blue-400);
     --color-lane-2: var(--green-400);

@@ -60,6 +60,21 @@ export function CommitExplorerPage(): ReactNode {
             </Section>
 
             <Section
+                title="A file with several changes"
+                description="A file the commit changed in three places, so its diff has three hunks, each after a bar that counts the unchanged lines left out. With the diff active, Up and Down step from hunk to hunk, marking the current one with an accent bar, and Shift with Up or Down moves to the commit's previous or next file."
+            >
+                <CommitExplorer
+                    initialState={{
+                        activePaneIndex: 2,
+                        selectedHash: exampleCommit.hash,
+                        openHash: exampleCommit.hash,
+                        selectedPath: "frontend/src/lib/git-commands.ts",
+                        openPath: "frontend/src/lib/git-commands.ts",
+                    }}
+                />
+            </Section>
+
+            <Section
                 title="Several branches at once"
                 description="Four lanes. A blame view is in progress on its own branch while two other branches are merged past it, so each merge's curve crosses the lanes between, and the stash branch crosses the blame branch on its way back to main. The open commit has a long title, cut short in the list and wrapped in full in its details, and a description of several paragraphs and a list."
             >
@@ -77,7 +92,7 @@ export function CommitExplorerPage(): ReactNode {
 
             <Section
                 title="A long-running branch"
-                description="A settings branch takes main's changes part way through with a merge of its own, while a hotfix leaves main and comes back, its curves crossing the settings lane, before main takes the finished branch."
+                description="Thirty commits on up to five lanes. A settings branch runs beside main for its whole history, takes main's changes twice with merges of its own and grows a themes branch that merges back into it, while a commit graph branch, two hotfixes and a zoom branch leave main and return around it. The lanes shift and cross as branches start and end; scroll the commit pane to follow them down."
             >
                 <CommitExplorer history={longBranchHistory} />
             </Section>
