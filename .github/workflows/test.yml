@@ -1,0 +1,35 @@
+# Runs the type check and the Playwright end-to-end tests on every push and pull request, using
+# the same script as the pre-commit hook. A fresh checkout has no what-changed baseline, so the
+# script runs every check.
+
+name: Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      # Installs the Bun and what-changed versions locked in mise.toml.
+      - uses: jdx/mise-action@v5.2.9
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The tests run in the Google Chrome that GitHub's Ubuntu runners have installed.
+      - name: Run the checks
+        run: ./scripts/test-everything.sh
+
+      # Keeps the logs and Playwright's failure screenshots and traces for reading after a
+      # failed run.
+      - name: Upload the test output
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: test-output
+          path: tmp/
+          retention-days: 14

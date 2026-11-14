@@ -63,6 +63,8 @@ The Playwright end-to-end tests start their own dev server on a free port and ru
 
 Runs the type check and the end-to-end tests when their files changed since they last passed, using [what-changed](https://github.com/ashleydavis/what-changed). `what-changed.yaml` lists the checks and the files each one watches.
 
+GitHub Actions runs the same script on every push and pull request (`.github/workflows/test.yml`). After a failed run, the logs and Playwright's screenshots and traces are attached to the run as the `test-output` artifact.
+
 ## Pre-commit hook
 
 ```bash
