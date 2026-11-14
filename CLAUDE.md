@@ -1,6 +1,6 @@
 # Graft style guide
 
-Follow [docs/process.md](docs/process.md), one step per message.
+Follow [process.md](process.md), one step per message.
 
 - Never read `../mockup/`, `../playbook/project/` or any other Graft UI, its code or screenshots, unless the developer asks in that message. Token values come from the intent and the developer's choices only.
 - `graft.css` is the only source of token values. `style-guide.md` and `areas/*.md` refer to tokens by name and never repeat a value.
@@ -14,6 +14,8 @@ Follow [docs/process.md](docs/process.md), one step per message.
 - Build components from MUI components wherever MUI has one, styled to this style guide through MUI's own customisation (theme `styleOverrides`, `variants`, `defaultProps`). Where that fails, use Tailwind classes. Where Tailwind fails, use raw CSS.
 - A component outside MUI's set is built in React, HTML and TypeScript, styled with Tailwind first and raw CSS where Tailwind fails.
 - A component made of other components follows the same order for each part: styled MUI components first, then Tailwind, then raw CSS.
+- `docs/` holds the built site for GitHub Pages, written by `bun run build`. Rebuild it after every change to `graft.css` or `src/`, so the committed site matches the source.
+- While working with the developer, keep the dev server running (`bun run dev`, port 5199) and the explorer open in Chrome at http://localhost:5199/. At the start of a session, start the server if it is down and open the page with `google-chrome --new-window`. After any change to `vite.config.ts`, stop the dev server process and start a new one: Vite's restart inside the same process leaves open browser connections on the closed server, which answers "The server is being restarted or closed".
 - Run commands through mise. The explorer's dev server is `bun run dev` on port 5199.
 - Never use `bun --bun`. This project uses Bun: scripts in `package.json` run a tool by passing its script file to `bun`, as in `bun node_modules/vite/bin/vite.js`.
 - Comments and docs say exactly what a thing is and does, in positive statements. Vague, ambiguous or imprecise statements are banned, and so is listing what the code, a feature or the project does not do.

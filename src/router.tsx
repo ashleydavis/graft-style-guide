@@ -52,10 +52,12 @@ export const pageRoute = createRoute({
 });
 
 //
-// The router, using browser history so each page's URL can be bookmarked and reloaded.
+// The router, using browser history so each page's URL can be bookmarked and reloaded. The base
+// path is Vite's base, "/" on the dev server and the repo name on GitHub Pages.
 //
 export const router = createRouter({
     routeTree: rootRoute.addChildren([indexRoute, pageRoute]),
+    basepath: import.meta.env.BASE_URL,
 });
 
 //

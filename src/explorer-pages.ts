@@ -7,6 +7,7 @@ import { OverviewPage } from "./pages/overview";
 import { ButtonPage } from "./pages/button";
 import { TextBoxPage } from "./pages/text-box";
 import { DialogPage } from "./pages/dialog";
+import { AboutPage } from "./pages/about";
 
 //
 // One page in the explorer.
@@ -61,5 +62,11 @@ export const explorerPages: IExplorerPage[] = [
         title: "Dialog",
         keywords: ["modal", "popup", "confirm", "form"],
         component: DialogPage,
+    },
+    {
+        id: "about",
+        title: "About",
+        keywords: ["graft", "github", "youtube", "series", "links"],
+        component: AboutPage,
     },
 ];

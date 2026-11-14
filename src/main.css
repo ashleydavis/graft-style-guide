@@ -1,10 +1,11 @@
 /*
  * Styles for the explorer itself. The layer order puts MUI's styles under Tailwind's
- * utilities, so a Tailwind class on an MUI component wins.
+ * utilities, so a Tailwind class on an MUI component wins. Tailwind reads class names from
+ * src/ only, so edits to docs and the built site in docs/ leave the open page as it is.
  */
 
 @layer theme, base, mui, components, utilities;
-@import "tailwindcss";
+@import "tailwindcss" source("../src");
 
 body {
     margin: 0;

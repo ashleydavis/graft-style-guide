@@ -166,6 +166,21 @@ export const graftTheme: Theme = createTheme({
                 },
             },
         },
+        MuiLink: {
+            styleOverrides: {
+                root: {
+                    color: "var(--color-accent)",
+                    textDecorationColor: "var(--color-accent)",
+                    "&:hover": {
+                        color: "var(--color-accent-hover)",
+                    },
+                    "&:focus-visible": {
+                        outline: "2px solid var(--color-focus)",
+                        outlineOffset: "2px",
+                    },
+                },
+            },
+        },
         MuiToggleButton: {
             styleOverrides: {
                 root: {

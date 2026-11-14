@@ -224,3 +224,12 @@ test.describe("Dialog", () => {
         await expect(page.getByRole("dialog")).toHaveCount(0);
     });
 });
+
+test.describe("About", () => {
+    test("the about page links to Graft on GitHub and to the YouTube channel", async ({ page }) => {
+        await page.goto("/page/about");
+        await expect(page.getByRole("heading", { level: 1, name: "About" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "github.com/ashleydavis/Graft" })).toHaveAttribute("href", "https://github.com/ashleydavis/Graft");
+        await expect(page.getByRole("link", { name: "Code Capers" })).toHaveAttribute("href", "https://www.youtube.com/@CodeCapers");
+    });
+});
