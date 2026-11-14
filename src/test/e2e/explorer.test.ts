@@ -230,14 +230,21 @@ test.describe("Dialog", () => {
         await expect(navigation.getByRole("list", { name: "Pages" }).getByRole("link")).toHaveText(["Dialog"]);
     });
 
-    test("the danger button takes the danger token, which differs from the accent", async ({ page }) => {
+    test("the danger button has red words and a red border on no fill", async ({ page }) => {
         await page.goto("/page/dialog?components=light");
         const discard = page.getByRole("button", { name: "Discard", exact: true });
         const keep = page.getByRole("button", { name: "Keep changes" });
-        const create = page.locator("main section").first().getByRole("button", { name: "Create" });
-        const discardBackground = await computedStyle(discard, "background-color");
-        expect(discardBackground).not.toBe("rgba(0, 0, 0, 0)");
-        expect(discardBackground).not.toBe(await computedStyle(create, "background-color"));
+        const danger = await page.locator('[data-theme="light"]').first().evaluate(element => {
+            const probe = document.createElement("span");
+            probe.style.color = "var(--color-danger)";
+            element.appendChild(probe);
+            const colour = getComputedStyle(probe).color;
+            probe.remove();
+            return colour;
+        });
+        expect(await computedStyle(discard, "color")).toBe(danger);
+        expect(await computedStyle(discard, "background-color")).toBe("rgba(0, 0, 0, 0)");
+        expect(await computedStyle(discard, "box-shadow")).toContain(danger);
         await expect(keep).toBeVisible();
     });
 
@@ -460,3 +467,122 @@ export async function isFontLoaded(page: Page, family: string): Promise<boolean>
         family,
     );
 }
+
+test.describe("Component pages", () => {
+    test("the drop-down menu button opens its menu below it and choosing an item closes it", async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 2400 });
+        await page.goto("/page/button?components=light");
+        const merge = page.getByRole("button", { name: "Merge" });
+        const buttonBox = await merge.boundingBox();
+        await merge.click();
+        const menu = page.getByRole("menu");
+        await expect(menu).toBeVisible();
+        await expect.poll(async () => (await menu.boundingBox())!.y).toBeGreaterThanOrEqual(buttonBox!.y + buttonBox!.height - 1);
+        await menu.getByRole("menuitem", { name: "Rebase onto main" }).click();
+        await expect(page.getByRole("menu")).toHaveCount(0);
+        await expect(page.getByText("Chose: Rebase onto main")).toBeVisible();
+    });
+
+    test("the drop-down dialog button opens its settings below it, runs on Pull and closes on Cancel", async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 2400 });
+        await page.goto("/page/button?components=light");
+        const pull = page.getByRole("button", { name: "Pull", exact: true });
+        const buttonBox = await pull.boundingBox();
+        await pull.click();
+        const settings = page.getByRole("dialog", { name: "Pull settings" });
+        await expect(settings).toBeVisible();
+        await expect.poll(async () => (await settings.boundingBox())!.y).toBeGreaterThanOrEqual(buttonBox!.y + buttonBox!.height - 1);
+        await settings.getByRole("button", { name: "Cancel" }).click();
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+        await pull.click();
+        await page.getByRole("dialog", { name: "Pull settings" }).getByRole("radio", { name: "Rebase" }).check();
+        await page.getByRole("dialog", { name: "Pull settings" }).getByRole("button", { name: "Pull" }).click();
+        await expect(page.getByText("Pulled from origin with rebase, auto-stash on.")).toBeVisible();
+    });
+
+    test("a menu takes the theme of the panel it opens from", async ({ page }) => {
+        await page.goto("/page/button");
+        const dropDowns = page.locator("main section").filter({ hasText: "Drop-down buttons" });
+        await dropDowns.locator('[data-theme="dark"]').getByRole("button", { name: "Merge" }).click();
+        const darkBackground = await computedStyle(page.getByRole("menu").locator(".."), "background-color");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("menu")).toHaveCount(0);
+        await dropDowns.locator('[data-theme="light"]').getByRole("button", { name: "Merge" }).click();
+        const lightBackground = await computedStyle(page.getByRole("menu").locator(".."), "background-color");
+        expect(lightBackground).not.toBe(darkBackground);
+    });
+
+    test("a select opens its list and shows the chosen item", async ({ page }) => {
+        await page.goto("/page/select?components=light");
+        const select = page.getByRole("combobox").first();
+        await select.click();
+        await page.getByRole("option", { name: "upstream" }).click();
+        await expect(select).toHaveText("upstream");
+    });
+
+    test("the stage all checkbox is mixed while some files are ticked and ticks them all when clicked", async ({ page }) => {
+        await page.goto("/page/toggles?components=light");
+        const stageAll = page.getByRole("checkbox", { name: "Stage all" });
+        await expect(stageAll).toHaveAttribute("data-indeterminate", "true");
+        await stageAll.click();
+        await expect(page.getByRole("checkbox", { name: "src/lanes.ts" })).toBeChecked();
+        await expect(stageAll).toBeChecked();
+    });
+
+    test("clicking a tab or pressing the arrow keys switches the view below", async ({ page }) => {
+        await page.goto("/page/tabs?components=light");
+        const tabs = page.getByRole("tablist", { name: "Repository views" });
+        await tabs.getByRole("tab", { name: /History/ }).click();
+        await expect(page.getByText("128 commits on main.")).toBeVisible();
+        await page.keyboard.press("ArrowRight");
+        await expect(tabs.getByRole("tab", { name: /Stashes/ })).toBeFocused();
+        await page.keyboard.press("Enter");
+        await expect(page.getByText("2 stashed sets of changes.")).toBeVisible();
+    });
+
+    test("right-clicking a commit opens the context menu", async ({ page }) => {
+        await page.goto("/page/menu?components=light");
+        await page.getByText("Right-click this commit").click({ button: "right" });
+        await expect(page.getByRole("menu")).toBeVisible();
+        await expect(page.getByRole("menuitem", { name: /Reset to here/ })).toBeVisible();
+    });
+
+    test("a tooltip shows when the pointer rests on its button", async ({ page }) => {
+        await page.goto("/page/tooltip?components=light");
+        const section = page.locator("main section").filter({ hasText: "On hover and focus" });
+        await section.getByRole("button", { name: "Push" }).hover();
+        await expect(page.getByRole("tooltip").filter({ hasText: "Push" })).toBeVisible();
+    });
+
+    test("clicking a folder in the tree closes and opens it", async ({ page }) => {
+        await page.goto("/page/list-and-tree?components=light");
+        const tree = page.getByRole("tree", { name: "Changed files" });
+        await expect(tree.getByText("lanes.ts")).toBeVisible();
+        await tree.getByRole("treeitem", { name: "graph", exact: true }).click();
+        await expect(tree.getByText("lanes.ts")).toHaveCount(0);
+        await tree.getByRole("treeitem", { name: "graph", exact: true }).click();
+        await expect(tree.getByText("lanes.ts")).toBeVisible();
+    });
+
+    test("the command palette narrows as you type and runs the highlighted command on Enter", async ({ page }) => {
+        await page.goto("/page/command-palette?components=light");
+        await page.getByRole("button", { name: "Open command palette" }).click();
+        const search = page.getByRole("textbox", { name: "Command" }).last();
+        await expect(search).toBeFocused();
+        await page.keyboard.type("pu");
+        await expect(page.getByRole("dialog", { name: "Command palette" }).getByRole("button")).toHaveText([/Pull/, /Push/]);
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("Enter");
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+        await expect(page.getByText("Ran: Push")).toBeVisible();
+    });
+
+    test("pushing shows a toast that closes on Dismiss", async ({ page }) => {
+        await page.goto("/page/notifications?components=light");
+        await page.getByRole("button", { name: "Push" }).click();
+        const toast = page.getByText("Pushed 2 commits to origin/main.");
+        await expect(toast).toBeVisible();
+        await page.getByRole("alert").filter({ hasText: "Pushed 2 commits" }).getByRole("button", { name: "Dismiss" }).click();
+        await expect(toast).toHaveCount(0);
+    });
+});

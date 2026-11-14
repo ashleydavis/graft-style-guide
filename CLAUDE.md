@@ -6,7 +6,7 @@ Follow [process.md](process.md), one step per message.
 - `graft.css` is the only source of token values. `style-guide.md` and `areas/*.md` refer to tokens by name and never repeat a value.
 - Raw palette tokens hold values. Role tokens point at raw palette tokens. Components and rules use role tokens only.
 - Every style has a light and a dark version: every role token (colours, shadows, borders, focus rings and every other value components use) has a light and a dark value, even when the two are the same. Every option, preview and rule covers both themes.
-- At each choice, offer two or three options on the style explorer and let the developer pick. Never pick for them. Every choice also has a last option, "Spot it", that paints the choice's tokens bright red to show where they appear. One choice decides one thing the preview shows plainly.
+- At each choice, offer two or three options on the style explorer and let the developer pick. Never pick for them. Every choice also has a last option, "Spot it", that paints the choice's tokens bright red to show where they appear. One choice decides one thing the preview shows plainly. When the developer asks for a fix or a change, make it directly; never turn it into a choice.
 - Anchor every rule to a token or a number, never to an adjective alone.
 - Check text and control contrast against WCAG 2.2 AA by computing the ratio, and report the figure.
 - `graft.css` needs no build step. No JSON token files.

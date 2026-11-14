@@ -122,6 +122,28 @@ With those in place, a contrast check ran over every text and control colour aga
 
 You could not see a difference between the options and asked Claude to choose. Claude took Just past, the smallest change that meets 3 to 1, as three new in-between shades used by the light lanes only. Every ratio is now recorded in the Contrast section of `style-guide.md`, which finishes the colours and other values in `graft.css`.
 
+## Building the components
+
+Every component on the todo list now has its own explorer page: select, checkbox, radio and switch, tabs, menu and context menu, tooltip, list and tree, table, toolbar and status bar, sidebar navigation, notifications and banners, progress and loading, badges and chips, and the command palette. The button page gained icon buttons, the danger button and, at your request, two drop-down buttons: one that opens a menu and one that opens a small dialog of settings anchored below the button.
+
+You asked for MUI to be used the right way, so each part is a real MUI component styled in one place, the MUI theme in `src/lib/mui-theme.ts`. Surfaces are MUI `Paper` with an outlined and an overlay variant, the ref badges are `Chip` variants, the banner icons are set once as the `Alert` default and the toolbar is MUI's `Toolbar`. Pages pass `sx` only for one-off layout such as a width.
+
+Popups such as menus, the select list and tooltips normally mount at the end of the page, outside the light or dark panel that opened them, so they came out in the wrong theme. The theme now mounts them next to the control that opens them, and a test checks that a menu opened in the dark panel and one opened in the light panel differ.
+
+Problems along the way:
+
+- **The command palette's search box lost focus** when the palette opened as a dialog, because MUI's dialog moves focus inside itself after it appears. The search box now takes focus once the dialog has finished opening.
+- **Popups measured too early.** The drop-down tests measured the menu while it was still growing in, and on a short window MUI slides a tall panel up so it stays on screen. The tests now wait for the popup to settle and use a tall window.
+- **A long title under the info button on a phone.** "Notifications and banners" ran under the floating info button at the top right, which the phone tests caught. Page titles on narrow screens now leave room on the right as well as the left.
+
+Running the contrast check over the new components found one failure: status colours used as words, such as a file's M, A or D letter and the danger item in a menu, fall under 4.5 to 1 in light on hover and selected rows. That is a choice on the Choices page, alongside the looks the components leave open: tabs, switch, tooltip, banners, ref badges, table rows, the sidebar's current item and tree guides. The Choices page can now draw a choice on its own preview, such as a row of tabs, instead of the small Graft screen.
+
+You found the red-filled danger buttons too bright and asked for red text, a red icon or a red border instead. Every danger button now has all three on no fill, and under the pointer its border thickens instead of filling grey, so the red words keep 4.8 to 1 in light and 6.4 to 1 in dark. Claude first offered this as a choice; you asked for fixes to be made, not offered, and that is now a rule in `CLAUDE.md`. You also asked for a little more room above the text in the ref badges such as main, so the badges gained half a spacing step at the top.
+
+You asked for every button to have a border. Contained buttons now have a line in the darker accent, outlined buttons keep their control border, and text buttons, icon buttons and disabled buttons have the soft border. Each is drawn as a 1px line inside the button, so it adds no size and every kind of button stays the same height. You also spotted that large buttons were no bigger than medium ones: the theme gave every size the medium padding. Large buttons now have more padding and the next text size up.
+
+You asked for more room above and below the items of the Merge button's menu. Every menu now has a full spacing step above its first item and below its last.
+
 The rest of the work, in order, is in `todo.md`.
 
 ## Picking it up again

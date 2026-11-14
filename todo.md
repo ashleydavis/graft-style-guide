@@ -34,22 +34,23 @@ The work to flesh out the Graft style guide, in the order of `process.md`. Each 
 
 Each gets its own explorer page, built from MUI components where MUI has one.
 
-- [ ] Button: review the kinds, sizes, icon buttons and the danger button.
-- [ ] Text box: review the states, search box and multi-line box.
-- [ ] Dialog: review the form and confirmation dialogs.
-- [ ] Select and dropdown.
-- [ ] Checkbox, radio button and switch.
-- [ ] Tabs.
-- [ ] Menu and context menu.
-- [ ] Tooltip.
-- [ ] List and tree, such as the file tree.
-- [ ] Table, such as the commit list.
-- [ ] Toolbar and status bar.
-- [ ] Sidebar navigation.
-- [ ] Notifications and banners.
-- [ ] Progress and loading states.
-- [ ] Badges and chips for branches, tags and remotes.
-- [ ] Command palette.
+- [x] Button: review the kinds, sizes, icon buttons and the danger button, and add the drop-down menu button and drop-down dialog button.
+- [x] Text box: review the states, search box and multi-line box.
+- [x] Dialog: review the form and confirmation dialogs.
+- [x] Select and dropdown.
+- [x] Checkbox, radio button and switch.
+- [x] Tabs.
+- [x] Menu and context menu.
+- [x] Tooltip.
+- [x] List and tree, such as the file tree.
+- [x] Table, such as the commit list.
+- [x] Toolbar and status bar.
+- [x] Sidebar navigation.
+- [x] Notifications and banners.
+- [x] Progress and loading states.
+- [x] Badges and chips for branches, tags and remotes.
+- [x] Command palette.
+- [ ] Pick the component looks on the Choices page: status colours as text, tabs, switch, tooltip, banners, ref badges, table rows, sidebar current item and tree guides.
 
 ## Git views
 

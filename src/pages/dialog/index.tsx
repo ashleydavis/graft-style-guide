@@ -42,7 +42,7 @@ export function DialogPage(): ReactNode {
                     </DialogContent>
                     <DialogActions>
                         <Button variant="text">Keep changes</Button>
-                        <Button variant="contained" color="error">
+                        <Button variant="outlined" color="error">
                             Discard
                         </Button>
                     </DialogActions>

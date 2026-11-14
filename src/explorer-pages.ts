@@ -11,6 +11,19 @@ import { ChoicesPage } from "./pages/choices";
 import { choices } from "./pages/choices/options";
 import { FontsPage } from "./pages/fonts";
 import { CommitGraphPage } from "./pages/commit-graph";
+import { SelectPage } from "./pages/select";
+import { TogglesPage } from "./pages/toggles";
+import { TabsPage } from "./pages/tabs";
+import { MenuPage } from "./pages/menu";
+import { TooltipPage } from "./pages/tooltip";
+import { TreePage } from "./pages/tree";
+import { TablePage } from "./pages/table";
+import { BarsPage } from "./pages/bars";
+import { SidebarPage } from "./pages/sidebar";
+import { NotificationsPage } from "./pages/notifications";
+import { ProgressPage } from "./pages/progress";
+import { BadgesPage } from "./pages/badges";
+import { CommandPalettePage } from "./pages/command-palette";
 
 //
 // One page in the explorer.
@@ -83,9 +96,87 @@ export const explorerPages: IExplorerPage[] = [
         component: TextBoxPage,
     },
     {
+        id: "select",
+        title: "Select",
+        keywords: ["dropdown", "drop-down", "combo", "picker", "options"],
+        component: SelectPage,
+    },
+    {
+        id: "toggles",
+        title: "Checkbox, radio and switch",
+        keywords: ["checkbox", "radio", "switch", "toggle", "option"],
+        component: TogglesPage,
+    },
+    {
+        id: "tabs",
+        title: "Tabs",
+        keywords: ["tab", "views", "switcher"],
+        component: TabsPage,
+    },
+    {
+        id: "menu",
+        title: "Menu",
+        keywords: ["context menu", "right-click", "actions", "dropdown"],
+        component: MenuPage,
+    },
+    {
+        id: "tooltip",
+        title: "Tooltip",
+        keywords: ["hint", "hover", "title"],
+        component: TooltipPage,
+    },
+    {
         id: "dialog",
         title: "Dialog",
         keywords: ["modal", "popup", "confirm", "form"],
         component: DialogPage,
+    },
+    {
+        id: "list-and-tree",
+        title: "List and tree",
+        keywords: ["file tree", "folders", "rows", "branches"],
+        component: TreePage,
+    },
+    {
+        id: "table",
+        title: "Table",
+        keywords: ["commit list", "grid", "rows", "columns"],
+        component: TablePage,
+    },
+    {
+        id: "toolbar-and-status-bar",
+        title: "Toolbar and status bar",
+        keywords: ["toolbar", "status", "actions", "footer"],
+        component: BarsPage,
+    },
+    {
+        id: "sidebar",
+        title: "Sidebar navigation",
+        keywords: ["navigation", "branches", "remotes", "tags", "stashes"],
+        component: SidebarPage,
+    },
+    {
+        id: "notifications",
+        title: "Notifications and banners",
+        keywords: ["alert", "toast", "snackbar", "banner", "message", "error"],
+        component: NotificationsPage,
+    },
+    {
+        id: "progress",
+        title: "Progress and loading",
+        keywords: ["spinner", "loading", "progress bar", "skeleton"],
+        component: ProgressPage,
+    },
+    {
+        id: "badges",
+        title: "Badges and chips",
+        keywords: ["chip", "badge", "ref", "branch", "tag", "remote", "label"],
+        component: BadgesPage,
+    },
+    {
+        id: "command-palette",
+        title: "Command palette",
+        keywords: ["commands", "search", "ctrl+k", "launcher"],
+        component: CommandPalettePage,
     },
 ];

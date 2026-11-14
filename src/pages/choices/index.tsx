@@ -34,7 +34,7 @@ export function ChoicesPage(): ReactNode {
                         }}
                     >
                         {choice.options.map(option => (
-                            <OptionCard key={option.id} option={option} showFocus={choice.showFocus} showHover={choice.showHover} menuStartsOpen={!choice.menuStartsClosed} lanes={choice.lanes} />
+                            <OptionCard key={option.id} option={option} showFocus={choice.showFocus} showHover={choice.showHover} menuStartsOpen={!choice.menuStartsClosed} lanes={choice.lanes} Preview={choice.Preview} />
                         ))}
                     </div>
                 </Section>

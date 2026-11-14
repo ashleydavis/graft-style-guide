@@ -262,7 +262,7 @@ export function ExplorerLayout(): ReactNode {
                 <Drawer open={sidebarState === "open"} onClose={() => setSidebar("minimised")} disableScrollLock>
                     <nav className="flex min-h-full w-64 flex-col gap-3 p-4">{sidebarContent}</nav>
                 </Drawer>
-                <main className="min-w-0 pt-3.5 pr-4 pb-8 pl-4 [&_h1]:pl-12">{pageArea}</main>
+                <main className="min-w-0 pt-3.5 pr-4 pb-8 pl-4 [&_h1]:pr-8 [&_h1]:pl-12">{pageArea}</main>
             </div>
         );
     }

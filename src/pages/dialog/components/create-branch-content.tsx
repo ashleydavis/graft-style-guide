@@ -24,7 +24,7 @@ export function CreateBranchContent({ onClose }: { onClose(): void }): ReactNode
                 <DialogContentText>Creates a branch from the selected commit and switches to it.</DialogContentText>
                 <Stack
                     sx={{
-                        gap: "var(--space-3)",
+                        gap: "var(--space-4)",
                         paddingTop: "var(--space-1)",
                     }}
                 >

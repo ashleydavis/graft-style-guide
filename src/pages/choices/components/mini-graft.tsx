@@ -68,7 +68,7 @@ export function MiniGraft({
                     className="inline-flex items-center"
                     style={{
                         gap: "var(--space-1)",
-                        padding: "0 var(--space-2)",
+                        padding: "calc(var(--space-1) / 2) var(--space-2) 0",
                         borderRadius: "var(--radius-full)",
                         background: "var(--color-accent)",
                         color: "var(--color-on-accent)",
