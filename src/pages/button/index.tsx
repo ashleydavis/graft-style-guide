@@ -21,6 +21,7 @@ import {
     faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import { Section } from "../../components/section";
+import { CopyButton } from "../../components/copy-button";
 import { DropDownDialogButton } from "./components/drop-down-dialog-button";
 import { DropDownMenuButton } from "./components/drop-down-menu-button";
 
@@ -89,6 +90,13 @@ export function ButtonPage(): ReactNode {
                     <IconButton aria-label="Delete branch (protected)" size="small" disabled>
                         <FontAwesomeIcon icon={faTrash} />
                     </IconButton>
+                </div>
+            </Section>
+
+            <Section title="Copy button" description="An icon button that copies a command, hash or path. Once it has copied, its icon turns into a tick in the success colour and its tooltip says Copied for a moment.">
+                <div className="flex flex-wrap items-center gap-2">
+                    <code style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)" }}>a1b2c3d</code>
+                    <CopyButton text="a1b2c3d" label="Copy hash" />
                 </div>
             </Section>
 

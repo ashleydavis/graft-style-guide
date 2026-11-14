@@ -151,6 +151,16 @@ More additions you asked for:
 - **A shortcuts overlay.** Pressing "?" anywhere outside a text box opens a searchable list of Graft's keyboard shortcuts over the page, in groups, with each key drawn as a key cap. It has its own page in the explorer. A faint dotted line in the border colour runs from each action to its keys, so the eye follows the row across.
 - **Room above "Start point".** The fields in the Create branch dialog are a full spacing step apart, so each label has room above it.
 
+## The commit explorer and the Git commands panel
+
+You asked for Graft's commit explorer and its help panel to be rebuilt here in the style guide's own styling, and for Claude to read them in `playbook/project` for what they do but not copy their look.
+
+- **The commit explorer** has its own page. Three columns open left to right, as in a file browser's column view: the commit list, the open commit's details and an open file's diff. Up and Down move the selection, Left and Right move between columns, Enter opens and Escape closes the rightmost column, the same keys as in Graft. The column the keys act on has an accent border, and the open commit and file have an accent bar. Commit rows use the ref badges, changed files use the status letters, and the diff is a new view with old and new line numbers on the diff colours. The examples use a small made-up history of Graft itself.
+- **The Git commands panel** has its own page, after you asked for it to come out of the commit explorer. It shows the commands behind a view, each with the folder it runs in and a copy button, with examples of none, one and two commands.
+- **A copy button** joined the Button page: it copies a command, hash or path and shows a tick in the success colour for a moment.
+- **Scrolling.** The first build used the browser's scroll-into-view to keep the selection and the newest column in sight, which also scrolled the whole page down to the last example as it loaded. The explorer now scrolls only inside its own columns, and a test checks the page stays at the top.
+- **A check on the example data.** A test that counts a diff's added lines found one file whose stated count was one short. A check now compares every file's counts with its diff.
+
 The rest of the work, in order, is in `todo.md`.
 
 ## Picking it up again

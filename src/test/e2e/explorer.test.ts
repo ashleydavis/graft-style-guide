@@ -7,6 +7,7 @@
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { choices } from "../../pages/choices/options";
+import { commits as exampleCommits } from "../../pages/commit-explorer/data";
 
 //
 // Returns the computed value of a CSS property on the element `locator` points at, so a test
@@ -605,5 +606,79 @@ test.describe("Component pages", () => {
         await expect(overlay.getByRole("listitem")).toContainText("Push");
         await page.keyboard.press("Escape");
         await expect(page.getByRole("dialog")).toHaveCount(0);
+    });
+});
+
+test.describe("Commit explorer", () => {
+    test("the arrow keys, Enter and Escape move through the commit, details and file panes", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
+        await explorer.focus();
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("Enter");
+        const details = explorer.getByRole("region", { name: "Commit details" });
+        await expect(details).toContainText("Move through the panes with the arrow keys");
+        await expect(details).toHaveAttribute("data-active", "true");
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("Enter");
+        const file = explorer.getByRole("region", { name: "File diff" });
+        await expect(file).toContainText("frontend/src/lib/commit-explorer.ts");
+        await expect(file).toHaveAttribute("data-active", "true");
+        await expect(file.locator('[data-line="added"]')).toHaveCount(8);
+        await page.keyboard.press("ArrowLeft");
+        await expect(details).toHaveAttribute("data-active", "true");
+        await page.keyboard.press("Escape");
+        await expect(file).toHaveCount(0);
+        await page.keyboard.press("Escape");
+        await expect(details).toHaveCount(0);
+        await expect(explorer.getByRole("region", { name: "Commits" })).toHaveAttribute("data-active", "true");
+    });
+
+    test("clicking a commit opens it and its close button closes it", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
+        await explorer.getByText("Initial commit").click();
+        const details = explorer.getByRole("region", { name: "Commit details" });
+        await expect(details).toContainText("None, this is the first commit");
+        await details.getByRole("button", { name: "Close commit details" }).click();
+        await expect(details).toHaveCount(0);
+    });
+
+    test("every example file's added and deleted counts match its diff", () => {
+        for (const commit of exampleCommits) {
+            for (const file of commit.files) {
+                const lines = file.diff.split("\n").filter(line => !line.startsWith("@@"));
+                expect(lines.filter(line => line.startsWith("+")).length, `${file.path} added`).toBe(file.linesAdded);
+                expect(lines.filter(line => line.startsWith("-")).length, `${file.path} deleted`).toBe(file.linesDeleted);
+            }
+        }
+    });
+
+    test("opening a pane scrolls only inside the explorer, never the page", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        await page.waitForTimeout(500);
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    });
+});
+
+test.describe("Git commands panel", () => {
+    test("the panel shows no commands, one command or two commands, the most recent first", async ({ page }) => {
+        await page.goto("/page/git-commands-panel?components=light");
+        const panels = page.getByRole("region", { name: "Git commands" });
+        await expect(panels.nth(0)).toContainText("This view ran no Git commands.");
+        await expect(panels.nth(1).getByRole("listitem")).toHaveCount(1);
+        await expect(panels.nth(1)).toContainText("git log --max-count=50");
+        await expect(panels.nth(2).getByRole("listitem")).toHaveCount(2);
+        await expect(panels.nth(2).getByRole("listitem").first()).toContainText("Most recent");
+    });
+
+    test("a copy button copies its command and shows a tick for a moment", async ({ page, context }) => {
+        await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+        await page.goto("/page/git-commands-panel?components=light");
+        const panel = page.getByRole("region", { name: "Git commands" }).nth(1);
+        await panel.getByRole("button", { name: "Copy command" }).click();
+        await expect(panel.getByRole("button", { name: "Copied" })).toBeVisible();
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("git log --max-count=50");
+        await expect(panel.getByRole("button", { name: "Copy command" })).toBeVisible({ timeout: 4000 });
     });
 });

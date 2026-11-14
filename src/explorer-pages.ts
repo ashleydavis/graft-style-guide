@@ -25,6 +25,8 @@ import { ProgressPage } from "./pages/progress";
 import { BadgesPage } from "./pages/badges";
 import { CommandPalettePage } from "./pages/command-palette";
 import { ShortcutsPage } from "./pages/shortcuts";
+import { CommitExplorerPage } from "./pages/commit-explorer";
+import { GitCommandsPanelPage } from "./pages/git-commands-panel";
 
 //
 // One page in the explorer.
@@ -67,6 +69,18 @@ export const explorerPages: IExplorerPage[] = [
         title: "Fonts",
         keywords: ["type", "typography", "text", "mono", "monospace", "code", "mona", "monaspace"],
         component: FontsPage,
+    },
+    {
+        id: "commit-explorer",
+        title: "Commit explorer",
+        keywords: ["commits", "history", "log", "diff", "panes", "columns", "keys"],
+        component: CommitExplorerPage,
+    },
+    {
+        id: "git-commands-panel",
+        title: "Git commands panel",
+        keywords: ["help", "right sidebar", "context help", "terminal", "commands"],
+        component: GitCommandsPanelPage,
     },
     {
         id: "commit-graph",
