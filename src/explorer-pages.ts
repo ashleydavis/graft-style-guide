@@ -24,6 +24,7 @@ import { NotificationsPage } from "./pages/notifications";
 import { ProgressPage } from "./pages/progress";
 import { BadgesPage } from "./pages/badges";
 import { CommandPalettePage } from "./pages/command-palette";
+import { ShortcutsPage } from "./pages/shortcuts";
 
 //
 // One page in the explorer.
@@ -178,5 +179,11 @@ export const explorerPages: IExplorerPage[] = [
         title: "Command palette",
         keywords: ["commands", "search", "ctrl+k", "launcher"],
         component: CommandPalettePage,
+    },
+    {
+        id: "shortcuts",
+        title: "Shortcuts overlay",
+        keywords: ["keyboard", "hotkeys", "keys", "help", "?"],
+        component: ShortcutsPage,
     },
 ];

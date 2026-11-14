@@ -144,6 +144,13 @@ You asked for every button to have a border. Contained buttons now have a line i
 
 You asked for more room above and below the items of the Merge button's menu. Every menu now has a full spacing step above its first item and below its last.
 
+More additions you asked for:
+
+- **Messages and toasts in every kind.** Banners and toasts now come in plain, info, success, warning and error. A plain message is a new `plain` variant of MUI's Alert with no icon and no status colour. MUI's Snackbar shows one toast at a time, so toasts sit in a MUI Stack at the bottom left of the screen instead: each slides up, several stack with the newest at the bottom, and each closes after 4 seconds or on Dismiss.
+- **Shortcuts in line with their words.** The keyboard shortcuts in tooltips, menus and the command palette sat about 2px high, because the code font draws its letters higher in the line than the interface font. A shared `Shortcut` component now puts them on the same baseline as the words.
+- **A shortcuts overlay.** Pressing "?" anywhere outside a text box opens a searchable list of Graft's keyboard shortcuts over the page, in groups, with each key drawn as a key cap. It has its own page in the explorer. A faint dotted line in the border colour runs from each action to its keys, so the eye follows the row across.
+- **Room above "Start point".** The fields in the Create branch dialog are a full spacing step apart, so each label has room above it.
+
 The rest of the work, in order, is in `todo.md`.
 
 ## Picking it up again

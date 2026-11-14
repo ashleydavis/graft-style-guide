@@ -577,12 +577,33 @@ test.describe("Component pages", () => {
         await expect(page.getByText("Ran: Push")).toBeVisible();
     });
 
-    test("pushing shows a toast that closes on Dismiss", async ({ page }) => {
+    test("toasts of each kind stack up at the bottom of the screen and close on Dismiss", async ({ page }) => {
         await page.goto("/page/notifications?components=light");
-        await page.getByRole("button", { name: "Push" }).click();
-        const toast = page.getByText("Pushed 2 commits to origin/main.");
-        await expect(toast).toBeVisible();
-        await page.getByRole("alert").filter({ hasText: "Pushed 2 commits" }).getByRole("button", { name: "Dismiss" }).click();
-        await expect(toast).toHaveCount(0);
+        for (const label of ["Plain", "Info", "Success", "Warning", "Error"]) {
+            await page.getByRole("button", { name: label, exact: true }).click();
+        }
+        const liveToasts = page.locator('[aria-live="polite"]');
+        const success = liveToasts.getByRole("alert").filter({ hasText: "Pushed 2 commits to origin/main." });
+        const error = liveToasts.getByRole("alert").filter({ hasText: "Push rejected. Pull first, then push again." });
+        await expect(success).toBeVisible();
+        await expect(error).toBeVisible();
+        await expect.poll(async () => (await error.boundingBox())!.y).toBeGreaterThan((await success.boundingBox())!.y);
+        await success.getByRole("button", { name: "Dismiss" }).click();
+        await expect(success).toHaveCount(0);
+        await expect(error).toBeVisible();
+    });
+
+    test("pressing ? opens the shortcuts overlay, typing narrows the list and Escape closes it", async ({ page }) => {
+        await page.goto("/page/shortcuts?components=light");
+        await page.locator("main h1").click();
+        await page.keyboard.press("?");
+        const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+        await expect(overlay).toHaveCount(1);
+        await expect(overlay.getByRole("textbox", { name: "Search shortcuts" })).toBeFocused();
+        await page.keyboard.type("push");
+        await expect(overlay.getByRole("listitem")).toHaveCount(1);
+        await expect(overlay.getByRole("listitem")).toContainText("Push");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog")).toHaveCount(0);
     });
 });

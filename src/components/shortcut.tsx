@@ -35,3 +35,34 @@ export function Shortcut({ keys }: { keys: string }): ReactNode {
         </span>
     );
 }
+
+//
+// Renders a shortcut as key caps, one for each key in `keys`, which joins the keys with "+", as
+// in "Ctrl+Shift+P".
+//
+export function KeyCaps({ keys }: { keys: string }): ReactNode {
+    return (
+        <span className="inline-flex flex-wrap items-center justify-end" style={{ gap: "var(--space-1)" }}>
+            {keys.split("+").map((key, index) => (
+                <kbd
+                    key={`${key}-${index}`}
+                    style={{
+                        minWidth: "var(--space-6)",
+                        padding: "0 var(--space-1)",
+                        textAlign: "center",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: "var(--text-xs)",
+                        lineHeight: "var(--leading-normal)",
+                        color: "var(--color-text)",
+                        background: "var(--color-raised)",
+                        border: "1px solid var(--color-border)",
+                        borderBottomWidth: "2px",
+                        borderRadius: "var(--radius-sm)",
+                    }}
+                >
+                    {key}
+                </kbd>
+            ))}
+        </span>
+    );
+}
