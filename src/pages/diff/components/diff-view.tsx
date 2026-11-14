@@ -5,13 +5,13 @@
 // lines between hunks collapsed behind a button that shows them.
 //
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
 import ButtonBase from "@mui/material/ButtonBase";
 import Tooltip from "@mui/material/Tooltip";
 import { Tip } from "../../../components/tip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowsUpDown, faCompress, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
-import { changePartners, parseHunks, splitRows, wordPieces, type IDiffLine, type IHunk } from "../model";
+import { changePartners, gapBefore, parseHunks, splitRows, wordPieces, type IDiffLine, type IGap, type IHunk } from "../model";
 
 //
 // How a diff is laid out.
@@ -55,6 +55,28 @@ export interface IDiffViewProps {
     // the colour of a selection inside the active pane. Absent when the keys are on no hunk.
     //
     currentHunk?: number;
+
+    //
+    // The position of the run of unchanged lines the keys are on, 0 before the first hunk and the
+    // hunk count after the last, drawn with the same border. Absent when the keys are on no run.
+    //
+    currentGap?: number;
+
+    //
+    // The runs of unchanged lines shown or hidden by their own buttons or by Space, by position. A
+    // run with no entry follows `showAllLines`.
+    //
+    gapStates?: ReadonlyMap<number, boolean>;
+
+    //
+    // Called with a run's position and whether it should show, when its button is clicked.
+    //
+    onGapStateChange?: (gapIndex: number, isShown: boolean) => void;
+
+    //
+    // Called with a run's position when its bar is clicked, so the click makes it the current stop.
+    //
+    onSelectGap?: (gapIndex: number) => void;
 
     //
     // True to show every unchanged line of the file, false to fold the runs between hunks away
@@ -328,44 +350,6 @@ export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | und
         </div>
     );
 }
-
-//
-// The unchanged lines between two hunks, before the first or after the last: where they start in
-// the old file, how many there are and how far the new file's numbers run ahead of the old file's
-// there.
-//
-interface IGap {
-    //
-    // The first unchanged line, numbered in the old file.
-    //
-    oldStart: number;
-
-    //
-    // How many unchanged lines there are.
-    //
-    count: number;
-
-    //
-    // The new file's line number minus the old file's for these lines.
-    //
-    shift: number;
-}
-
-//
-// Returns the unchanged lines before `hunk`, after the hunk before it, or after the last hunk when
-// `hunk` is undefined and the whole old file is known.
-//
-export function gapBefore(hunks: IHunk[], index: number, oldFileLength: number | undefined): IGap {
-    const previous = hunks[index - 1];
-    const oldStart = previous ? previous.oldStart + previous.oldCount : 1;
-    const previousShift = previous ? previous.newStart + previous.lines.filter(line => line.kind !== "deleted").length - (previous.oldStart + previous.oldCount) : 0;
-    const hunk = hunks[index];
-    if (hunk) {
-        return { oldStart, count: Math.max(hunk.oldStart - oldStart, 0), shift: hunk.newStart - hunk.oldStart };
-    }
-    return { oldStart, count: oldFileLength === undefined ? 0 : Math.max(oldFileLength - oldStart + 1, 0), shift: previousShift };
-}
-
 //
 // Renders the button in a gap bar's line number gutter that shows or hides a run of unchanged
 // lines, with a tooltip that says which.
@@ -407,61 +391,95 @@ export function gapLines(gap: IGap, oldFileLines: string[]): IDiffLine[] {
 }
 
 //
-// Renders a run of unchanged lines that the diff leaves out, then the header of the hunk after it:
-// a bar with how many lines are left out and, when the old file is known, a button that shows them
-// in place, then the hunk's range and the function or section it is in. `shownLines` are the
-// unchanged lines once shown, drawn under a bar whose button, `onHide`, folds them away again and
-// above the hunk's bar; `onShow` shows them. Both are absent when the old file is unknown. `action` shows at the bar's right edge, the hunk's top right, and
-// stays in view while the diff scrolls sideways.
+// Renders the border that marks the current hunk or run of unchanged lines, set a little inside it
+// so it stays clear of the pane's own border.
 //
-export function GapBar({
+function CurrentBorder(): ReactNode {
+    return (
+        <span
+            aria-hidden="true"
+            style={{
+                position: "absolute",
+                inset: "calc(var(--space-1) / 2) var(--space-1)",
+                border: "2px solid var(--color-select-item)",
+                borderRadius: "var(--radius-sm)",
+                pointerEvents: "none",
+                zIndex: 1,
+            }}
+        />
+    );
+}
+
+//
+// Renders a run of unchanged lines the diff leaves out, as its own group of rows that can be the
+// current stop: a bar with how many lines there are and, when the old file is known, a button that
+// shows them in place, or once they show, folds them away again. `isShown` says which. Clicking
+// the bar makes the run the current stop. A run with no lines draws nothing.
+//
+export function GapRows({
     gap,
-    hunk,
+    position,
     layout,
     wrap,
-    shownLines,
-    onShow,
-    onHide,
-    action,
+    lines,
+    isShown,
+    onToggle,
+    isCurrent,
+    onSelect,
 }: {
     gap: IGap;
-    hunk: IHunk | undefined;
+    position: number;
     layout: DiffLayout;
     wrap: boolean;
-    shownLines?: IDiffLine[];
-    onShow?: () => void;
-    onHide?: () => void;
-    action?: ReactNode;
+    lines: IDiffLine[] | undefined;
+    isShown: boolean;
+    onToggle: () => void;
+    isCurrent: boolean;
+    onSelect?: () => void;
 }): ReactNode {
-    const context = hunk ? hunk.header.replace(/^@@[^@]*@@\s?/, "") : "";
-    const range = hunk ? hunk.header.slice(0, hunk.header.length - context.length).trim() : "";
-    if (shownLines) {
-        const lines = shownLines;
-        return (
-            <>
-                {onHide ? (
-                    <div role="row" data-line="gap-open" className="flex items-center" style={{ gap: "var(--space-3)", minHeight: "var(--space-6)", background: "var(--color-raised)", color: "var(--color-text-muted)" }}>
-                        <GapButton layout={layout} label={`Hide ${lines.length} unchanged ${lines.length === 1 ? "line" : "lines"}`} detail="Folds these lines away again." icon={faCompress} onClick={onHide} />
-                        <span>{`${lines.length} unchanged ${lines.length === 1 ? "line" : "lines"}`}</span>
-                    </div>
-                ) : undefined}
-                {lines.map(line =>
-                    layout === "unified" ? (
-                        <UnifiedRow key={line.oldNumber} line={line} partner={undefined} wrap={wrap} />
-                    ) : (
-                        <div key={line.oldNumber} role="row" className="flex">
-                            <SplitSide line={line} side="old" partner={undefined} wrap={wrap} />
-                            <SplitSide line={line} side="new" partner={undefined} wrap={wrap} />
-                        </div>
-                    ),
-                )}
-                {hunk ? <GapBar gap={{ ...gap, count: 0 }} hunk={hunk} layout={layout} wrap={wrap} action={action} /> : undefined}
-            </>
-        );
-    }
-    if (gap.count === 0 && !hunk) {
+    if (gap.count === 0) {
         return undefined;
     }
+    const count = `${gap.count} unchanged ${gap.count === 1 ? "line" : "lines"}`;
+    return (
+        <div role="rowgroup" data-gap-index={position} data-current={isCurrent} onClick={lines ? onSelect : undefined} style={{ position: "relative", cursor: lines && onSelect ? "pointer" : undefined }}>
+            {isCurrent ? <CurrentBorder /> : undefined}
+            <div role="row" data-line="gap" className="flex items-center" style={{ gap: "var(--space-3)", minHeight: "calc(var(--space-6) + var(--space-1))", background: "var(--color-raised)", color: "var(--color-text-muted)" }}>
+                {lines ? (
+                    isShown ? (
+                        <GapButton layout={layout} label={`Hide ${count}`} detail="Folds these lines away again." icon={faCompress} onClick={onToggle} />
+                    ) : (
+                        <GapButton layout={layout} label={`Show ${count}`} detail="Lines the change left as they were." icon={faArrowsUpDown} onClick={onToggle} />
+                    )
+                ) : (
+                    <span className="flex-none" style={{ width: `calc(${GUTTER_WIDTH} * ${layout === "unified" ? 2 : 1})` }} />
+                )}
+                <span style={{ whiteSpace: "pre" }}>{count}</span>
+            </div>
+            {lines && isShown
+                ? lines.map(line =>
+                      layout === "unified" ? (
+                          <UnifiedRow key={line.oldNumber} line={line} partner={undefined} wrap={wrap} />
+                      ) : (
+                          <div key={line.oldNumber} role="row" className="flex">
+                              <SplitSide line={line} side="old" partner={undefined} wrap={wrap} />
+                              <SplitSide line={line} side="new" partner={undefined} wrap={wrap} />
+                          </div>
+                      ),
+                  )
+                : undefined}
+        </div>
+    );
+}
+
+//
+// Renders a hunk's header row: the hunk's range and the function or section it is in, with
+// `action` at the row's right edge, the hunk's top right, staying in view while the diff scrolls
+// sideways.
+//
+export function HunkHeader({ hunk, layout, action }: { hunk: IHunk; layout: DiffLayout; action?: ReactNode }): ReactNode {
+    const context = hunk.header.replace(/^@@[^@]*@@\s?/, "");
+    const range = hunk.header.slice(0, hunk.header.length - context.length).trim();
     return (
         <div
             role="row"
@@ -469,14 +487,8 @@ export function GapBar({
             className="flex items-center"
             style={{ gap: "var(--space-3)", minHeight: "calc(var(--space-6) + var(--space-1))", background: "var(--color-raised)", color: "var(--color-text-muted)" }}
         >
-            {gap.count > 0 && onShow ? (
-                <GapButton layout={layout} label={`Show ${gap.count} unchanged ${gap.count === 1 ? "line" : "lines"}`} detail="Lines the change left as they were." icon={faArrowsUpDown} onClick={onShow} />
-            ) : (
-                <span className="flex-none" style={{ width: `calc(${GUTTER_WIDTH} * ${layout === "unified" ? 2 : 1})` }} />
-            )}
+            <span className="flex-none" style={{ width: `calc(${GUTTER_WIDTH} * ${layout === "unified" ? 2 : 1})` }} />
             <span style={{ whiteSpace: "pre" }}>
-                {gap.count > 0 ? `${gap.count} unchanged ${gap.count === 1 ? "line" : "lines"}` : ""}
-                {gap.count > 0 && range ? "   " : ""}
                 {range}
                 {context ? <span style={{ fontFamily: "var(--font-sans)" }}>{`  ${context}`}</span> : undefined}
             </span>
@@ -505,31 +517,35 @@ export function GapBar({
 }
 
 //
-// Renders the diff. Each hunk follows a bar with the unchanged lines before it, and a bar after
-// the last hunk counts the unchanged lines to the end of the file when the old file is known.
-// Without wrapping, the view is as wide as its longest line and scrolls sideways inside its
-// container.
+// Renders the diff. Each hunk follows the run of unchanged lines before it, and a run after the
+// last hunk counts the unchanged lines to the end of the file when the old file is known. Each run
+// shows or hides as `gapStates` says, following `showAllLines` where it says nothing. Without
+// wrapping, the view is as wide as its longest line and scrolls sideways inside its container.
 //
-export function DiffView({ diff, layout, wrap, oldFileLines, hunkAction, currentHunk, showAllLines = false, hunkIndexes, search = "", currentMatch, onMatchCount, onSelectHunk }: IDiffViewProps): ReactNode {
+export function DiffView({
+    diff,
+    layout,
+    wrap,
+    oldFileLines,
+    hunkAction,
+    currentHunk,
+    currentGap,
+    showAllLines = false,
+    gapStates = new Map(),
+    onGapStateChange,
+    hunkIndexes,
+    search = "",
+    currentMatch,
+    onMatchCount,
+    onSelectHunk,
+    onSelectGap,
+}: IDiffViewProps): ReactNode {
     const hunks = useMemo(() => parseHunks(diff), [diff]);
-
-    //
-    // The runs of unchanged lines shown or hidden by their own buttons, by position: 0 before the
-    // first hunk and the hunk count after the last. A run with no entry follows the whole-file
-    // switch, and turning that switch starts every run again from it.
-    //
-    const [opened, setOpened] = useState<{ showAllLines: boolean; gaps: ReadonlyMap<number, boolean> }>({ showAllLines, gaps: new Map() });
-    const gapStates = opened.showAllLines === showAllLines ? opened.gaps : new Map<number, boolean>();
     const gapCount = hunks.length + 1;
     const gaps = useMemo(() => Array.from({ length: gapCount }, (_, position) => gapBefore(hunks, position, oldFileLines?.length)), [hunks, gapCount, oldFileLines]);
     const allGapLines = useMemo(() => gaps.map(gap => (oldFileLines && gap.count > 0 ? gapLines(gap, oldFileLines) : undefined)), [gaps, oldFileLines]);
-    const shownGapLines = allGapLines.map((lines, position) => ((gapStates.get(position) ?? showAllLines) ? lines : undefined));
-    function setGap(position: number, isShown: boolean): (() => void) | undefined {
-        if (!allGapLines[position]) {
-            return undefined;
-        }
-        return () => setOpened({ showAllLines, gaps: new Map(gapStates).set(position, isShown) });
-    }
+    const isGapShown = (position: number): boolean => allGapLines[position] !== undefined && (gapStates.get(position) ?? showAllLines);
+    const shownGapLines = allGapLines.map((lines, position) => (isGapShown(position) ? lines : undefined));
 
     //
     // Numbers the search's matches in the order the lines show, shown unchanged lines included.
@@ -553,6 +569,23 @@ export function DiffView({ diff, layout, wrap, oldFileLines, hunkAction, current
         onMatchCount?.(matchTotal);
     }, [matchTotal, onMatchCount]);
 
+    function gapRows(position: number): ReactNode {
+        return (
+            <GapRows
+                key={`gap-${position}`}
+                gap={gaps[position]}
+                position={position}
+                layout={layout}
+                wrap={wrap}
+                lines={allGapLines[position]}
+                isShown={isGapShown(position)}
+                onToggle={() => onGapStateChange?.(position, !isGapShown(position))}
+                isCurrent={currentGap === position}
+                onSelect={onSelectGap ? () => onSelectGap(position) : undefined}
+            />
+        );
+    }
+
     return (
         <DiffSearchContext.Provider value={{ needle: search.trim(), current: currentMatch, firstMatch }}>
         <div
@@ -569,49 +602,30 @@ export function DiffView({ diff, layout, wrap, oldFileLines, hunkAction, current
                 const index = hunkIndexes?.[position] ?? position;
                 const partners = changePartners(hunk.lines);
                 return (
-                    <div
-                        key={hunk.header + index}
-                        role="rowgroup"
-                        data-hunk-index={index}
-                        data-current={currentHunk === index}
-                        onClick={onSelectHunk ? () => onSelectHunk(index) : undefined}
-                        style={{ position: "relative", cursor: onSelectHunk ? "pointer" : undefined }}
-                    >
-                        {currentHunk === index ? (
-                            <span
-                                aria-hidden="true"
-                                style={{
-                                    position: "absolute",
-                                    inset: "calc(var(--space-1) / 2) var(--space-1)",
-                                    border: "2px solid var(--color-select-item)",
-                                    borderRadius: "var(--radius-sm)",
-                                    pointerEvents: "none",
-                                    zIndex: 1,
-                                }}
-                            />
-                        ) : undefined}
-                        <GapBar
-                            gap={gaps[position]}
-                            hunk={hunk}
-                            layout={layout}
-                            wrap={wrap}
-                            shownLines={shownGapLines[position]}
-                            onShow={setGap(position, true)}
-                            onHide={setGap(position, false)}
-                            action={hunkAction?.(index)}
-                        />
-                        {layout === "unified"
-                            ? hunk.lines.map((line, lineIndex) => <UnifiedRow key={lineIndex} line={line} partner={partners.get(line)} wrap={wrap} />)
-                            : splitRows(hunk.lines).map((row, rowIndex) => (
-                                  <div key={rowIndex} role="row" className="flex" style={{ gap: "1px", background: "var(--color-border)" }}>
-                                      <SplitSide line={row.old} side="old" partner={row.old ? partners.get(row.old) : undefined} wrap={wrap} />
-                                      <SplitSide line={row.new} side="new" partner={row.new ? partners.get(row.new) : undefined} wrap={wrap} />
-                                  </div>
-                              ))}
-                    </div>
+                    <Fragment key={hunk.header + index}>
+                        {gapRows(position)}
+                        <div
+                            role="rowgroup"
+                            data-hunk-index={index}
+                            data-current={currentHunk === index}
+                            onClick={onSelectHunk ? () => onSelectHunk(index) : undefined}
+                            style={{ position: "relative", cursor: onSelectHunk ? "pointer" : undefined }}
+                        >
+                            {currentHunk === index ? <CurrentBorder /> : undefined}
+                            <HunkHeader hunk={hunk} layout={layout} action={hunkAction?.(index)} />
+                            {layout === "unified"
+                                ? hunk.lines.map((line, lineIndex) => <UnifiedRow key={lineIndex} line={line} partner={partners.get(line)} wrap={wrap} />)
+                                : splitRows(hunk.lines).map((row, rowIndex) => (
+                                      <div key={rowIndex} role="row" className="flex" style={{ gap: "1px", background: "var(--color-border)" }}>
+                                          <SplitSide line={row.old} side="old" partner={row.old ? partners.get(row.old) : undefined} wrap={wrap} />
+                                          <SplitSide line={row.new} side="new" partner={row.new ? partners.get(row.new) : undefined} wrap={wrap} />
+                                      </div>
+                                  ))}
+                        </div>
+                    </Fragment>
                 );
             })}
-            <GapBar gap={gaps[hunks.length]} hunk={undefined} layout={layout} wrap={wrap} shownLines={shownGapLines[hunks.length]} onShow={setGap(hunks.length, true)} onHide={setGap(hunks.length, false)} />
+            {gapRows(hunks.length)}
         </div>
         </DiffSearchContext.Provider>
     );

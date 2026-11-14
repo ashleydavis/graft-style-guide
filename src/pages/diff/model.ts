@@ -296,3 +296,41 @@ export function withHunkDiscarded(diff: string, index: number): string {
         })
         .join("\n");
 }
+
+
+//
+// The unchanged lines between two hunks, before the first or after the last: where they start in
+// the old file, how many there are and how far the new file's numbers run ahead of the old file's
+// there.
+//
+export interface IGap {
+    //
+    // The first unchanged line, numbered in the old file.
+    //
+    oldStart: number;
+
+    //
+    // How many unchanged lines there are.
+    //
+    count: number;
+
+    //
+    // The new file's line number minus the old file's for these lines.
+    //
+    shift: number;
+}
+
+//
+// Returns the unchanged lines before `hunk`, after the hunk before it, or after the last hunk when
+// `hunk` is undefined and the whole old file is known.
+//
+export function gapBefore(hunks: IHunk[], index: number, oldFileLength: number | undefined): IGap {
+    const previous = hunks[index - 1];
+    const oldStart = previous ? previous.oldStart + previous.oldCount : 1;
+    const previousShift = previous ? previous.newStart + previous.lines.filter(line => line.kind !== "deleted").length - (previous.oldStart + previous.oldCount) : 0;
+    const hunk = hunks[index];
+    if (hunk) {
+        return { oldStart, count: Math.max(hunk.oldStart - oldStart, 0), shift: hunk.newStart - hunk.oldStart };
+    }
+    return { oldStart, count: oldFileLength === undefined ? 0 : Math.max(oldFileLength - oldStart + 1, 0), shift: previousShift };
+}

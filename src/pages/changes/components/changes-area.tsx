@@ -4,7 +4,8 @@
 // box commits what is staged.
 //
 
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { diffStops, stopAfterMove, type DiffStop } from "../../diff/stops";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -31,7 +32,7 @@ import { Tip } from "../../../components/tip";
 import { FilePath } from "../../commit-explorer/components/file-path";
 import { LineCounts } from "../../commit-explorer/components/line-counts";
 import { Pane } from "../../commit-explorer/components/pane";
-import { countLines, FileDiffCard, type IFileDiff } from "../../diff/components/file-diff-card";
+import { countLines, FileDiffCard, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import { parseHunks, withHunkDiscarded as withHunkRemoved, withoutHunks } from "../../diff/model";
 import { initialStaging, isFileStaged, withFileToggled, withHunkDiscarded as withStagedHunkDiscarded, withHunkToggled, type IStaging } from "../../diff/staging";
 import { StatusLetter } from "../../tree";
@@ -87,6 +88,34 @@ export function stagedState(staging: IStaging, hunkCount: number): "all" | "some
     }
     return staging.hunks.size > 0 ? "some" : "none";
 }
+//
+// The name of the card that shows the whole diff, as the runs of unchanged lines in it are named.
+//
+const ONE_DIFF_CARD = "File diff";
+
+//
+// One section of the split view: its title, the name of its card, the positions of the file's
+// hunks it shows, what its file button does and what it says when it has no hunks.
+//
+interface ISplitSection {
+    title: string;
+    card: string;
+    hunks: number[];
+    action: "stage" | "unstage";
+    empty: string;
+}
+
+//
+// Returns the split view's two sections for `file`: the staged hunks, then the unstaged ones.
+//
+export function splitSections(file: IFileDiff, staging: IStaging): ISplitSection[] {
+    const all = Array.from({ length: parseHunks(file.diff ?? "").length }, (_unused, index) => index);
+    return [
+        { title: "Staged", card: "Staged diff", hunks: all.filter(index => staging.hunks.has(index)), action: "unstage", empty: "Nothing in this file is staged." },
+        { title: "Unstaged", card: "Unstaged diff", hunks: all.filter(index => !staging.hunks.has(index)), action: "stage", empty: "Everything in this file is staged." },
+    ];
+}
+
 
 //
 // Renders a file's change in two sections, its staged hunks above its unstaged ones, each the
@@ -99,8 +128,10 @@ export function SplitDiff({
     staging,
     onStagingChange,
     isCurrent,
-    currentHunk,
+    currentStop,
     onSelectHunk,
+    onSelectGap,
+    cardRef,
     onDiscardFile,
     onDiscardHunk,
     isMaximised,
@@ -110,18 +141,17 @@ export function SplitDiff({
     staging: IStaging;
     onStagingChange: (staging: IStaging) => void;
     isCurrent: boolean;
-    currentHunk: number | undefined;
+    currentStop: DiffStop | undefined;
     onSelectHunk: (hunkIndex: number) => void;
+    onSelectGap: (card: string, gapIndex: number) => void;
+    cardRef: (card: string) => Ref<IFileDiffCardHandle>;
     onDiscardFile: () => void;
     onDiscardHunk: (hunkIndex: number) => void;
     isMaximised: boolean;
     onToggleMaximise: () => void;
 }): ReactNode {
-    const all = Array.from({ length: parseHunks(file.diff ?? "").length }, (_unused, index) => index);
-    const sections: { title: string; hunks: number[]; action: "stage" | "unstage"; empty: string }[] = [
-        { title: "Staged", hunks: all.filter(index => staging.hunks.has(index)), action: "unstage", empty: "Nothing in this file is staged." },
-        { title: "Unstaged", hunks: all.filter(index => !staging.hunks.has(index)), action: "stage", empty: "Everything in this file is staged." },
-    ];
+    const sections = splitSections(file, staging);
+    const currentHunk = currentStop?.kind === "hunk" ? currentStop.hunk : undefined;
     return (
         <div className="flex min-h-0 flex-1 flex-col" style={{ gap: "var(--space-2)" }}>
             {sections.map(section => (
@@ -137,12 +167,15 @@ export function SplitDiff({
                         <div className="min-h-0 flex-1">
                             <FileDiffCard
                                 key={file.path + section.title}
+                                ref={cardRef(section.card)}
                                 file={file}
-                                label={`${section.title} diff`}
+                                label={section.card}
                                 onlyHunks={section.hunks}
                                 fileAction={section.action}
-                                isCurrent={isCurrent && currentHunk !== undefined && section.hunks.includes(currentHunk)}
+                                isCurrent={isCurrent && ((currentHunk !== undefined && section.hunks.includes(currentHunk)) || (currentStop?.kind === "gap" && currentStop.card === section.card))}
                                 currentHunk={currentHunk}
+                                currentGap={currentStop?.kind === "gap" && currentStop.card === section.card ? currentStop.gap : undefined}
+                                onSelectGap={gap => onSelectGap(section.card, gap)}
                                 staging={staging}
                                 onStagingChange={onStagingChange}
                                 answersKeys={false}
@@ -197,7 +230,23 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [selectedPath, setSelectedPath] = useState<string | undefined>(startFiles[0]?.path);
     const [selectedSection, setSelectedSection] = useState<ListSection>("all");
     const [activePane, setActivePane] = useState<0 | 1 | 2>(0);
-    const [currentHunk, setCurrentHunk] = useState<number | undefined>(undefined);
+    const [currentStop, setCurrentStop] = useState<DiffStop | undefined>(undefined);
+    const currentHunk = currentStop?.kind === "hunk" ? currentStop.hunk : undefined;
+    const cardRefs = useRef(new Map<string, IFileDiffCardHandle | null>());
+
+    function setCurrentHunk(hunk: number | undefined): void {
+        setCurrentStop(hunk === undefined ? undefined : { kind: "hunk", hunk });
+    }
+
+    //
+    // Returns a ref that keeps the card named `card`, so Space can show or fold its runs of
+    // unchanged lines.
+    //
+    function cardRef(card: string): Ref<IFileDiffCardHandle> {
+        return handle => {
+            cardRefs.current.set(card, handle);
+        };
+    }
     const [summary, setSummary] = useState("");
     const [description, setDescription] = useState("");
     const [amend, setAmend] = useState(false);
@@ -286,29 +335,30 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Returns the selected file's hunks in the order Up and Down step through them: the file's own
-    // order in one diff, and its staged hunks before its unstaged ones in the split.
+    // Returns the selected file's stops in the order Up and Down step through them, its hunks and
+    // the runs of unchanged lines between them: as the one diff draws them, and in the split the
+    // staged section's stops before the unstaged section's.
     //
-    function hunkOrder(): number[] {
-        if (!selectedFile) {
+    function stopOrder(): DiffStop[] {
+        if (!selectedFile?.diff) {
             return [];
         }
-        const all = Array.from({ length: hunkCountOf(selectedFile) }, (_unused, index) => index);
-        if (diffMode === "one") {
-            return all;
+        if (diffMode === "one" || hunkCountOf(selectedFile) === 0) {
+            return diffStops(selectedFile.diff, selectedFile.oldFileLines, undefined, ONE_DIFF_CARD);
         }
-        const staged = stagingOf(selectedFile).hunks;
-        return [...all.filter(index => staged.has(index)), ...all.filter(index => !staged.has(index))];
+        const diff = selectedFile.diff;
+        const count = hunkCountOf(selectedFile);
+        return splitSections(selectedFile, stagingOf(selectedFile)).flatMap(section => {
+            if (section.hunks.length === 0) {
+                return [];
+            }
+            const dropped = new Set(Array.from({ length: count }, (_unused, index) => index).filter(index => !section.hunks.includes(index)));
+            return diffStops(withoutHunks(diff, dropped), selectedFile.oldFileLines, section.hunks, section.card);
+        });
     }
 
     function moveHunk(step: number): void {
-        const order = hunkOrder();
-        if (order.length === 0) {
-            return;
-        }
-        const position = currentHunk === undefined ? -1 : order.indexOf(currentHunk);
-        const next = position < 0 ? (step > 0 ? 0 : order.length - 1) : Math.min(Math.max(position + step, 0), order.length - 1);
-        setCurrentHunk(order[next]);
+        setCurrentStop(stopAfterMove(stopOrder(), currentStop, step));
     }
 
     function toggleMaximise(pane: 0 | 1 | 2): void {
@@ -419,6 +469,9 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             else {
                 moveHunk(step);
             }
+        }
+        else if (key === " " && currentStop?.kind === "gap") {
+            cardRefs.current.get(currentStop.card ?? ONE_DIFF_CARD)?.toggleGap(currentStop.gap);
         }
         else if (key === " " && selectedFile) {
             setStaging(selectedFile.path, currentHunk === undefined ? withFileToggled(stagingOf(selectedFile), hunkCountOf(selectedFile)) : withHunkToggled(stagingOf(selectedFile), currentHunk));
@@ -594,7 +647,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 staging={stagingOf(selectedFile)}
                                 onStagingChange={staging => setStaging(selectedFile.path, staging)}
                                 isCurrent={activePane === 1}
-                                currentHunk={currentHunk}
+                                currentStop={currentStop}
+                                cardRef={cardRef}
+                                onSelectGap={(card, gap) => {
+                                    setCurrentStop({ kind: "gap", gap, card });
+                                    setActivePane(1);
+                                }}
                                 onDiscardFile={() => setPendingDiscard({ path: selectedFile.path })}
                                 onDiscardHunk={hunk => setPendingDiscard({ path: selectedFile.path, hunk })}
                                 isMaximised={maximised === 1}
@@ -610,8 +668,14 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     key={selectedFile.path + (selectedFile.diff ?? "")}
                                     file={selectedFile}
                                     label="File diff"
+                                    ref={cardRef(ONE_DIFF_CARD)}
                                     isCurrent={activePane === 1}
                                     currentHunk={currentHunk}
+                                    currentGap={currentStop?.kind === "gap" && currentStop.card === ONE_DIFF_CARD ? currentStop.gap : undefined}
+                                    onSelectGap={gap => {
+                                        setCurrentStop({ kind: "gap", gap, card: ONE_DIFF_CARD });
+                                        setActivePane(1);
+                                    }}
                                     staging={stagingOf(selectedFile)}
                                     onStagingChange={staging => setStaging(selectedFile.path, staging)}
                                     answersKeys={false}

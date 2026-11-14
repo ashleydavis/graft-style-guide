@@ -13,10 +13,11 @@ import { KeyCaps } from "../../../components/shortcut";
 import { Tip } from "../../../components/tip";
 import { parseHunks } from "../model";
 import { initialStaging, withFileToggled, withHunkToggled, type IStaging } from "../staging";
-import { FileDiffCard, type IFileDiff } from "./file-diff-card";
+import { diffStops, isSameStop, type DiffStop } from "../stops";
+import { FileDiffCard, type IFileDiff, type IFileDiffCardHandle } from "./file-diff-card";
 
 //
-// Where the keys are: a file and, within it, a hunk.
+// Where the keys are: a file and, within it, a stop: a hunk or a run of unchanged lines.
 //
 export interface IDiffPosition {
     //
@@ -25,26 +26,27 @@ export interface IDiffPosition {
     file: number;
 
     //
-    // The position of the current hunk in that file, from 0, or undefined when the keys are on the
-    // file as a whole.
+    // The current stop in that file, or undefined when the keys are on the file as a whole.
     //
-    hunk: number | undefined;
+    stop: DiffStop | undefined;
 }
 
 //
-// Returns the position one change from `position`, forward for step 1 and back for step -1,
-// running on into the next or previous file that has changes and skipping files with none. At the
-// first or last change it stays where it is.
+// Returns the position one stop from `position`, forward for step 1 and back for step -1, running
+// on into the next or previous file that has stops and skipping files with none. At the first or
+// last stop it stays where it is. `stopLists` holds each file's stops in order.
 //
-export function changeAfterMove(hunkCounts: number[], position: IDiffPosition, step: number): IDiffPosition {
-    const current = position.hunk === undefined ? (step > 0 ? -1 : hunkCounts[position.file]) : position.hunk;
-    const next = current + step;
-    if (next >= 0 && next < hunkCounts[position.file]) {
-        return { file: position.file, hunk: next };
+export function changeAfterMove(stopLists: DiffStop[][], position: IDiffPosition, step: number): IDiffPosition {
+    const stops = stopLists[position.file];
+    const index = position.stop === undefined ? (step > 0 ? -1 : stops.length) : stops.findIndex(stop => isSameStop(stop, position.stop));
+    const next = index + step;
+    if (next >= 0 && next < stops.length) {
+        return { file: position.file, stop: stops[next] };
     }
-    for (let file = position.file + step; file >= 0 && file < hunkCounts.length; file += step) {
-        if (hunkCounts[file] > 0) {
-            return { file, hunk: step > 0 ? 0 : hunkCounts[file] - 1 };
+    for (let file = position.file + step; file >= 0 && file < stopLists.length; file += step) {
+        const fileStops = stopLists[file];
+        if (fileStops.length > 0) {
+            return { file, stop: step > 0 ? fileStops[0] : fileStops[fileStops.length - 1] };
         }
     }
     return position;
@@ -66,13 +68,17 @@ export function NavigationButton({ label, keys, icon, onClick }: { label: string
 //
 // Renders the explorer. The toolbar along its top says which file and change the keys are on and
 // has buttons for the previous and next change and file. With the focus anywhere in the explorer
-// outside a text box or menu, Up and Down move from change to change, running on across files,
-// Shift with Up or Down moves from file to file, and Space stages or unstages the current change,
-// or the current file when no change is picked. The explorer keeps every card's staging. The current file has an accent border and the
+// outside a text box or menu, Up and Down move from stop to stop, through each file's changes and
+// the runs of unchanged lines between them, running on across files, Shift with Up or Down moves
+// from file to file, and Space stages or unstages the current change, or the current file when no
+// change is picked, and shows or folds the current run of unchanged lines. The explorer keeps every card's staging. The current file has an accent border and the
 // current change an accent bar, and the page scrolls to bring them into view.
 //
 export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
-    const [position, setPosition] = useState<IDiffPosition>({ file: 0, hunk: undefined });
+    const [position, setPosition] = useState<IDiffPosition>({ file: 0, stop: undefined });
+    const cardRefs = useRef<(IFileDiffCardHandle | null)[]>([]);
+    const stopLists = files.map(file => diffStops(file.diff ?? "", file.oldFileLines));
+    const currentHunk = position.stop?.kind === "hunk" ? position.stop.hunk : undefined;
     const hasMoved = useRef(false);
     const explorerRef = useRef<HTMLDivElement>(null);
     const hunkCounts = files.map(file => parseHunks(file.diff ?? "").length);
@@ -87,7 +93,8 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
             return;
         }
         const card = explorerRef.current?.querySelectorAll("[data-diff-card]")[position.file];
-        const target = position.hunk === undefined ? card : card?.querySelector(`[data-hunk-index="${position.hunk}"]`);
+        const stop = position.stop;
+        const target = stop === undefined ? card : card?.querySelector(stop.kind === "hunk" ? `[data-hunk-index="${stop.hunk}"]` : `[data-gap-index="${stop.gap}"]`);
         target?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }, [position]);
 
@@ -97,7 +104,7 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
     }
 
     function moveFile(step: number): void {
-        move({ file: Math.min(Math.max(position.file + step, 0), files.length - 1), hunk: undefined });
+        move({ file: Math.min(Math.max(position.file + step, 0), files.length - 1), stop: undefined });
     }
 
     function onKeyDown(event: KeyboardEvent): void {
@@ -113,8 +120,12 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
                 return;
             }
             event.preventDefault();
+            if (position.stop?.kind === "gap") {
+                cardRefs.current[position.file]?.toggleGap(position.stop.gap);
+                return;
+            }
             const staging = stagings[position.file];
-            setStaging(position.file, position.hunk === undefined ? withFileToggled(staging, hunkCounts[position.file]) : withHunkToggled(staging, position.hunk));
+            setStaging(position.file, currentHunk === undefined ? withFileToggled(staging, hunkCounts[position.file]) : withHunkToggled(staging, currentHunk));
             return;
         }
         event.preventDefault();
@@ -123,7 +134,7 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
             moveFile(step);
         }
         else {
-            move(changeAfterMove(hunkCounts, position, step));
+            move(changeAfterMove(stopLists, position, step));
         }
     }
 
@@ -143,11 +154,13 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
             >
                 <span aria-live="polite" className="flex-1" style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
                     File {position.file + 1} of {files.length}
-                    {hunkCounts[position.file] > 0 ? ` · ${position.hunk === undefined ? "no change picked" : `change ${position.hunk + 1} of ${hunkCounts[position.file]}`}` : " · no changes to step through"}
+                    {stopLists[position.file].length > 0
+                        ? ` · ${position.stop === undefined ? "no change picked" : position.stop.kind === "gap" ? "unchanged lines" : `change ${position.stop.hunk + 1} of ${hunkCounts[position.file]}`}`
+                        : " · no changes to step through"}
                 </span>
                 <span className="flex items-center" style={{ gap: "var(--space-1)" }}>
-                    <NavigationButton label="Previous change" keys="↑" icon={faAngleUp} onClick={() => move(changeAfterMove(hunkCounts, position, -1))} />
-                    <NavigationButton label="Next change" keys="↓" icon={faAngleDown} onClick={() => move(changeAfterMove(hunkCounts, position, 1))} />
+                    <NavigationButton label="Previous change" keys="↑" icon={faAngleUp} onClick={() => move(changeAfterMove(stopLists, position, -1))} />
+                    <NavigationButton label="Next change" keys="↓" icon={faAngleDown} onClick={() => move(changeAfterMove(stopLists, position, 1))} />
                     <NavigationButton label="Previous file" keys="Shift+↑" icon={faAnglesUp} onClick={() => moveFile(-1)} />
                     <NavigationButton label="Next file" keys="Shift+↓" icon={faAnglesDown} onClick={() => moveFile(1)} />
                 </span>
@@ -166,11 +179,16 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
                     <FileDiffCard
                         file={file}
                         isCurrent={index === position.file}
-                        currentHunk={index === position.file ? position.hunk : undefined}
+                        currentHunk={index === position.file ? currentHunk : undefined}
+                        currentGap={index === position.file && position.stop?.kind === "gap" ? position.stop.gap : undefined}
+                        ref={handle => {
+                            cardRefs.current[index] = handle;
+                        }}
+                        onSelectGap={gap => move({ file: index, stop: { kind: "gap", gap } })}
                         staging={stagings[index]}
                         onStagingChange={staging => setStaging(index, staging)}
                         answersKeys={false}
-                        onSelectHunk={hunk => move({ file: index, hunk })}
+                        onSelectHunk={hunk => move({ file: index, stop: { kind: "hunk", hunk } })}
                     />
                 </div>
             ))}

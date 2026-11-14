@@ -1,11 +1,11 @@
 //
-// The commit details pane: the column that opens to the right of the commit pane, with the
-// commit's full message, who wrote and made it and when, its hash and parents, and the files it
-// changed with their line counts.
+// The commit details pane: the column that opens to the right of the commit pane, with one row for
+// the commit itself, its message on one line and its short hash, then the files it changed with
+// their line counts. Opening the commit's row shows the full commit pane to the right, with the
+// whole message, who wrote and made it and when, its refs, hash and parents.
 //
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import Link from "@mui/material/Link";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListSubheader from "@mui/material/ListSubheader";
@@ -13,7 +13,10 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderOpen, faFolderTree, faList, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { faFolderOpen, faFolderTree, faList, faMessage, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { RefBadge } from "../../badges";
+import { COMMIT_SUMMARY_PATH } from "../explorer-state";
+import { refBadge } from "./commit-pane";
 import { CopyButton } from "../../../components/copy-button";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { StatusLetter } from "../../tree";
@@ -46,58 +49,6 @@ const fileViews: { value: FileListView; label: string; icon: IconDefinition }[] 
     { value: "columns", label: "File name and folder", icon: faTableColumns },
     { value: "tree", label: "Tree", icon: faFolderTree },
 ];
-
-//
-// How many lines of a commit's description show before the rest is folded away.
-//
-const DESCRIPTION_LINES = 3;
-
-//
-// Renders a commit's description in small muted text. A description longer than
-// DESCRIPTION_LINES shows its first lines, ending in an ellipsis, with a "Show more" link that
-// unfolds the rest and a "Show less" link that folds it again, so the changed files below stay in
-// view.
-//
-export function Description({ text }: { text: string }): ReactNode {
-    const textRef = useRef<HTMLParagraphElement>(null);
-    const [isOpen, setIsOpen] = useState(false);
-    const [isLong, setIsLong] = useState(false);
-
-    useLayoutEffect(() => {
-        const element = textRef.current;
-        if (element && !isOpen) {
-            setIsLong(element.scrollHeight > element.clientHeight + 1);
-        }
-    }, [text, isOpen]);
-
-    return (
-        <div className="flex flex-col items-start" style={{ gap: "var(--space-1)" }}>
-            <p
-                ref={textRef}
-                style={{
-                    fontSize: "var(--text-sm)",
-                    color: "var(--color-text-muted)",
-                    whiteSpace: "pre-wrap",
-                    ...(isOpen
-                        ? {}
-                        : {
-                              display: "-webkit-box",
-                              WebkitBoxOrient: "vertical",
-                              WebkitLineClamp: DESCRIPTION_LINES,
-                              overflow: "hidden",
-                          }),
-                }}
-            >
-                {text}
-            </p>
-            {isLong ? (
-                <Link component="button" aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)} sx={{ fontSize: "var(--text-sm)" }}>
-                    {isOpen ? "Show less" : "Show more"}
-                </Link>
-            ) : undefined}
-        </div>
-    );
-}
 
 //
 // Renders one labelled line of the commit's facts: the label small and muted in a column of its
@@ -271,15 +222,13 @@ export interface ICommitDetailsPaneProps {
 }
 
 //
-// Renders the pane, headed "Commit" and the short hash. The description shows only when the
-// message has more than a title, folded to its first lines when it is long, and the author and
-// committer show separately only when they differ. The changed files list by full path, by file
+// Renders the pane, headed "Commit" and the short hash. The commit's row comes first, then the
+// changed files, and the keys move through both as one list. The changed files list by full path, by file
 // name and folder in two columns, or as a tree of folders, as the switch above them picks. The
 // selected file scrolls into view when the keys move the selection.
 //
 export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, fileView, onChangeFileView, onSelectFile, onClose }: ICommitDetailsPaneProps): ReactNode {
     const selectedRef = useRef<HTMLLIElement>(null);
-    const isSamePerson = commit.authorName === commit.committerName && commit.authorDate.getTime() === commit.committerDate.getTime();
     const totalAdded = commit.files.reduce((total, file) => total + file.linesAdded, 0);
     const totalDeleted = commit.files.reduce((total, file) => total + file.linesDeleted, 0);
 
@@ -316,37 +265,29 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
             }
             onClose={onClose}
         >
-            <div className="flex flex-col" style={{ gap: "var(--space-3)", padding: "var(--space-4)", borderBottom: "1px solid var(--color-border)" }}>
-                <div className="flex flex-col" style={{ gap: "var(--space-1)" }}>
-                    <h3 style={{ fontSize: "var(--text-lg)", fontWeight: "var(--weight-bold)", lineHeight: "var(--leading-tight)" }}>{commit.title}</h3>
-                    {commit.description !== "" ? <Description text={commit.description} /> : undefined}
-                </div>
-                <dl className="grid items-baseline" style={{ gridTemplateColumns: "auto minmax(0, 1fr)", gap: "var(--space-2) var(--space-4)" }}>
-                    <Fact label={isSamePerson ? "Author" : "Authored"}>
-                        <PersonAndDate name={commit.authorName} email={commit.authorEmail} date={commit.authorDate} />
-                    </Fact>
-                    {isSamePerson ? undefined : (
-                        <Fact label="Committed">
-                            <PersonAndDate name={commit.committerName} email={commit.committerEmail} date={commit.committerDate} />
-                        </Fact>
-                    )}
-                    <Fact label="Hash">
-                        <span className="flex items-center" style={{ gap: "var(--space-1)" }}>
-                            <code className="min-w-0 truncate" style={{ fontFamily: "var(--font-mono)" }}>
-                                {commit.hash}
-                            </code>
-                            <CopyButton text={commit.hash} label="Copy hash" />
-                        </span>
-                    </Fact>
-                    <Fact label={commit.parentHashes.length === 1 ? "Parent" : "Parents"}>
-                        {commit.parentHashes.length === 0 ? (
-                            <span style={{ color: "var(--color-text-muted)" }}>None, this is the first commit</span>
-                        ) : (
-                            <code style={{ fontFamily: "var(--font-mono)" }}>{commit.parentHashes.map(parent => parent.slice(0, 7)).join("  ")}</code>
-                        )}
-                    </Fact>
-                </dl>
-            </div>
+            <List aria-label="Commit" sx={{ padding: "var(--space-1) var(--space-1) 0" }}>
+                <ListItemButton
+                    component="li"
+                    ref={selectedPath === COMMIT_SUMMARY_PATH ? selectedRef : undefined}
+                    selected={selectedPath === COMMIT_SUMMARY_PATH}
+                    aria-current={openPath === COMMIT_SUMMARY_PATH ? "true" : undefined}
+                    aria-label="Commit message"
+                    onClick={() => onSelectFile(COMMIT_SUMMARY_PATH)}
+                    sx={{
+                        gap: "var(--space-2)",
+                        fontSize: "var(--text-sm)",
+                        boxShadow: openPath === COMMIT_SUMMARY_PATH ? "inset 2px 0 0 var(--color-select-item)" : "none",
+                    }}
+                >
+                    <FontAwesomeIcon icon={faMessage} style={{ fontSize: "var(--icon-sm)", color: "var(--color-text-muted)" }} />
+                    <span className="min-w-0 flex-1 truncate" style={{ fontWeight: "var(--weight-medium)" }}>
+                        {commit.title}
+                    </span>
+                    <code className="flex-none" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>
+                        {commit.hash.slice(0, 7)}
+                    </code>
+                </ListItemButton>
+            </List>
             <List
                 aria-label="Files changed"
                 sx={{ padding: "0 var(--space-1) var(--space-2)" }}
@@ -427,5 +368,114 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                 )}
             </List>
         </Pane>
+    );
+}
+
+//
+// What the full commit pane shows and reports.
+//
+export interface ICommitInfoPaneProps {
+    //
+    // The open commit.
+    //
+    commit: ICommit;
+
+    //
+    // True while the pane is the one the keys act on.
+    //
+    isActive: boolean;
+
+    //
+    // True while the pane fills the explorer.
+    //
+    isMaximised: boolean;
+
+    //
+    // Called by the pane's maximise button.
+    //
+    onToggleMaximise: () => void;
+
+    //
+    // Called by the close button.
+    //
+    onClose: () => void;
+}
+
+//
+// Renders the full commit pane, which opens to the right of the commit details pane in place of a
+// file's diff and grows to fill the width left, as the diff does: the commit's title and its whole
+// description, each with a copy button, its refs, who wrote and made it and when, showing the
+// committer apart only when they differ from the author, its hash with a copy button and its
+// parents.
+//
+export function CommitInfoPane({ commit, isActive, isMaximised, onToggleMaximise, onClose }: ICommitInfoPaneProps): ReactNode {
+    const isSamePerson = commit.authorName === commit.committerName && commit.authorDate.getTime() === commit.committerDate.getTime();
+    return (
+        <div style={{ flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
+        <Pane
+            label="Full commit details"
+            width="100%"
+            fillsHeight
+            isActive={isActive}
+            isMaximised={isMaximised}
+            onToggleMaximise={onToggleMaximise}
+            title="Commit details"
+            onClose={onClose}
+        >
+            <div className="flex flex-col" style={{ gap: "var(--space-4)", padding: "var(--space-4)" }}>
+                <div className="flex flex-col" style={{ gap: "var(--space-2)" }}>
+                    <div className="flex items-start" style={{ gap: "var(--space-2)" }}>
+                        <h3 className="min-w-0 flex-1" style={{ fontSize: "var(--text-lg)", fontWeight: "var(--weight-bold)", lineHeight: "var(--leading-tight)" }}>
+                            {commit.title}
+                        </h3>
+                        <CopyButton text={commit.title} label="Copy summary" />
+                    </div>
+                    {commit.description !== "" ? (
+                        <div className="flex items-start" style={{ gap: "var(--space-2)" }}>
+                            <p className="min-w-0 flex-1" style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)", whiteSpace: "pre-wrap" }}>
+                                {commit.description}
+                            </p>
+                            <CopyButton text={commit.description} label="Copy description" />
+                        </div>
+                    ) : undefined}
+                </div>
+                <dl className="grid items-baseline" style={{ gridTemplateColumns: "auto minmax(0, 1fr)", gap: "var(--space-2) var(--space-4)" }}>
+                    {commit.refs.length > 0 ? (
+                        <Fact label={commit.refs.length === 1 ? "Ref" : "Refs"}>
+                            <span className="flex flex-wrap" style={{ gap: "var(--space-1)" }}>
+                                {commit.refs.map(gitRef => {
+                                    const badge = refBadge(gitRef);
+                                    return <RefBadge key={gitRef} kind={badge.kind} name={badge.name} />;
+                                })}
+                            </span>
+                        </Fact>
+                    ) : undefined}
+                    <Fact label={isSamePerson ? "Author" : "Authored"}>
+                        <PersonAndDate name={commit.authorName} email={commit.authorEmail} date={commit.authorDate} />
+                    </Fact>
+                    {isSamePerson ? undefined : (
+                        <Fact label="Committed">
+                            <PersonAndDate name={commit.committerName} email={commit.committerEmail} date={commit.committerDate} />
+                        </Fact>
+                    )}
+                    <Fact label="Hash">
+                        <span className="flex items-center" style={{ gap: "var(--space-1)" }}>
+                            <code className="min-w-0 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                                {commit.hash}
+                            </code>
+                            <CopyButton text={commit.hash} label="Copy hash" />
+                        </span>
+                    </Fact>
+                    <Fact label={commit.parentHashes.length === 1 ? "Parent" : "Parents"}>
+                        {commit.parentHashes.length === 0 ? (
+                            <span style={{ color: "var(--color-text-muted)" }}>None, this is the first commit</span>
+                        ) : (
+                            <code style={{ fontFamily: "var(--font-mono)" }}>{commit.parentHashes.map(parent => parent.slice(0, 7)).join("  ")}</code>
+                        )}
+                    </Fact>
+                </dl>
+            </div>
+        </Pane>
+        </div>
     );
 }

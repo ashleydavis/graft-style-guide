@@ -5,15 +5,18 @@
 //
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { diffStops, stopAfterMove, type DiffStop } from "../../diff/stops";
+import { exampleOldFile } from "../../diff/example-old-file";
+import type { IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCodeBranch } from "@fortawesome/free-solid-svg-icons";
 import { KeyCaps } from "../../../components/shortcut";
 import { changedFile, commitByHash, graftHistory, type ICommit, type IHistory } from "../data";
-import { closeCommitDetailsPane, closeFilePane, explorerKeys, initialExplorerState, selectCommit, selectFile, stateAfterKey, type IExplorerState } from "../explorer-state";
+import { closeCommitDetailsPane, closeFilePane, COMMIT_SUMMARY_PATH, explorerKeys, initialExplorerState, selectCommit, selectFile, stateAfterKey, type IExplorerState } from "../explorer-state";
 import { filePathsInViewOrder, type FileListView } from "../file-views";
 import { scrollLastChildIntoView, scrollSelectionIntoView } from "../scroll";
 import { parseHunks } from "../../diff/model";
-import { CommitDetailsPane } from "./commit-details-pane";
+import { CommitDetailsPane, CommitInfoPane } from "./commit-details-pane";
 import { CommitPane } from "./commit-pane";
 import { FilePane } from "./file-pane";
 import { ResizeHandle } from "./resize-handle";
@@ -62,7 +65,7 @@ function isOwnKeyTarget(target: EventTarget, key: string): boolean {
 // The panes' labels in order, so a pane's position, as the explorer's state counts them, comes
 // from its label.
 //
-const PANE_LABELS = ["Commits", "Commit details", "File diff"];
+const PANE_LABELS = ["Commits", "Commit details", "File diff", "Full commit details"];
 
 //
 export function matchingCommits(commits: ICommit[], search: string): ICommit[] {
@@ -104,9 +107,13 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     const isSearching = search.trim() !== "";
     const columnsRef = useRef<HTMLDivElement>(null);
     const openCommit = state.openHash !== undefined ? commitByHash(history, state.openHash) : undefined;
-    const openFile = state.openHash !== undefined && state.openPath !== undefined ? changedFile(history, state.openHash, state.openPath) : undefined;
-    const [currentHunk, setCurrentHunk] = useState<number | undefined>(undefined);
-    const openPaneCount = openFile ? 3 : openCommit ? 2 : 1;
+    const isCommitOpen = state.openPath === COMMIT_SUMMARY_PATH;
+    const openFile = state.openHash !== undefined && state.openPath !== undefined && !isCommitOpen ? changedFile(history, state.openHash, state.openPath) : undefined;
+    const [currentStop, setCurrentStop] = useState<DiffStop | undefined>(undefined);
+    const currentHunk = currentStop?.kind === "hunk" ? currentStop.hunk : undefined;
+    const currentGap = currentStop?.kind === "gap" ? currentStop.gap : undefined;
+    const fileCardRef = useRef<IFileDiffCardHandle>(null);
+    const openPaneCount = openFile || (openCommit && isCommitOpen) ? 3 : openCommit ? 2 : 1;
     const maximisedPane = maximised !== undefined && maximised < openPaneCount ? maximised : undefined;
 
     //
@@ -125,7 +132,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     }
 
     useEffect(() => {
-        setCurrentHunk(undefined);
+        setCurrentStop(undefined);
     }, [state.openHash, state.openPath]);
 
     useEffect(() => {
@@ -135,27 +142,23 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     }, [state.openHash, state.openPath]);
 
     useEffect(() => {
-        const element = columnsRef.current?.querySelector(`[aria-label="File diff"] [data-hunk-index="${currentHunk}"]`);
+        const selector = currentStop?.kind === "gap" ? `[data-gap-index="${currentStop.gap}"]` : `[data-hunk-index="${currentHunk}"]`;
+        const element = columnsRef.current?.querySelector(`[aria-label="File diff"] ${selector}`);
         if (element instanceof HTMLElement) {
             scrollSelectionIntoView(element);
         }
-    }, [currentHunk]);
+    }, [currentStop, currentHunk]);
 
     //
-    // Moves the keys to the hunk `step` hunks from the current one in the open file, staying on
-    // the first or last hunk at the ends. With no hunk current yet, Down goes to the first hunk
-    // and Up to the last.
+    // Moves the keys `step` stops from the current one in the open file, through its hunks and the
+    // runs of unchanged lines between them, staying on the first or last stop at the ends. With no
+    // stop current yet, Down goes to the first stop and Up to the last.
     //
     function moveHunk(step: number): void {
-        const count = openFile ? parseHunks(openFile.diff).length : 0;
-        if (count === 0) {
+        if (!openFile) {
             return;
         }
-        if (currentHunk === undefined) {
-            setCurrentHunk(step > 0 ? 0 : count - 1);
-            return;
-        }
-        setCurrentHunk(Math.min(Math.max(currentHunk + step, 0), count - 1));
+        setCurrentStop(current => stopAfterMove(diffStops(openFile.diff, exampleOldFile(openFile.path, openFile.status, openFile.diff)), current, step));
     }
 
     //
@@ -166,7 +169,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         if (!openCommit) {
             return;
         }
-        const paths = filePathsInViewOrder(openCommit.files, fileView);
+        const paths = [COMMIT_SUMMARY_PATH, ...filePathsInViewOrder(openCommit.files, fileView)];
         const index = state.openPath === undefined ? -1 : paths.indexOf(state.openPath);
         const next = paths[Math.min(Math.max(index + step, 0), paths.length - 1)];
         if (next !== undefined) {
@@ -179,6 +182,12 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             event.preventDefault();
             event.stopPropagation();
             toggleMaximise(state.activePaneIndex);
+            return;
+        }
+        if (event.key === " " && state.activePaneIndex === 2 && currentStop?.kind === "gap" && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
+            event.preventDefault();
+            event.stopPropagation();
+            fileCardRef.current?.toggleGap(currentStop.gap);
             return;
         }
         if (!explorerKeys.includes(event.key) || event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target, event.key)) {
@@ -199,7 +208,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         setState(current =>
             stateAfterKey(current, event.key, {
                 commitHashes: commits.map(commit => commit.hash),
-                filePaths: current.openHash !== undefined ? filePathsInViewOrder(commitByHash(history, current.openHash).files, fileView) : [],
+                filePaths: current.openHash !== undefined ? [COMMIT_SUMMARY_PATH, ...filePathsInViewOrder(commitByHash(history, current.openHash).files, fileView)] : [],
             }),
         );
     }
@@ -247,7 +256,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                 //
                 onPointerDown={event => {
                     const pane = (event.target as Element).closest(PANE_LABELS.map(label => `section[aria-label="${label}"]`).join(", "))?.getAttribute("aria-label");
-                    const index = pane ? PANE_LABELS.indexOf(pane) : -1;
+                    const index = pane ? Math.min(PANE_LABELS.indexOf(pane), 2) : -1;
                     if (index >= 0) {
                         setState(current => (current.activePaneIndex === index ? current : { ...current, activePaneIndex: index }));
                     }
@@ -311,10 +320,25 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                         file={openFile}
                         isActive={state.activePaneIndex === 2}
                         currentHunk={currentHunk}
+                        currentGap={currentGap}
+                        cardRef={fileCardRef}
                         onSelectHunk={hunk => {
-                            setCurrentHunk(hunk);
+                            setCurrentStop({ kind: "hunk", hunk });
                             setState(current => ({ ...current, activePaneIndex: 2 }));
                         }}
+                        onSelectGap={gap => {
+                            setCurrentStop({ kind: "gap", gap });
+                            setState(current => ({ ...current, activePaneIndex: 2 }));
+                        }}
+                        onClose={() => setState(closeFilePane)}
+                    />
+                ) : undefined}
+                {openCommit && isCommitOpen && shows(2) ? (
+                    <CommitInfoPane
+                        commit={openCommit}
+                        isActive={state.activePaneIndex === 2}
+                        isMaximised={maximisedPane === 2}
+                        onToggleMaximise={() => toggleMaximise(2)}
                         onClose={() => setState(closeFilePane)}
                     />
                 ) : undefined}

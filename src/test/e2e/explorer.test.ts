@@ -621,6 +621,8 @@ test.describe("Commit explorer", () => {
         await expect(details).toContainText("Move through the panes with the arrow keys");
         await expect(details).toHaveAttribute("data-active", "true");
         await page.keyboard.press("ArrowDown");
+        await expect(explorer.getByRole("region", { name: "Full commit details" })).toContainText("Sam Lee");
+        await page.keyboard.press("ArrowDown");
         const file = explorer.getByRole("region", { name: "File diff" });
         await expect(file).toContainText("frontend/src/lib/commit-explorer.ts");
         await expect(details).toHaveAttribute("data-active", "true");
@@ -641,7 +643,8 @@ test.describe("Commit explorer", () => {
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         await explorer.getByText("Initial commit").click();
         const details = explorer.getByRole("region", { name: "Commit details" });
-        await expect(details).toContainText("None, this is the first commit");
+        await details.getByRole("button", { name: "Commit message" }).click();
+        await expect(explorer.getByRole("region", { name: "Full commit details" })).toContainText("None, this is the first commit");
         await details.getByRole("button", { name: "Close commit details" }).click();
         await expect(details).toHaveCount(0);
     });
@@ -775,6 +778,7 @@ test.describe("Commit explorer search and file views", () => {
         await expect(details.getByText("backend/src/tasks")).toBeVisible();
         await page.keyboard.press("ArrowRight");
         await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("ArrowDown");
         await expect(explorer.getByRole("region", { name: "File diff" })).toContainText("backend/src/tasks/file-diff-task.zig");
         await page.keyboard.press("ArrowDown");
         await expect(explorer.getByRole("region", { name: "File diff" })).toContainText("file-pane.tsx");
@@ -841,9 +845,12 @@ test.describe("File paths, staging and tooltips", () => {
         const explorer = page.getByRole("application", { name: "Diff explorer" });
         await explorer.focus();
         await page.keyboard.press("ArrowDown");
+        await expect(explorer).toContainText("File 1 of 9 · unchanged lines");
+        await page.keyboard.press("ArrowDown");
         await expect(explorer).toContainText("File 1 of 9 · change 1 of 2");
-        await page.keyboard.press("ArrowDown");
-        await page.keyboard.press("ArrowDown");
+        for (let step = 0; step < 3; step++) {
+            await page.keyboard.press("ArrowDown");
+        }
         await expect(explorer).toContainText("File 2 of 9 · change 1 of 1");
         await expect(explorer.getByRole("region", { name: "frontend/src/lib/theme-names.ts" })).toHaveAttribute("data-current", "true");
         await expect(explorer.locator('[data-current="true"][data-hunk-index="0"]')).toHaveCount(1);
@@ -871,8 +878,9 @@ test.describe("File paths, staging and tooltips", () => {
         const card = explorer.getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         const hunkButtons = card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage)$/ });
         await explorer.focus();
-        await page.keyboard.press("ArrowDown");
-        await page.keyboard.press("ArrowDown");
+        for (let step = 0; step < 4; step++) {
+            await page.keyboard.press("ArrowDown");
+        }
         await page.keyboard.press("Space");
         await expect(hunkButtons).toHaveText(["Unstage", "Unstage"]);
         await page.keyboard.press("Space");
@@ -883,8 +891,9 @@ test.describe("File paths, staging and tooltips", () => {
         await page.goto("/page/diff?components=light");
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await card.focus();
-        await page.keyboard.press("ArrowDown");
-        await page.keyboard.press("ArrowDown");
+        for (let step = 0; step < 4; step++) {
+            await page.keyboard.press("ArrowDown");
+        }
         await expect(card.locator('[data-current="true"][data-hunk-index="1"]')).toHaveCount(1);
         await page.keyboard.press("Space");
         await expect(card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage)$/ })).toHaveText(["Unstage", "Unstage"]);
@@ -1053,7 +1062,7 @@ test.describe("Whole file, search in shown lines and clicking panes", () => {
     test("a press anywhere in a commit explorer pane makes it active", async ({ page }) => {
         await page.goto("/page/commit-explorer?components=light");
         const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
-        await explorer.getByRole("region", { name: "Commit details" }).getByText("Hash").click();
+        await explorer.getByRole("region", { name: "Commit details" }).getByText("Files changed").click();
         await expect(explorer.getByRole("region", { name: "Commit details" })).toHaveAttribute("data-active", "true");
         await explorer.getByRole("region", { name: "Commits" }).getByText("Initial commit").click();
         await expect(explorer.getByRole("region", { name: "Commits" })).toHaveAttribute("data-active", "true");
@@ -1083,5 +1092,47 @@ test.describe("Discarding changes", () => {
         await area.getByRole("dialog").getByRole("button", { name: "Discard" }).click();
         await expect(area.getByRole("button", { name: "frontend/src/lib/zoom.ts" })).toHaveCount(0);
         await expect(area.getByText("8 files")).toBeVisible();
+    });
+});
+
+test.describe("Runs of unchanged lines and the full commit details", () => {
+    test("Up and Down stop on runs of unchanged lines and Space shows and folds them", async ({ page }) => {
+        await page.goto("/page/diff?components=light");
+        const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
+        const context = card.locator('[data-line="context"]');
+        const before = await context.count();
+        await card.focus();
+        await page.keyboard.press("ArrowDown");
+        await expect(card.locator('[data-current="true"][data-gap-index="0"]')).toHaveCount(1);
+        await page.keyboard.press("Space");
+        await expect(context).toHaveCount(before + 6);
+        await page.keyboard.press("Space");
+        await expect(context).toHaveCount(before);
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("ArrowDown");
+        await expect(card.locator('[data-current="true"][data-gap-index="1"]')).toHaveCount(1);
+    });
+
+    test("clicking a run of unchanged lines makes it the current stop", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" });
+        const diff = area.getByRole("region", { name: "File diff" });
+        await diff.getByText("24 unchanged lines").click();
+        await expect(diff.locator('[data-current="true"][data-gap-index="1"]')).toHaveCount(1);
+        await page.keyboard.press("Space");
+        await expect(diff.getByRole("button", { name: "Hide 24 unchanged lines" })).toBeVisible();
+    });
+
+    test("the commit's row opens its full details, with copy buttons for the summary and description", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
+        await explorer.getByText("Show the Git commands each page runs").click();
+        const details = explorer.getByRole("region", { name: "Commit details" });
+        await expect(details.getByRole("button", { name: "Commit message" })).toContainText("a1b2c3d");
+        await details.getByRole("button", { name: "Commit message" }).click();
+        const full = explorer.getByRole("region", { name: "Full commit details" });
+        await expect(full).toContainText("The help panel in the right sidebar lists the commands");
+        await expect(full.getByRole("button", { name: "Copy summary" })).toBeVisible();
+        await expect(full.getByRole("button", { name: "Copy description" })).toBeVisible();
     });
 });

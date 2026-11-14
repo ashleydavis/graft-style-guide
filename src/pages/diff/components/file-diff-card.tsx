@@ -3,7 +3,8 @@
 // the diff or, for a change with no lines to show, a note of what changed.
 //
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { diffStops, stopAfterMove, type DiffStop } from "../stops";
 import { transitionName } from "../../../lib/view-transition";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
@@ -261,6 +262,16 @@ export function DiscardButton({ what, onClick }: { what: string; onClick: () => 
 }
 
 //
+// What an explorer around a file diff card can ask of it.
+//
+export interface IFileDiffCardHandle {
+    //
+    // Shows the run of unchanged lines at `gapIndex` when it is folded, and folds it when it shows.
+    //
+    toggleGap: (gapIndex: number) => void;
+}
+
+//
 // What a file diff card shows and how.
 //
 export interface IFileDiffCardProps {
@@ -294,6 +305,24 @@ export interface IFileDiffCardProps {
     // The position of the hunk the diff explorer's keys are on, from 0, or undefined.
     //
     currentHunk?: number;
+
+    //
+    // The position of the run of unchanged lines the keys are on, when an explorer around the card
+    // keeps the current stop. Absent when the keys are on no run.
+    //
+    currentGap?: number;
+
+    //
+    // Called with a run of unchanged lines' position when its bar is clicked, for a card whose
+    // current stop an explorer around it keeps.
+    //
+    onSelectGap?: (gapIndex: number) => void;
+
+    //
+    // Holds what an explorer around the card can ask of it: showing or folding a run of unchanged
+    // lines, as Space on the current run does.
+    //
+    ref?: Ref<IFileDiffCardHandle>;
 
     //
     // The card's name for assistive technology, the file's path by default.
@@ -398,6 +427,9 @@ export function FileDiffCard({
     stageable = true,
     isCurrent = false,
     currentHunk,
+    currentGap,
+    onSelectGap,
+    ref,
     label,
     fillHeight = false,
     onClose,
@@ -425,6 +457,27 @@ export function FileDiffCard({
     const staging = givenStaging ?? ownStaging;
     const setStaging = onStagingChange ?? setOwnStaging;
     const [showAllLines, setShowAllLines] = useState(false);
+
+    //
+    // The runs of unchanged lines shown or folded one at a time, by position. Turning the whole
+    // file on or off starts every run again from the switch.
+    //
+    const [gapStates, setGapStates] = useState<ReadonlyMap<number, boolean>>(new Map());
+
+    function changeShowAllLines(isShown: boolean): void {
+        setShowAllLines(isShown);
+        setGapStates(new Map());
+    }
+
+    function setGapState(gapIndex: number, isShown: boolean): void {
+        setGapStates(current => new Map(current).set(gapIndex, isShown));
+    }
+
+    function toggleGap(gapIndex: number): void {
+        setGapState(gapIndex, !(gapStates.get(gapIndex) ?? showAllLines));
+    }
+
+    useImperativeHandle(ref, () => ({ toggleGap }));
     const id = useId();
     const [search, setSearch] = useState("");
     const [currentMatch, setCurrentMatch] = useState(0);
@@ -465,8 +518,25 @@ export function FileDiffCard({
             setSearch("");
         }
     }
-    const [ownHunk, setOwnHunk] = useState<number | undefined>(undefined);
-    const shownHunk = answersKeys ? ownHunk : currentHunk;
+    const [ownStop, setOwnStop] = useState<DiffStop | undefined>(undefined);
+    const shownHunk = answersKeys ? (ownStop?.kind === "hunk" ? ownStop.hunk : undefined) : currentHunk;
+    const shownGap = answersKeys ? (ownStop?.kind === "gap" ? ownStop.gap : undefined) : currentGap;
+
+    //
+    // Brings the current hunk or run of unchanged lines into view when the keys move to it.
+    //
+    useEffect(() => {
+        const selector = shownGap !== undefined ? `[data-gap-index="${shownGap}"]` : shownHunk !== undefined ? `[data-hunk-index="${shownHunk}"]` : undefined;
+        const element = selector ? bodyRef.current?.querySelector(selector) : undefined;
+        if (element instanceof HTMLElement) {
+            if (element.closest("[data-pane-scroll]")) {
+                scrollSelectionIntoView(element);
+            }
+            else {
+                element.scrollIntoView({ block: "nearest" });
+            }
+        }
+    }, [shownGap, shownHunk]);
     const fileStaged = isFileStaged(staging, hunkCount);
 
     function toggleHunk(index: number): void {
@@ -492,18 +562,22 @@ export function FileDiffCard({
         if (!answersKeys || event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target)) {
             return;
         }
-        if ((event.key === "ArrowUp" || event.key === "ArrowDown") && hunkCount > 0) {
+        const stops = shownDiff !== undefined ? diffStops(shownDiff, file.oldFileLines, onlyHunks) : [];
+        if ((event.key === "ArrowUp" || event.key === "ArrowDown") && stops.length > 0) {
             event.preventDefault();
-            const step = event.key === "ArrowUp" ? -1 : 1;
-            setOwnHunk(ownHunk === undefined ? (step > 0 ? 0 : hunkCount - 1) : Math.min(Math.max(ownHunk + step, 0), hunkCount - 1));
+            setOwnStop(stopAfterMove(stops, ownStop, event.key === "ArrowUp" ? -1 : 1));
+        }
+        else if (event.key === " " && ownStop?.kind === "gap") {
+            event.preventDefault();
+            toggleGap(ownStop.gap);
         }
         else if (event.key === " " && stageable) {
             event.preventDefault();
-            if (ownHunk === undefined) {
+            if (ownStop === undefined) {
                 toggleFile();
             }
-            else {
-                toggleHunk(ownHunk);
+            else if (ownStop.kind === "hunk") {
+                toggleHunk(ownStop.hunk);
             }
         }
     }
@@ -575,7 +649,7 @@ export function FileDiffCard({
                         onLayout={setLayout}
                         onWrap={setWrap}
                         showAllLines={showAllLines}
-                        onShowAllLines={setShowAllLines}
+                        onShowAllLines={changeShowAllLines}
                         isWholeFile={file.oldFileLines === undefined}
                     />
                 ) : undefined}
@@ -676,7 +750,11 @@ export function FileDiffCard({
                             search={search}
                             currentMatch={isSearching ? currentMatch : undefined}
                             onMatchCount={setMatchCount}
-                            onSelectHunk={answersKeys ? setOwnHunk : onSelectHunk}
+                            onSelectHunk={answersKeys ? hunk => setOwnStop({ kind: "hunk", hunk }) : onSelectHunk}
+                            onSelectGap={answersKeys ? gap => setOwnStop({ kind: "gap", gap }) : onSelectGap}
+                            currentGap={shownGap}
+                            gapStates={gapStates}
+                            onGapStateChange={setGapState}
                             layout={layout}
                             wrap={wrap}
                             oldFileLines={file.oldFileLines}

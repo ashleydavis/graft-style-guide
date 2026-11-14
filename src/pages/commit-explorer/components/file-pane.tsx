@@ -4,9 +4,9 @@
 // and the Diff page draw a diff the same way.
 //
 
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { exampleOldFile } from "../../diff/example-old-file";
-import { FileDiffCard } from "../../diff/components/file-diff-card";
+import { FileDiffCard, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import type { IChangedFile } from "../data";
 
 //
@@ -44,6 +44,21 @@ export interface IFilePaneProps {
     onSelectHunk: (hunkIndex: number) => void;
 
     //
+    // The position of the run of unchanged lines the keys are on, or undefined.
+    //
+    currentGap: number | undefined;
+
+    //
+    // Called with a run of unchanged lines' position when its bar is clicked.
+    //
+    onSelectGap: (gapIndex: number) => void;
+
+    //
+    // Holds the card, so the explorer can show or fold the current run of unchanged lines.
+    //
+    cardRef: Ref<IFileDiffCardHandle>;
+
+    //
     // Called by the card's close button.
     //
     onClose: () => void;
@@ -55,7 +70,7 @@ export interface IFilePaneProps {
 // the diff uses the room there is and scrolls sideways only when wrapping is switched off. A
 // commit is history, already made, so the card has no Stage or Unstage buttons.
 //
-export function FilePane({ file, isActive, currentHunk, isMaximised, onToggleMaximise, onSelectHunk, onClose }: IFilePaneProps): ReactNode {
+export function FilePane({ file, isActive, currentHunk, currentGap, cardRef, isMaximised, onToggleMaximise, onSelectHunk, onSelectGap, onClose }: IFilePaneProps): ReactNode {
     return (
         <div style={{ flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
             <FileDiffCard
@@ -66,7 +81,10 @@ export function FilePane({ file, isActive, currentHunk, isMaximised, onToggleMax
                 answersKeys={false}
                 isCurrent={isActive}
                 currentHunk={currentHunk}
+                currentGap={currentGap}
+                ref={cardRef}
                 onSelectHunk={onSelectHunk}
+                onSelectGap={onSelectGap}
                 fillHeight
                 isMaximised={isMaximised}
                 onToggleMaximise={onToggleMaximise}

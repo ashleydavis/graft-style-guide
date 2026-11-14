@@ -51,6 +51,14 @@ export interface IExplorerItems {
 }
 
 //
+// The item at the top of the commit details pane's list, which stands for the commit itself: its
+// message on one line and its short hash. It takes a place in the list of paths, so the keys move
+// through it as through the files, and opening it shows the full details in the pane to the right.
+// The colon makes it a name no changed file in the examples has.
+//
+export const COMMIT_SUMMARY_PATH = ":commit";
+
+//
 // The explorer as it first shows: the commit pane alone, active, with nothing selected.
 //
 export const initialExplorerState: IExplorerState = {
