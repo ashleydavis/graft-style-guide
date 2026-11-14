@@ -135,41 +135,41 @@ export const choices: IChoice[] = [
     {
         title: "Status colours as text",
         description:
-            "The new file tree and menus put status colours on rows as words: the M, A, D and R letters and the danger item of a menu. In light they fall to 3.8 to 1 on the selected row and 4.4 to 1 on the hover row, under the 4.5 to 1 text needs. Each option darkens the success, warning, danger and info colours in light, which also darkens their dots, icons and the danger button. Dark stays as it is, at 4.6 to 1 or more.",
+            "The new file tree and menus put status colours on rows as words: the M, A, D and R letters and the danger item of a menu. In light they fall to 4.0 to 1 on the selected row and 4.4 to 1 on the hover row, under the 4.5 to 1 text needs. Each option darkens the success, warning, danger and info colours in light, which also darkens their dots, icons and the danger button. Dark stays as it is, at 4.5 to 1 or more.",
         Preview: StatusTextPreview,
         options: [
             {
                 id: "A",
                 name: "Just past",
-                description: "The least change: 4.6 to 1 on the selected row and 5.9 to 1 on the panel.",
+                description: "The least change: 4.8 to 1 or more on the selected row and 5.8 to 1 or more on the panel.",
                 light: {
                     "--color-success": "#157439",
                     "--color-warning": "#a54a0b",
                     "--color-danger": "#c51f1f",
-                    "--color-info": "#2159e2",
+                    "--color-info": "#0d6a84",
                 },
                 dark: {
                     "--color-success": "#4ade80",
                     "--color-warning": "#fbbf24",
                     "--color-danger": "#f87171",
-                    "--color-info": "#60a5fa",
+                    "--color-info": "#22d3ee",
                 },
             },
             {
                 id: "B",
                 name: "Deep",
-                description: "The next shades down: 5.1 to 1 or more on the selected row and 6.5 to 1 or more on the panel.",
+                description: "The next shades down: 5.3 to 1 or more on the selected row and 6.4 to 1 or more on the panel.",
                 light: {
                     "--color-success": "#166534",
                     "--color-warning": "#92400e",
                     "--color-danger": "#b91c1c",
-                    "--color-info": "#1d4ed8",
+                    "--color-info": "#155e75",
                 },
                 dark: {
                     "--color-success": "#4ade80",
                     "--color-warning": "#fbbf24",
                     "--color-danger": "#f87171",
-                    "--color-info": "#60a5fa",
+                    "--color-info": "#22d3ee",
                 },
             },
             spotIt(["--color-success", "--color-warning", "--color-danger", "--color-info"]),

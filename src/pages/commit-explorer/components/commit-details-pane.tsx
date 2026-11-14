@@ -186,7 +186,7 @@ export function FileRow({ file, depth, label, isSelected, isOpen, selectedRef, o
                 gap: "var(--space-2)",
                 fontSize: "var(--text-sm)",
                 paddingLeft: `calc(var(--space-3) + var(--space-4) * ${depth})`,
-                boxShadow: isOpen ? "inset 2px 0 0 var(--color-accent)" : "none",
+                boxShadow: isOpen ? "inset 2px 0 0 var(--color-select-item)" : "none",
                 //
                 // The path menu shows on the row under the pointer, the selected row and a row
                 // with the keyboard in it, so the rest of the list stays quiet. Its space is kept,

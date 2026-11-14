@@ -5,6 +5,7 @@
 
 import type { IFileDiff } from "./components/file-diff-card";
 import { exampleImageVersions } from "./components/image-diff";
+import { exampleOldFile } from "./example-old-file";
 
 //
 // The old version of zoom.ts, one entry per line, so the unchanged lines between its hunks can be
@@ -93,6 +94,7 @@ export const longLinesChange: IFileDiff = {
         " Other settings are described below.",
     ].join("\n"),
 };
+longLinesChange.oldFileLines = exampleOldFile(longLinesChange.path, longLinesChange.status, longLinesChange.diff ?? "");
 
 //
 // Returns a diff that adds `count` generated lines to a lock file, for a diff too large to show
@@ -111,7 +113,7 @@ function lockFileDiff(count: number): string {
 // away, a renamed file with a change, a rename with no changes, a binary file, a mode change, a
 // file that ends without a line break and a lock file too large to show straight away.
 //
-export const commitFiles: IFileDiff[] = [
+const commitFileList: IFileDiff[] = [
     {
         path: "frontend/src/lib/theme-names.ts",
         status: "A",
@@ -164,3 +166,8 @@ export const commitFiles: IFileDiff[] = [
         diff: lockFileDiff(1240),
     },
 ];
+
+//
+// The commit's files, each with its old file built so its unchanged lines can show.
+//
+export const commitFiles: IFileDiff[] = commitFileList.map(file => (file.diff && !file.oldFileLines ? { ...file, oldFileLines: exampleOldFile(file.path, file.status, file.diff) } : file));

@@ -59,6 +59,11 @@ export interface IPaneProps {
     isMaximised?: boolean;
 
     //
+    // True for a pane that takes the full height of its container, however little it holds.
+    //
+    fillsHeight?: boolean;
+
+    //
     // Called by the maximise button, absent for a pane with no maximise button.
     //
     onToggleMaximise?: () => void;
@@ -80,7 +85,7 @@ export interface IPaneProps {
 // pane with no header, and a maximised pane fills its explorer. The header sits on the panel colour above a divider, with the
 // title cut short when it is wider than the pane.
 //
-export function Pane({ label, width, shrinksTo, isActive, title, headerExtra, toolbar, isMaximised = false, onToggleMaximise, onClose, children }: IPaneProps): ReactNode {
+export function Pane({ label, width, shrinksTo, isActive, title, headerExtra, toolbar, isMaximised = false, fillsHeight = false, onToggleMaximise, onClose, children }: IPaneProps): ReactNode {
     const maximiseButton = onToggleMaximise ? <MaximiseButton isMaximised={isMaximised} onClick={onToggleMaximise} /> : undefined;
     const id = useId();
     return (
@@ -97,6 +102,7 @@ export function Pane({ label, width, shrinksTo, isActive, title, headerExtra, to
                 minWidth: isMaximised ? 0 : shrinksTo,
                 maxWidth: isMaximised ? "none" : "calc(100vw - var(--space-8) * 2)",
                 maxHeight: "100%",
+                height: fillsHeight ? "100%" : undefined,
                 overflow: "hidden",
                 borderRadius: "var(--radius-lg)",
                 borderColor: isActive ? "var(--color-select-pane)" : "var(--color-border)",

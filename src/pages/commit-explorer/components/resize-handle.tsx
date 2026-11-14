@@ -103,7 +103,7 @@ export function ResizeHandle({ label, getWidth, min, max, onReset, onWidth }: IR
             >
                 <span
                     aria-hidden="true"
-                    className="h-full transition-colors group-hover:bg-(--color-accent) group-focus-visible:bg-(--color-accent) group-active:bg-(--color-accent)"
+                    className="h-full transition-colors group-hover:bg-(--color-select-pane) group-focus-visible:bg-(--color-select-pane) group-active:bg-(--color-select-pane)"
                     style={{ width: "2px", borderRadius: "var(--radius-full)" }}
                 />
             </div>

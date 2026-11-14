@@ -4,7 +4,12 @@
 // box commits what is staged.
 //
 
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -21,15 +26,14 @@ import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faFileLines, faLayerGroup, faMagnifyingGlass, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FilePathMenu } from "../../../components/file-path-menu";
-import { MaximiseButton } from "../../../components/maximise-button";
 import { KeyCaps } from "../../../components/shortcut";
 import { Tip } from "../../../components/tip";
 import { FilePath } from "../../commit-explorer/components/file-path";
 import { LineCounts } from "../../commit-explorer/components/line-counts";
 import { Pane } from "../../commit-explorer/components/pane";
 import { countLines, FileDiffCard, type IFileDiff } from "../../diff/components/file-diff-card";
-import { parseHunks, withoutHunks } from "../../diff/model";
-import { initialStaging, isFileStaged, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
+import { parseHunks, withHunkDiscarded as withHunkRemoved, withoutHunks } from "../../diff/model";
+import { initialStaging, isFileStaged, withFileToggled, withHunkDiscarded as withStagedHunkDiscarded, withHunkToggled, type IStaging } from "../../diff/staging";
 import { StatusLetter } from "../../tree";
 import { withViewTransition } from "../../../lib/view-transition";
 
@@ -97,6 +101,10 @@ export function SplitDiff({
     isCurrent,
     currentHunk,
     onSelectHunk,
+    onDiscardFile,
+    onDiscardHunk,
+    isMaximised,
+    onToggleMaximise,
 }: {
     file: IFileDiff;
     staging: IStaging;
@@ -104,6 +112,10 @@ export function SplitDiff({
     isCurrent: boolean;
     currentHunk: number | undefined;
     onSelectHunk: (hunkIndex: number) => void;
+    onDiscardFile: () => void;
+    onDiscardHunk: (hunkIndex: number) => void;
+    isMaximised: boolean;
+    onToggleMaximise: () => void;
 }): ReactNode {
     const all = Array.from({ length: parseHunks(file.diff ?? "").length }, (_unused, index) => index);
     const sections: { title: string; hunks: number[]; action: "stage" | "unstage"; empty: string }[] = [
@@ -135,6 +147,10 @@ export function SplitDiff({
                                 onStagingChange={onStagingChange}
                                 answersKeys={false}
                                 onSelectHunk={onSelectHunk}
+                                onDiscardFile={onDiscardFile}
+                                onDiscardHunk={onDiscardHunk}
+                                isMaximised={isMaximised}
+                                onToggleMaximise={onToggleMaximise}
                                 initialWrap
                                 fillHeight
                             />
@@ -165,7 +181,8 @@ function isOwnKeyTarget(target: EventTarget, key: string): boolean {
 // that stages or unstages the whole file, ticked when all of it is staged and half-ticked when
 // some hunks are, and a count of the files and how many are staged. The selected file's diff
 // shows to its right in the Diff page's diff card, with Stage and Unstage buttons for the file and
-// each hunk; the checkboxes and the buttons share one staging. Under the files the commit box
+// each hunk; the checkboxes and the buttons share one staging. The files take the area's full
+// height. To the right of the diff the commit box
 // takes a summary and a description, with "Amend" and "No verify" checkboxes and
 // the Commit button, which needs a summary and something staged, or the amend box ticked. A
 // commit takes the staged files and hunks out of the list and says what it committed. The keys
@@ -179,7 +196,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [stagings, setStagings] = useState<ReadonlyMap<string, IStaging>>(() => new Map(startFiles.map(file => [file.path, initialStaging(file.stagedHunks)])));
     const [selectedPath, setSelectedPath] = useState<string | undefined>(startFiles[0]?.path);
     const [selectedSection, setSelectedSection] = useState<ListSection>("all");
-    const [activePane, setActivePane] = useState<0 | 1>(0);
+    const [activePane, setActivePane] = useState<0 | 1 | 2>(0);
     const [currentHunk, setCurrentHunk] = useState<number | undefined>(undefined);
     const [summary, setSummary] = useState("");
     const [description, setDescription] = useState("");
@@ -187,8 +204,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [skipHooks, setSkipHooks] = useState(false);
     const [committed, setCommitted] = useState<string | undefined>(undefined);
     const [diffMode, setDiffMode] = useState<"one" | "split">("one");
-    const [maximised, setMaximised] = useState<0 | 1 | undefined>(undefined);
+    const [maximised, setMaximised] = useState<0 | 1 | 2 | undefined>(undefined);
     const [fileSearch, setFileSearch] = useState("");
+    const [pendingDiscard, setPendingDiscard] = useState<{ path: string; hunk?: number } | undefined>(undefined);
+    const areaRef = useRef<HTMLDivElement>(null);
     const shownFiles = files.filter(file => `${file.oldPath ?? ""} ${file.path}`.toLowerCase().includes(fileSearch.trim().toLowerCase()));
     const selectedFile = files.find(file => file.path === selectedPath);
     const hunkCountOf = (file: IFileDiff): number => parseHunks(file.diff ?? "").length;
@@ -292,7 +311,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         setCurrentHunk(order[next]);
     }
 
-    function toggleMaximise(pane: 0 | 1): void {
+    function toggleMaximise(pane: 0 | 1 | 2): void {
         withViewTransition(() => setMaximised(maximised === pane ? undefined : pane));
     }
 
@@ -329,6 +348,43 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         setSkipHooks(false);
     }
 
+    //
+    // Throws away the change waiting in `pendingDiscard`: a whole file leaves the list, and a hunk
+    // leaves its file's diff, taking the file with it when it was the file's last change.
+    //
+    function discard(): void {
+        if (!pendingDiscard) {
+            return;
+        }
+        const { path, hunk } = pendingDiscard;
+        setPendingDiscard(undefined);
+        const file = files.find(candidate => candidate.path === path);
+        if (!file) {
+            return;
+        }
+        const isLastChange = hunk === undefined || hunkCountOf(file) <= 1;
+        if (isLastChange) {
+            const index = files.indexOf(file);
+            const left = files.filter(candidate => candidate !== file);
+            setFiles(left);
+            setStagings(current => {
+                const next = new Map(current);
+                next.delete(path);
+                return next;
+            });
+            if (selectedPath === path) {
+                setSelectedPath(left[Math.min(index, left.length - 1)]?.path);
+                setCurrentHunk(undefined);
+            }
+            return;
+        }
+        setFiles(files.map(candidate => (candidate === file ? { ...file, diff: withHunkRemoved(file.diff ?? "", hunk), stagedHunks: undefined } : candidate)));
+        setStaging(path, withStagedHunkDiscarded(stagingOf(file), hunk));
+        if (selectedPath === path && currentHunk !== undefined) {
+            setCurrentHunk(currentHunk > hunk ? currentHunk - 1 : currentHunk === hunk ? undefined : currentHunk);
+        }
+    }
+
     function onKeyDown(event: KeyboardEvent): void {
         if (event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target, event.key)) {
             return;
@@ -339,7 +395,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             toggleMaximise(activePane);
             return;
         }
-        if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Escape", " "].includes(key)) {
+        if (activePane === 2 || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Escape", " "].includes(key)) {
             return;
         }
         event.preventDefault();
@@ -374,6 +430,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
 
     return (
         <div
+            ref={areaRef}
             role="application"
             aria-label="Changes"
             tabIndex={0}
@@ -388,11 +445,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             }}
         >
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row" style={{ gap: "var(--space-3)", padding: "var(--space-3)" }}>
-                <div className={maximised === 1 ? "hidden" : maximised === 0 ? "flex min-h-0 flex-1 flex-col" : "flex min-h-0 flex-col lg:w-[400px] lg:flex-none"} style={{ gap: "var(--space-3)" }}>
+                <div className={maximised === 1 || maximised === 2 ? "hidden" : maximised === 0 ? "flex min-h-0 flex-1 flex-col" : "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[360px] lg:flex-none"} style={{ gap: "var(--space-3)" }}>
                     <div className="flex min-h-0 flex-1 flex-col" style={{ maxHeight: "100%" }} onPointerDown={() => setActivePane(0)}>
                         <Pane
                             label="Changed files"
                             width="100%"
+                            fillsHeight
                             isActive={activePane === 0}
                             isMaximised={maximised === 0}
                             onToggleMaximise={() => toggleMaximise(0)}
@@ -428,6 +486,31 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                         },
                                     }}
                                 />
+                            }
+                            headerExtra={
+                            <ToggleButtonGroup
+                                size="small"
+                                exclusive
+                                value={diffMode}
+                                onChange={(_event, value: "one" | "split" | null) => {
+                                    if (value) {
+                                        setDiffMode(value);
+                                    }
+                                }}
+                                aria-label="Diff shows"
+                                sx={{ "& .MuiToggleButton-root": { padding: "var(--space-1) var(--space-2)", fontSize: "var(--icon-sm)" } }}
+                            >
+                                <Tooltip title={<Tip title="One diff" detail="The file's whole change, staged and unstaged together." />}>
+                                    <ToggleButton value="one" aria-label="One diff">
+                                        <FontAwesomeIcon icon={faFileLines} />
+                                    </ToggleButton>
+                                </Tooltip>
+                                <Tooltip title={<Tip title="Staged and unstaged" detail="The staged changes and the unstaged changes in separate sections, staged above." />}>
+                                    <ToggleButton value="split" aria-label="Staged and unstaged">
+                                        <FontAwesomeIcon icon={faLayerGroup} />
+                                    </ToggleButton>
+                                </Tooltip>
+                            </ToggleButtonGroup>
                             }
                             title={
                                 <span className="flex items-baseline" style={{ gap: "var(--space-2)" }}>
@@ -501,86 +584,9 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                             )}
                         </Pane>
                     </div>
-
-                    <section
-                        aria-label="Commit"
-                        className="flex flex-none flex-col"
-                        style={{
-                            gap: "var(--space-2)",
-                            padding: "var(--space-3)",
-                            background: "var(--color-panel)",
-                            border: "1px solid var(--color-border)",
-                            borderRadius: "var(--radius-lg)",
-                            boxShadow: "var(--shadow-raised)",
-                        }}
-                    >
-                        {committed ? (
-                            <Alert severity="success" onClose={() => setCommitted(undefined)}>
-                                {committed}
-                            </Alert>
-                        ) : undefined}
-                        <TextField
-                            size="small"
-                            fullWidth
-                            label="Summary"
-                            value={summary}
-                            onChange={event => setSummary(event.target.value)}
-                        />
-                        <TextField size="small" fullWidth multiline minRows={2} maxRows={6} label="Description" value={description} onChange={event => setDescription(event.target.value)} />
-                        <div className="flex flex-wrap items-center" style={{ gap: "0 var(--space-3)" }}>
-                            <Tooltip title={<Tip title="Amend the last commit" detail="Replaces the last commit with one that also holds what is staged, using this message." />}>
-                                <FormControlLabel label="Amend" control={<Checkbox size="small" checked={amend} onChange={event => onAmend(event.target.checked)} />} />
-                            </Tooltip>
-                            <Tooltip title={<Tip title="No verify (--no-verify)" detail="Commits without running the repository's pre-commit and commit-msg hooks." />}>
-                                <FormControlLabel label="No verify" control={<Checkbox size="small" checked={skipHooks} onChange={event => setSkipHooks(event.target.checked)} />} />
-                            </Tooltip>
-                        </div>
-                        <Tooltip
-                            title={
-                                canCommit ? (
-                                    <Tip title={amend ? "Amend the last commit" : "Commit the staged changes"} detail={skipHooks ? "With --no-verify, so no hooks run." : undefined} />
-                                ) : (
-                                    <Tip title="Nothing to commit yet" detail="Write a summary and stage a change, or tick Amend." />
-                                )
-                            }
-                        >
-                            <span>
-                                <Button variant="contained" fullWidth disabled={!canCommit} onClick={commit}>
-                                    {amend ? "Amend commit" : `Commit ${stagedFiles.length} ${stagedFiles.length === 1 ? "file" : "files"}`}
-                                </Button>
-                            </span>
-                        </Tooltip>
-                    </section>
                 </div>
 
-                <div className={maximised === 0 ? "hidden" : "flex min-h-[420px] min-w-0 flex-1 flex-col lg:min-h-0"} style={{ gap: "var(--space-2)" }} onPointerDown={() => setActivePane(1)}>
-                    <div className="flex flex-none flex-wrap items-center" style={{ gap: "var(--space-2)" }}>
-                        <ToggleButtonGroup
-                            size="small"
-                            exclusive
-                            value={diffMode}
-                            onChange={(_event, value: "one" | "split" | null) => {
-                                if (value) {
-                                    setDiffMode(value);
-                                }
-                            }}
-                            aria-label="Diff shows"
-                            sx={{ "& .MuiToggleButton-root": { padding: "var(--space-1) var(--space-2)", fontSize: "var(--icon-sm)" } }}
-                        >
-                            <Tooltip title={<Tip title="One diff" detail="The file's whole change, staged and unstaged together." />}>
-                                <ToggleButton value="one" aria-label="One diff">
-                                    <FontAwesomeIcon icon={faFileLines} />
-                                </ToggleButton>
-                            </Tooltip>
-                            <Tooltip title={<Tip title="Staged and unstaged" detail="The staged changes and the unstaged changes in separate sections, staged above." />}>
-                                <ToggleButton value="split" aria-label="Staged and unstaged">
-                                    <FontAwesomeIcon icon={faLayerGroup} />
-                                </ToggleButton>
-                            </Tooltip>
-                        </ToggleButtonGroup>
-                        <span className="flex-1" />
-                        <MaximiseButton isMaximised={maximised === 1} onClick={() => toggleMaximise(1)} />
-                    </div>
+                <div className={maximised === 0 || maximised === 2 ? "hidden" : "flex min-h-[420px] min-w-0 flex-1 flex-col lg:min-h-0"} style={{ gap: "var(--space-2)" }} onPointerDown={() => setActivePane(1)}>
                     {selectedFile ? (
                         diffMode === "split" && hunkCountOf(selectedFile) > 0 ? (
                             <SplitDiff
@@ -589,6 +595,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 onStagingChange={staging => setStaging(selectedFile.path, staging)}
                                 isCurrent={activePane === 1}
                                 currentHunk={currentHunk}
+                                onDiscardFile={() => setPendingDiscard({ path: selectedFile.path })}
+                                onDiscardHunk={hunk => setPendingDiscard({ path: selectedFile.path, hunk })}
+                                isMaximised={maximised === 1}
+                                onToggleMaximise={() => toggleMaximise(1)}
                                 onSelectHunk={hunk => {
                                     setCurrentHunk(hunk);
                                     setActivePane(1);
@@ -605,6 +615,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     staging={stagingOf(selectedFile)}
                                     onStagingChange={staging => setStaging(selectedFile.path, staging)}
                                     answersKeys={false}
+                                    onDiscardFile={() => setPendingDiscard({ path: selectedFile.path })}
+                                    onDiscardHunk={hunk => setPendingDiscard({ path: selectedFile.path, hunk })}
+                                    isMaximised={maximised === 1}
+                                    onToggleMaximise={() => toggleMaximise(1)}
                                     onSelectHunk={hunk => {
                                         setCurrentHunk(hunk);
                                         setActivePane(1);
@@ -619,6 +633,71 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                             Select a file to see its diff.
                         </div>
                     )}
+                </div>
+
+                <div
+                    className={maximised === 2 ? "flex min-h-0 flex-1 flex-col" : maximised === undefined ? "flex min-h-0 flex-none flex-col lg:w-[300px]" : "hidden"}
+                    onPointerDown={() => setActivePane(2)}
+                >
+                <Pane label="Commit" title="Commit" width="100%" fillsHeight isActive={activePane === 2} isMaximised={maximised === 2} onToggleMaximise={() => toggleMaximise(2)}>
+                <div className="flex h-full flex-col" style={{ gap: "var(--space-4)", padding: "var(--space-4) var(--space-3) var(--space-3)" }}>
+                    {committed ? (
+                        <Alert severity="success" onClose={() => setCommitted(undefined)}>
+                            {committed}
+                        </Alert>
+                    ) : undefined}
+                    <TextField
+                        size="small"
+                        fullWidth
+                        label="Summary"
+                        value={summary}
+                        onChange={event => setSummary(event.target.value)}
+                    />
+                    <TextField
+                        size="small"
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        label="Description"
+                        value={description}
+                        onChange={event => setDescription(event.target.value)}
+                        //
+                        // The description takes the height the commit box has left over, so a long
+                        // message has room before it scrolls.
+                        //
+                        className="lg:min-h-0 lg:flex-1"
+                        sx={{
+                            "@media (min-width: 1024px)": {
+                                "& .MuiInputBase-root": { height: "100%", alignItems: "flex-start" },
+                                "& textarea": { height: "100% !important", overflow: "auto !important" },
+                            },
+                        }}
+                    />
+                    <div className="flex flex-wrap items-center" style={{ gap: "0 var(--space-3)" }}>
+                        <Tooltip title={<Tip title="Amend the last commit" detail="Replaces the last commit with one that also holds what is staged, using this message." />}>
+                            <FormControlLabel label="Amend" control={<Checkbox size="small" checked={amend} onChange={event => onAmend(event.target.checked)} />} />
+                        </Tooltip>
+                        <Tooltip title={<Tip title="No verify (--no-verify)" detail="Commits without running the repository's pre-commit and commit-msg hooks." />}>
+                            <FormControlLabel label="No verify" control={<Checkbox size="small" checked={skipHooks} onChange={event => setSkipHooks(event.target.checked)} />} />
+                        </Tooltip>
+                    </div>
+                    <Tooltip
+                        title={
+                            canCommit ? (
+                                <Tip title={amend ? "Amend the last commit" : "Commit the staged changes"} detail={skipHooks ? "With --no-verify, so no hooks run." : undefined} />
+                            ) : (
+                                <Tip title="Nothing to commit yet" detail="Write a summary and stage a change, or tick Amend." />
+                            )
+                        }
+                    >
+                        <span>
+                            <Button variant="contained" fullWidth disabled={!canCommit} onClick={commit}>
+                                {amend ? "Amend commit" : `Commit ${stagedFiles.length} ${stagedFiles.length === 1 ? "file" : "files"}`}
+                            </Button>
+                        </span>
+                    </Tooltip>
+                </div>
+                </Pane>
                 </div>
             </div>
 
@@ -645,6 +724,25 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     </span>
                 ))}
             </div>
+            <Dialog open={pendingDiscard !== undefined} onClose={() => setPendingDiscard(undefined)} container={() => areaRef.current} maxWidth="xs" fullWidth={true}>
+                <DialogTitle>{pendingDiscard?.hunk === undefined ? "Discard the file's changes?" : "Discard this change?"}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {pendingDiscard?.hunk === undefined
+                            ? `Puts ${pendingDiscard?.path ?? ""} back as it was in the last commit.`
+                            : `Puts this part of ${pendingDiscard.path} back as it was in the last commit.`}{" "}
+                        Discarded changes are gone for good.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button variant="text" onClick={() => setPendingDiscard(undefined)}>
+                        Keep changes
+                    </Button>
+                    <Button variant="outlined" color="error" onClick={discard}>
+                        Discard
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 }

@@ -24,12 +24,13 @@ export function OverviewPage(): ReactNode {
                     {[
                         ["--gray-0", "--gray-50", "--gray-100", "--gray-200", "--gray-300", "--gray-400", "--gray-450"],
                         ["--gray-500", "--gray-550", "--gray-600", "--gray-700", "--gray-750", "--gray-800", "--gray-900", "--gray-950"],
-                        ["--violet-100", "--violet-300", "--violet-400", "--violet-500", "--violet-500-a08", "--violet-500-a14", "--violet-500-a16", "--violet-500-a26", "--violet-600", "--violet-700", "--violet-900", "--violet-950"],
+                        ["--violet-300", "--violet-400", "--violet-500", "--violet-600", "--violet-700", "--violet-950"],
                         ["--green-100", "--green-200", "--green-400", "--green-600", "--green-650", "--green-700", "--green-900", "--green-950"],
                         ["--red-100", "--red-200", "--red-400", "--red-600", "--red-900", "--red-950", "--red-975"],
                         ["--amber-400", "--amber-600", "--amber-650", "--amber-700"],
-                        ["--blue-400", "--blue-600"],
-                        ["--cyan-400", "--cyan-600", "--cyan-650"],
+                        ["--blue-100", "--blue-300", "--blue-400", "--blue-500", "--blue-500-a08", "--blue-500-a14", "--blue-500-a16", "--blue-500-a26", "--blue-600", "--blue-700", "--blue-900"],
+                        ["--cyan-400", "--cyan-600", "--cyan-650", "--cyan-700"],
+                        ["--pink-400", "--pink-600"],
                         ["--black-40", "--black-60"],
                     ].map(names => (
                         <div key={names[0]} className="flex flex-wrap gap-3">
@@ -64,6 +65,8 @@ export function OverviewPage(): ReactNode {
                         "--color-focus",
                         "--color-select-pane",
                         "--color-select-item",
+                        "--color-scrollbar-thumb",
+                        "--color-scrollbar-track",
                         "--color-success",
                         "--color-warning",
                         "--color-danger",
@@ -245,6 +248,14 @@ export function OverviewPage(): ReactNode {
                             <TokenLabel name={name} />
                         </div>
                     ))}
+                </div>
+            </Section>
+
+            <Section title="Fading" description="A row the search does not match, faded beside one that matches.">
+                <div className="flex flex-col gap-2">
+                    <span>A commit that matches</span>
+                    <span style={{ opacity: "var(--opacity-faded)" }}>A commit that does not match</span>
+                    <TokenLabel name="--opacity-faded" />
                 </div>
             </Section>
         </div>

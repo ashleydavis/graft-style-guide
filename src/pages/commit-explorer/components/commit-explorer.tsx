@@ -59,6 +59,12 @@ function isOwnKeyTarget(target: EventTarget, key: string): boolean {
 // Returns the commits that match `search`, ignoring case: those whose title, author, hash or refs
 // contain it. An empty search matches every commit.
 //
+// The panes' labels in order, so a pane's position, as the explorer's state counts them, comes
+// from its label.
+//
+const PANE_LABELS = ["Commits", "Commit details", "File diff"];
+
+//
 export function matchingCommits(commits: ICommit[], search: string): ICommit[] {
     const needle = search.trim().toLowerCase();
     if (needle === "") {
@@ -69,9 +75,9 @@ export function matchingCommits(commits: ICommit[], search: string): ICommit[] {
 
 //
 // Renders the explorer in a window frame: a title bar with the repository and branch, the panes,
-// with a search box at the top of the commit list that narrows it, and the key hints. While a
-// search is typed the list shows only the matching commits, without the graph, whose lines would
-// no longer join. The explorer answers its keys while the focus is anywhere inside it outside the
+// with a search box at the top of the commit list, and the key hints. While a search is typed,
+// every commit keeps its place and its lanes, the commits that do not match fade, and Up and Down
+// move through the matches only. The explorer answers its keys while the focus is anywhere inside it outside the
 // search box; click a commit or move to the explorer with Tab to use them. In the file pane, Up and
 // Down move from change to change in the diff, marking the current one, and Shift with Up or Down
 // opens the previous or next file of the commit. It shows `history`, the
@@ -94,6 +100,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         return columnsRef.current?.querySelector(`[aria-label="${label}"]`)?.getBoundingClientRect().width ?? 0;
     }
     const commits = matchingCommits(history.commits, search);
+    const matchingHashes = new Set(commits.map(commit => commit.hash));
     const isSearching = search.trim() !== "";
     const columnsRef = useRef<HTMLDivElement>(null);
     const openCommit = state.openHash !== undefined ? commitByHash(history, state.openHash) : undefined;
@@ -231,19 +238,43 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                 </span>
             </div>
 
-            <div ref={columnsRef} className="flex min-h-0 flex-1 items-stretch overflow-x-auto" style={{ padding: "var(--space-3)" }}>
+            <div
+                ref={columnsRef}
+                className="flex min-h-0 flex-1 items-stretch overflow-x-auto"
+                style={{ padding: "var(--space-3)" }}
+                //
+                // A press anywhere in a pane makes it the active pane, found by the pane's label.
+                //
+                onPointerDown={event => {
+                    const pane = (event.target as Element).closest(PANE_LABELS.map(label => `section[aria-label="${label}"]`).join(", "))?.getAttribute("aria-label");
+                    const index = pane ? PANE_LABELS.indexOf(pane) : -1;
+                    if (index >= 0) {
+                        setState(current => (current.activePaneIndex === index ? current : { ...current, activePaneIndex: index }));
+                    }
+                }}
+            >
                 {shows(0) ? (
                     <CommitPane
                         isMaximised={maximisedPane === 0}
                         onToggleMaximise={() => toggleMaximise(0)}
-                        commits={commits}
+                        commits={history.commits}
                         laneCount={history.laneCount}
                         width={commitPaneWidth}
-                        showGraph={!isSearching}
+                        matchingHashes={isSearching ? matchingHashes : undefined}
                         search={search}
                         matchCount={commits.length}
                         totalCount={history.commits.length}
-                        onSearch={setSearch}
+                        onSearch={text => {
+                            setSearch(text);
+                            //
+                            // The selection moves to the first match when the selected commit no
+                            // longer matches, so Up and Down start from a match.
+                            //
+                            const matches = matchingCommits(history.commits, text);
+                            if (matches.length > 0 && !matches.some(commit => commit.hash === state.selectedHash)) {
+                                setState(current => ({ ...current, selectedHash: matches[0].hash }));
+                            }
+                        }}
                         selectedHash={state.selectedHash}
                         openHash={state.openHash}
                         isActive={state.activePaneIndex === 0}

@@ -5,6 +5,7 @@
 //
 
 import type { ReactNode } from "react";
+import { exampleOldFile } from "../../diff/example-old-file";
 import { FileDiffCard } from "../../diff/components/file-diff-card";
 import type { IChangedFile } from "../data";
 
@@ -58,7 +59,7 @@ export function FilePane({ file, isActive, currentHunk, isMaximised, onToggleMax
     return (
         <div style={{ flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
             <FileDiffCard
-                file={{ path: file.path, status: file.status, diff: file.diff }}
+                file={{ path: file.path, status: file.status, diff: file.diff, oldFileLines: exampleOldFile(file.path, file.status, file.diff) }}
                 label="File diff"
                 initialWrap
                 stageable={false}

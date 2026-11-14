@@ -751,17 +751,19 @@ test.describe("Diff", () => {
 });
 
 test.describe("Commit explorer search and file views", () => {
-    test("the search box narrows the commit list and hides the graph while it does", async ({ page }) => {
+    test("the search box fades the commits that do not match and keeps the graph", async ({ page }) => {
         await page.goto("/page/commit-explorer?components=light");
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         const commitPane = explorer.getByRole("region", { name: "Commits" });
+        const lanesBefore = await commitPane.locator("line[data-lane]").count();
         await explorer.getByRole("textbox", { name: "Search commits" }).fill("pane");
         const rows = commitPane.getByRole("list", { name: "Commits" }).locator(":scope > li");
-        await expect(rows).toHaveCount(3);
-        await expect(commitPane).toContainText("3 of 7");
-        await expect(commitPane.locator("line[data-lane]")).toHaveCount(0);
-        await explorer.getByRole("button", { name: "Clear search" }).click();
         await expect(rows).toHaveCount(7);
+        await expect(rows.and(page.locator('[data-match="true"]'))).toHaveCount(3);
+        await expect(commitPane).toContainText("3 of 7");
+        await expect(commitPane.locator("line[data-lane]")).toHaveCount(lanesBefore);
+        await explorer.getByRole("button", { name: "Clear search" }).click();
+        await expect(rows.and(page.locator('[data-match="true"]'))).toHaveCount(7);
     });
 
     test("the tree view lists files by folder and the arrow keys follow its order", async ({ page }) => {
@@ -1021,5 +1023,65 @@ test.describe("Finding, clicking hunks, resizing and maximising", () => {
         await expect(explorer.getByRole("region", { name: "Commit details" })).toBeHidden();
         await page.keyboard.press("m");
         await expect(explorer.getByRole("region", { name: "Commit details" })).toBeVisible();
+    });
+});
+
+test.describe("Whole file, search in shown lines and clicking panes", () => {
+    test("search finds matches in unchanged lines once the whole file shows", async ({ page }) => {
+        await page.goto("/page/diff?components=light");
+        const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
+        const find = card.getByRole("textbox", { name: "Find in this diff" });
+        await find.fill("zoomIn");
+        await expect(card).toContainText("No matches");
+        await card.getByRole("button", { name: "Show the whole file" }).click();
+        await expect(card).toContainText("1 of 1");
+        await expect(card.locator('[data-search-match="0"]')).toBeVisible();
+    });
+
+    test("every changed text file in the commit explorer can show the whole file", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const section = page.locator("section", { has: page.getByRole("heading", { name: "A file with several changes" }) });
+        const explorer = section.getByRole("application", { name: "Commit explorer" }).first();
+        const pane = explorer.getByRole("region", { name: "File diff" });
+        const toggle = pane.getByRole("button", { name: "Show the whole file" });
+        await expect(toggle).toBeEnabled();
+        const before = await pane.locator('[role="row"]').count();
+        await toggle.click();
+        await expect.poll(() => pane.locator('[role="row"]').count()).toBeGreaterThan(before);
+    });
+
+    test("a press anywhere in a commit explorer pane makes it active", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
+        await explorer.getByRole("region", { name: "Commit details" }).getByText("Hash").click();
+        await expect(explorer.getByRole("region", { name: "Commit details" })).toHaveAttribute("data-active", "true");
+        await explorer.getByRole("region", { name: "Commits" }).getByText("Initial commit").click();
+        await expect(explorer.getByRole("region", { name: "Commits" })).toHaveAttribute("data-active", "true");
+    });
+});
+
+test.describe("Discarding changes", () => {
+    test("discarding a hunk asks first, then takes it out of the diff", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" });
+        const card = area.getByRole("region", { name: "File diff" });
+        await expect(card.locator("[data-hunk-index]")).toHaveCount(2);
+        await card.getByRole("button", { name: "Discard this hunk" }).last().click();
+        const dialog = area.getByRole("dialog", { name: "Discard this change?" });
+        await dialog.getByRole("button", { name: "Keep changes" }).click();
+        await expect(card.locator("[data-hunk-index]")).toHaveCount(2);
+        await card.getByRole("button", { name: "Discard this hunk" }).last().click();
+        await dialog.getByRole("button", { name: "Discard" }).click();
+        await expect(card.locator("[data-hunk-index]")).toHaveCount(1);
+        await expect(card).toContainText("+3−2");
+    });
+
+    test("discarding a file takes it out of the list", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" });
+        await area.getByRole("region", { name: "File diff" }).getByRole("button", { name: "Discard this file" }).click();
+        await area.getByRole("dialog").getByRole("button", { name: "Discard" }).click();
+        await expect(area.getByRole("button", { name: "frontend/src/lib/zoom.ts" })).toHaveCount(0);
+        await expect(area.getByText("8 files")).toBeVisible();
     });
 });

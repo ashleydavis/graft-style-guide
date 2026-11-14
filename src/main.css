@@ -32,3 +32,11 @@ html {
     animation-duration: var(--duration-normal);
     animation-timing-function: var(--ease-standard);
 }
+
+/*
+ * Scrollbars keep the browser's own size, thumb and arrow buttons, and take a grey thumb on a
+ * see-through track, so they sit quietly on whatever surface scrolls.
+ */
+* {
+    scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+}

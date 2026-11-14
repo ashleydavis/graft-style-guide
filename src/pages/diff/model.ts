@@ -266,3 +266,33 @@ export function withoutHunks(diff: string, drop: ReadonlySet<number>): string {
     }
     return kept.join("\n");
 }
+
+//
+// Returns the diff without hunk `index`, from 0, as it reads once that change is discarded and the
+// file goes back to how it was there. The hunks after it start that many lines earlier in the new
+// file, so their headers' new line numbers move up by the lines the discarded hunk added less the
+// lines it deleted.
+//
+export function withHunkDiscarded(diff: string, index: number): string {
+    const hunk = parseHunks(diff)[index];
+    if (!hunk) {
+        return diff;
+    }
+    const added = hunk.lines.filter(line => line.kind === "added").length;
+    const deleted = hunk.lines.filter(line => line.kind === "deleted").length;
+    const shift = added - deleted;
+    let position = -1;
+    return withoutHunks(diff, new Set([index]))
+        .split("\n")
+        .map(line => {
+            if (!line.startsWith("@@")) {
+                return line;
+            }
+            position += 1;
+            if (position < index) {
+                return line;
+            }
+            return line.replace(/^(@@ -\S+ \+)(\d+)/, (_match, start: string, newStart: string) => `${start}${Number(newStart) - shift}`);
+        })
+        .join("\n");
+}

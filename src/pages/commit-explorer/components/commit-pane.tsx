@@ -69,9 +69,10 @@ export interface ICommitPaneProps {
     width: number | undefined;
 
     //
-    // True to draw each row's lanes of the commit graph, false while a search leaves rows out.
+    // The hashes of the commits that match the search, or undefined while there is no search. A
+    // commit that does not match stays in its place with its lanes, and its text fades.
     //
-    showGraph: boolean;
+    matchingHashes: ReadonlySet<string> | undefined;
 
     //
     // The hash of the selected commit, drawn on the selected background, or undefined.
@@ -131,7 +132,7 @@ export interface ICommitPaneProps {
 // commit's details show both. The selected row scrolls into view when the keys move the selection past the
 // top or bottom of the pane.
 //
-export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMaximise, showGraph, search, matchCount, totalCount, onSearch, selectedHash, openHash, isActive, onSelectCommit }: ICommitPaneProps): ReactNode {
+export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMaximise, matchingHashes, search, matchCount, totalCount, onSearch, selectedHash, openHash, isActive, onSelectCommit }: ICommitPaneProps): ReactNode {
     const isSearching = search.trim() !== "";
     const selectedRef = useRef<HTMLLIElement>(null);
 
@@ -181,13 +182,14 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
                 />
             }
         >
-            {commits.length === 0 ? (
-                <p style={{ padding: "var(--space-6) var(--space-4)", textAlign: "center", color: "var(--color-text-muted)" }}>No commits match the search.</p>
+            {matchingHashes?.size === 0 ? (
+                <p style={{ padding: "var(--space-3) var(--space-4) 0", textAlign: "center", color: "var(--color-text-muted)" }}>No commits match the search.</p>
             ) : undefined}
             <List aria-label="Commits" className="@container" sx={{ padding: "var(--space-2) 0" }}>
                 {commits.map(commit => {
                     const isOpen = commit.hash === openHash;
                     const isSelected = commit.hash === selectedHash;
+                    const isMatch = matchingHashes === undefined || matchingHashes.has(commit.hash);
                     return (
                         <ListItemButton
                             key={commit.hash}
@@ -195,6 +197,7 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
                             ref={isSelected ? selectedRef : undefined}
                             selected={isSelected}
                             aria-current={isOpen ? "true" : undefined}
+                            data-match={isMatch}
                             onClick={() => onSelectCommit(commit.hash)}
                             sx={{
                                 gap: "var(--space-3)",
@@ -202,7 +205,7 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
                                 paddingTop: 0,
                                 paddingBottom: 0,
                                 borderRadius: 0,
-                                boxShadow: isOpen ? "inset 2px 0 0 var(--color-accent)" : "none",
+                                boxShadow: isOpen ? "inset 2px 0 0 var(--color-select-item)" : "none",
                                 //
                                 // The row's background, which the commit's dot rings itself in so it
                                 // stands clear of the lane lines on a plain, hovered or selected row.
@@ -214,9 +217,14 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
                                 "&.Mui-selected, &.Mui-selected:hover": {
                                     "--row-background": "var(--color-selected)",
                                 },
+                                //
+                                // A commit the search does not match fades everything but its
+                                // lanes, so the graph still joins up.
+                                //
+                                "& > span, & > code": { opacity: isMatch ? 1 : "var(--opacity-faded)" },
                             }}
                         >
-                            {showGraph ? <GraphLanes shape={commit.graph} laneCount={laneCount} ringColour="var(--row-background)" /> : undefined}
+                            <GraphLanes shape={commit.graph} laneCount={laneCount} ringColour="var(--row-background)" />
                             <span className="flex min-w-0 flex-1 items-center overflow-hidden" style={{ gap: "var(--space-2)" }}>
                                 <span className="truncate" style={{ minWidth: "min(calc(var(--space-8) * 4), 100%)", fontWeight: isOpen ? "var(--weight-bold)" : "var(--weight-normal)" }}>
                                     {commit.title}

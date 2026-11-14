@@ -14,7 +14,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faChevronDown, faChevronRight, faFileImage, faFileShield, faTableColumns, faTextWidth, faBars, faTriangleExclamation, faPlus, faMinus, faXmark, faExpand, faCompress, faMagnifyingGlass, faChevronUp } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faChevronDown, faChevronRight, faFileImage, faFileShield, faTableColumns, faTextWidth, faBars, faTriangleExclamation, faPlus, faMinus, faXmark, faExpand, faCompress, faMagnifyingGlass, faChevronUp, faTrashCan } from "@fortawesome/free-solid-svg-icons";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { MaximiseButton } from "../../../components/maximise-button";
 import { Tip } from "../../../components/tip";
@@ -52,7 +52,9 @@ export interface IFileDiff {
     diff?: string;
 
     //
-    // The whole old file, so the unchanged lines between hunks can be shown.
+    // The whole old file, so the unchanged lines between hunks can be shown. Absent for a diff
+    // that holds the whole file, as an added or deleted file's does, which turns the switch that
+    // shows the whole file off.
     //
     oldFileLines?: string[];
 
@@ -131,6 +133,7 @@ export function DiffControls({
     onWrap,
     showAllLines = false,
     onShowAllLines,
+    isWholeFile = false,
 }: {
     layout: DiffLayout;
     wrap: boolean;
@@ -138,20 +141,32 @@ export function DiffControls({
     onWrap: (wrap: boolean) => void;
     showAllLines?: boolean;
     onShowAllLines?: (showAllLines: boolean) => void;
+    isWholeFile?: boolean;
 }): ReactNode {
     return (
         <span className="flex items-center" style={{ gap: "var(--space-1)" }}>
             {onShowAllLines ? (
-                <Tooltip title={<Tip title={showAllLines ? "Show only the changes" : "Show the whole file"} detail={showAllLines ? "Folds the unchanged lines between the changes away." : "Opens every run of unchanged lines."} />}>
-                    <IconButton
-                        size="small"
-                        aria-label="Show the whole file"
-                        aria-pressed={showAllLines}
-                        onClick={() => onShowAllLines(!showAllLines)}
-                        sx={showAllLines ? { color: "var(--color-accent)", backgroundColor: "var(--color-selected)" } : undefined}
-                    >
-                        <FontAwesomeIcon icon={showAllLines ? faCompress : faExpand} />
-                    </IconButton>
+                <Tooltip
+                    title={
+                        isWholeFile ? (
+                            <Tip title="Show the whole file" detail="The diff already shows the whole file: Git added or deleted all of it." />
+                        ) : (
+                            <Tip title={showAllLines ? "Show only the changes" : "Show the whole file"} detail={showAllLines ? "Folds the unchanged lines between the changes away." : "Opens every run of unchanged lines."} />
+                        )
+                    }
+                >
+                    <span className="inline-flex">
+                        <IconButton
+                            size="small"
+                            aria-label="Show the whole file"
+                            aria-pressed={showAllLines}
+                            disabled={isWholeFile}
+                            onClick={() => onShowAllLines(!showAllLines)}
+                            sx={showAllLines ? { color: "var(--color-accent)", backgroundColor: "var(--color-selected)" } : undefined}
+                        >
+                            <FontAwesomeIcon icon={showAllLines ? faCompress : faExpand} />
+                        </IconButton>
+                    </span>
                 </Tooltip>
             ) : undefined}
             <ToggleButtonGroup
@@ -219,6 +234,28 @@ export function StageButton({ isStaged, what, onClick }: { isStaged: boolean; wh
             >
                 {isStaged ? "Unstage" : "Stage"}
             </Button>
+        </Tooltip>
+    );
+}
+
+//
+// Renders the Discard button for a file or a hunk: a small danger button, outlined in the error
+// colour, that throws away the changes of `what` in the working tree.
+//
+export function DiscardButton({ what, onClick }: { what: string; onClick: () => void }): ReactNode {
+    return (
+        <Tooltip title={<Tip title={`Discard this ${what}`} detail={`Puts the ${what} back as it was in the last commit. Asks first, because Git cannot bring the changes back.`} />}>
+            <IconButton
+                size="small"
+                color="error"
+                aria-label={`Discard this ${what}`}
+                onClick={event => {
+                    event.stopPropagation();
+                    onClick();
+                }}
+            >
+                <FontAwesomeIcon icon={faTrashCan} />
+            </IconButton>
         </Tooltip>
     );
 }
@@ -309,6 +346,16 @@ export interface IFileDiffCardProps {
     onlyHunks?: number[];
 
     //
+    // Called by the file's Discard button, absent for a card with no Discard buttons.
+    //
+    onDiscardFile?: () => void;
+
+    //
+    // Called with a hunk's position, from 0, by that hunk's Discard button.
+    //
+    onDiscardHunk?: (hunkIndex: number) => void;
+
+    //
     // What the file's Stage or Unstage button does in a card that shows only part of a file:
     // "stage" stages every hunk and "unstage" unstages every hunk. Absent for a button that flips
     // between the two as the whole file's staging changes.
@@ -358,6 +405,8 @@ export function FileDiffCard({
     onToggleMaximise,
     onlyHunks,
     fileAction,
+    onDiscardFile,
+    onDiscardHunk,
     onSelectHunk,
     staging: givenStaging,
     onStagingChange,
@@ -526,9 +575,11 @@ export function FileDiffCard({
                         onLayout={setLayout}
                         onWrap={setWrap}
                         showAllLines={showAllLines}
-                        onShowAllLines={file.oldFileLines ? setShowAllLines : undefined}
+                        onShowAllLines={setShowAllLines}
+                        isWholeFile={file.oldFileLines === undefined}
                     />
                 ) : undefined}
+                {onDiscardFile ? <DiscardButton what="file" onClick={onDiscardFile} /> : undefined}
                 {stageable ? <StageButton isStaged={fileAction === undefined ? fileStaged : fileAction === "unstage"} what="file" onClick={toggleFile} /> : undefined}
                 {onToggleMaximise ? <MaximiseButton isMaximised={isMaximised} onClick={onToggleMaximise} /> : undefined}
                 {onClose ? (
@@ -631,7 +682,16 @@ export function FileDiffCard({
                             oldFileLines={file.oldFileLines}
                             currentHunk={shownHunk}
                             showAllLines={showAllLines}
-                            hunkAction={stageable ? index => <StageButton isStaged={staging.hunks.has(index)} what="hunk" onClick={() => toggleHunk(index)} /> : undefined}
+                            hunkAction={
+                                stageable || onDiscardHunk
+                                    ? index => (
+                                          <>
+                                              {onDiscardHunk ? <DiscardButton what="hunk" onClick={() => onDiscardHunk(index)} /> : undefined}
+                                              {stageable ? <StageButton isStaged={staging.hunks.has(index)} what="hunk" onClick={() => toggleHunk(index)} /> : undefined}
+                                          </>
+                                      )
+                                    : undefined
+                            }
                         />
                     ) : undefined}
                 </div>

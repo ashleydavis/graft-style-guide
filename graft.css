@@ -9,10 +9,11 @@
  * shadows, animation timing, icon sizes, focus ring, muted text, hover, selected and disabled
  * colours and control borders are the developer's picks.
  *
- * Hover and selected are see-through washes of --violet-500, the active pane's colour, so they
- * tint whatever they sit on.
+ * Selection has its own colour, blue, which no other role uses: the accent is violet, info is cyan
+ * and the graph's first lane is pink. Hover and selected are
+ * see-through washes of --blue-500, the active pane's colour, so they tint whatever they sit on.
  *
- * Selections nested inside each other step through violet: --color-select-pane marks the active
+ * Selections nested inside each other step through blue: --color-select-pane marks the active
  * pane, --color-select-item a selection inside it, such as the current hunk, and --color-focus
  * the keyboard focus inside that, such as a focused text box. Each step inward stands further from
  * the background.
@@ -36,17 +37,11 @@
     --gray-900: #18181b;
     --gray-950: #09090b;
 
-    --violet-100: #ede9fe;
     --violet-300: #c4b5fd;
     --violet-400: #a78bfa;
     --violet-500: #8b5cf6;
     --violet-600: #7c3aed;
-    --violet-500-a08: rgb(139 92 246 / 0.08);
-    --violet-500-a14: rgb(139 92 246 / 0.14);
-    --violet-500-a16: rgb(139 92 246 / 0.16);
-    --violet-500-a26: rgb(139 92 246 / 0.26);
     --violet-700: #6d28d9;
-    --violet-900: #4c1d95;
     --violet-950: #150c2e;
 
     --green-100: #dcfce7;
@@ -71,12 +66,25 @@
     --amber-650: #c76607;
     --amber-700: #b45309;
 
+    --blue-100: #dbeafe;
+    --blue-300: #93c5fd;
     --blue-400: #60a5fa;
+    --blue-500: #3b82f6;
+    --blue-500-a08: rgb(59 130 246 / 0.08);
+    --blue-500-a14: rgb(59 130 246 / 0.14);
+    --blue-500-a16: rgb(59 130 246 / 0.16);
+    --blue-500-a26: rgb(59 130 246 / 0.26);
     --blue-600: #2563eb;
+    --blue-700: #1d4ed8;
+    --blue-900: #1e3a8a;
 
     --cyan-400: #22d3ee;
     --cyan-600: #0891b2;
     --cyan-650: #098bac;
+    --cyan-700: #0e7490;
+
+    --pink-400: #f472b6;
+    --pink-600: #db2777;
 
     --black-40: rgb(0 0 0 / 0.4);
     --black-60: rgb(0 0 0 / 0.6);
@@ -131,22 +139,25 @@
     --color-raised: var(--gray-100);
     --color-border: var(--gray-200);
     --color-border-control: var(--gray-450);
+    --color-scrollbar-thumb: var(--gray-450);
+    --color-scrollbar-track: transparent;
     --color-text: var(--gray-900);
     --color-text-muted: var(--gray-550);
-    --color-hover: var(--violet-500-a08);
-    --color-selected: var(--violet-500-a16);
+    --color-hover: var(--blue-500-a08);
+    --color-selected: var(--blue-500-a16);
     --color-disabled: var(--gray-100);
     --color-text-disabled: var(--gray-500);
+    --opacity-faded: 0.35;
     --color-accent: var(--violet-600);
     --color-accent-hover: var(--violet-700);
     --color-on-accent: var(--gray-0);
-    --color-focus: var(--violet-900);
-    --color-select-pane: var(--violet-500);
-    --color-select-item: var(--violet-700);
+    --color-focus: var(--blue-900);
+    --color-select-pane: var(--blue-500);
+    --color-select-item: var(--blue-700);
     --color-success: var(--green-700);
     --color-warning: var(--amber-700);
     --color-danger: var(--red-600);
-    --color-info: var(--blue-600);
+    --color-info: var(--cyan-700);
     --color-on-danger: var(--gray-0);
     --color-scrim: var(--black-40);
     --color-diff-added: var(--green-100);
@@ -156,7 +167,7 @@
     --color-diff-removed-line: var(--red-600);
     --color-diff-removed-word: var(--red-200);
     --color-conflict: var(--amber-600);
-    --color-lane-1: var(--blue-600);
+    --color-lane-1: var(--pink-600);
     --color-lane-2: var(--green-650);
     --color-lane-3: var(--amber-650);
     --color-lane-4: var(--red-600);
@@ -173,22 +184,25 @@
     --color-raised: var(--gray-800);
     --color-border: var(--gray-700);
     --color-border-control: var(--gray-500);
+    --color-scrollbar-thumb: var(--gray-500);
+    --color-scrollbar-track: transparent;
     --color-text: var(--gray-50);
     --color-text-muted: var(--gray-400);
-    --color-hover: var(--violet-500-a14);
-    --color-selected: var(--violet-500-a26);
+    --color-hover: var(--blue-500-a14);
+    --color-selected: var(--blue-500-a26);
     --color-disabled: var(--gray-800);
     --color-text-disabled: var(--gray-500);
+    --opacity-faded: 0.35;
     --color-accent: var(--violet-400);
     --color-accent-hover: var(--violet-300);
     --color-on-accent: var(--violet-950);
-    --color-focus: var(--violet-100);
-    --color-select-pane: var(--violet-500);
-    --color-select-item: var(--violet-300);
+    --color-focus: var(--blue-100);
+    --color-select-pane: var(--blue-500);
+    --color-select-item: var(--blue-300);
     --color-success: var(--green-400);
     --color-warning: var(--amber-400);
     --color-danger: var(--red-400);
-    --color-info: var(--blue-400);
+    --color-info: var(--cyan-400);
     --color-on-danger: var(--red-975);
     --color-scrim: var(--black-60);
     --color-diff-added: var(--green-950);
@@ -198,7 +212,7 @@
     --color-diff-removed-line: var(--red-400);
     --color-diff-removed-word: var(--red-900);
     --color-conflict: var(--amber-400);
-    --color-lane-1: var(--blue-400);
+    --color-lane-1: var(--pink-400);
     --color-lane-2: var(--green-400);
     --color-lane-3: var(--amber-400);
     --color-lane-4: var(--red-400);

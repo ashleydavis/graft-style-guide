@@ -61,3 +61,12 @@ export function withFileToggled(staging: IStaging, hunkCount: number): IStaging 
         isWholeFile: !isStaged,
     };
 }
+
+//
+// Returns the staging once hunk `index` is discarded: that hunk drops out and the staged hunks
+// after it move up one place.
+//
+export function withHunkDiscarded(staging: IStaging, index: number): IStaging {
+    const hunks = new Set([...staging.hunks].filter(hunk => hunk !== index).map(hunk => (hunk > index ? hunk - 1 : hunk)));
+    return { hunks, isWholeFile: staging.isWholeFile && hunks.size > 0 };
+}
