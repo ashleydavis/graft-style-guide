@@ -292,7 +292,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                 aria-label="Files changed"
                 sx={{ padding: "0 var(--space-1) var(--space-2)" }}
                 subheader={
-                    <ListSubheader component="div" className="flex items-center" sx={{ gap: "var(--space-2)", paddingTop: "var(--space-3)" }}>
+                    <ListSubheader component="div" className="flex items-center" sx={{ gap: "var(--space-2)", paddingTop: "var(--space-3)", paddingBottom: "var(--space-2)" }}>
                         <span className="flex-1">Files changed ({commit.files.length})</span>
                         {commit.files.length > 0 ? <LineCounts added={totalAdded} deleted={totalDeleted} /> : undefined}
                         {commit.files.length > 0 ? (
@@ -459,7 +459,7 @@ export function CommitInfoPane({ commit, isActive, isMaximised, onToggleMaximise
                         </Fact>
                     )}
                     <Fact label="Hash">
-                        <span className="flex items-center" style={{ gap: "var(--space-1)" }}>
+                        <span className="flex items-center" style={{ gap: "var(--space-2)" }}>
                             <code className="min-w-0 truncate" style={{ fontFamily: "var(--font-mono)" }}>
                                 {commit.hash}
                             </code>

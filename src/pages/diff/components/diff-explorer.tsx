@@ -114,6 +114,10 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
             event.preventDefault();
             return;
         }
+        if (!isInField && !event.ctrlKey && !event.altKey && !event.metaKey && cardRefs.current[position.file]?.handleLineKey(event.key, event.shiftKey)) {
+            event.preventDefault();
+            return;
+        }
         if ((event.key !== "ArrowUp" && event.key !== "ArrowDown" && event.key !== " ") || event.ctrlKey || event.altKey || event.metaKey) {
             return;
         }
@@ -164,7 +168,7 @@ export function DiffExplorer({ files }: { files: IFileDiff[] }): ReactNode {
                         ? ` · ${position.stop === undefined ? "no change picked" : position.stop.kind === "gap" ? "unchanged lines" : `change ${position.stop.hunk + 1} of ${hunkCounts[position.file]}`}`
                         : " · no changes to step through"}
                 </span>
-                <span className="flex items-center" style={{ gap: "var(--space-1)" }}>
+                <span className="flex items-center" style={{ gap: "var(--space-2)" }}>
                     <NavigationButton label="Previous change" keys="↑" icon={faAngleUp} onClick={() => move(changeAfterMove(stopLists, position, -1))} />
                     <NavigationButton label="Next change" keys="↓" icon={faAngleDown} onClick={() => move(changeAfterMove(stopLists, position, 1))} />
                     <NavigationButton label="Previous file" keys="Shift+↑" icon={faAnglesUp} onClick={() => moveFile(-1)} />

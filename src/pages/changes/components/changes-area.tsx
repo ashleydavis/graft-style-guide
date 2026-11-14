@@ -493,6 +493,13 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             toggleMaximise(activePane);
             return;
         }
+        if (activePane === 1) {
+            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
+            if (cards.some(card => cardRefs.current.get(card)?.handleLineKey(key, event.shiftKey) === true)) {
+                event.preventDefault();
+                return;
+            }
+        }
         if (activePane === 1 && !event.shiftKey) {
             const cards = diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
             const handled = cards.map(card => cardRefs.current.get(card)?.handleOptionKey(key) === true);

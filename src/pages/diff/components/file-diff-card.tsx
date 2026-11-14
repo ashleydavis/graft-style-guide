@@ -27,7 +27,7 @@ import { statusColour } from "../../tree";
 import { parseHunks, sectionDiff } from "../model";
 import { emptyStaging, hunkStagedState, initialStaging, isFileStaged, stagedLinesOf, withFileToggled, withHunkStaged, withLinesStaged, type IStaging } from "../staging";
 import { scrollSelectionIntoView } from "../../commit-explorer/scroll";
-import { DiffView, type DiffLayout } from "./diff-view";
+import { DiffView, type DiffLayout, type LinePick } from "./diff-view";
 import { ImageDiff, type IImageVersion } from "./image-diff";
 
 //
@@ -252,7 +252,7 @@ export interface IDiffOptionsProps {
 
 //
 // Renders the switch between staging and discarding whole changes and picking lines one by one,
-// in the diff's header and in the options dialog.
+// in the options dialog.
 //
 function PickModeSwitch({ isSelectingLines, onSelectingLines }: { isSelectingLines: boolean; onSelectingLines: (isSelectingLines: boolean) => void }): ReactNode {
     return (
@@ -273,7 +273,7 @@ function PickModeSwitch({ isSelectingLines, onSelectingLines }: { isSelectingLin
                     <FontAwesomeIcon icon={faObjectGroup} />
                 </ToggleButton>
             </Tooltip>
-            <Tooltip title={<Tip title="Lines" detail={`Tick lines to stage, unstage or discard just those. Key: ${DIFF_OPTION_KEYS.selectLines.toUpperCase()}`} />}>
+            <Tooltip title={<Tip title="Lines" detail={`Pick lines to stage, unstage or discard just those. Key: ${DIFF_OPTION_KEYS.selectLines.toUpperCase()}`} />}>
                 <ToggleButton value="lines" aria-label="Pick lines">
                     <FontAwesomeIcon icon={faListCheck} />
                 </ToggleButton>
@@ -393,7 +393,7 @@ export function DiffOptions({ layout, onLayout, wrap, onWrap, showAllLines, onSh
                     {onSelectingLines ? (
                         <OptionRow
                             label="Stage and discard"
-                            detail="Whole changes, or lines ticked one by one."
+                            detail="Whole changes, or lines picked one by one."
                             keyName={DIFF_OPTION_KEYS.selectLines}
                             control={<PickModeSwitch isSelectingLines={isSelectingLines === true} onSelectingLines={onSelectingLines} />}
                         />
@@ -403,34 +403,31 @@ export function DiffOptions({ layout, onLayout, wrap, onWrap, showAllLines, onSh
         </>
     );
 }
-
 //
-// Renders the button that stages or unstages a whole file or one hunk: "Stage" with a plus while
-// it is unstaged and "Unstage" with a minus once it is staged.
+// Renders the button that stages or unstages a whole file, a hunk or picked lines: an icon button
+// with a plus while it is unstaged and a minus once it is staged, its tooltip naming what it does.
 //
 export function StageButton({ isStaged, what, onClick }: { isStaged: boolean; what: string; onClick: () => void }): ReactNode {
+    const label = isStaged ? `Unstage this ${what}` : `Stage this ${what}`;
     return (
         <Tooltip
             title={
                 <Tip
-                    title={isStaged ? `Unstage this ${what}` : `Stage this ${what}`}
-                    detail={isStaged ? `Takes the ${what}'s changes out of the next commit. They stay in the working tree.` : `Adds the ${what}'s changes to the next commit.`}
+                    title={label}
+                    detail={isStaged ? `Takes the ${what}'s changes out of the next commit. They stay in the working tree.` : `Adds the ${what}'s changes for the next commit.`}
                 />
             }
         >
-            <Button
+            <IconButton
                 size="small"
-                variant="outlined"
-                startIcon={<FontAwesomeIcon icon={isStaged ? faMinus : faPlus} />}
-                onClick={onClick}
-                //
-                // One width for both labels, wide enough for "Unstage", so the button keeps its
-                // size and the header keeps its place when the label changes.
-                //
-                sx={{ width: "calc(var(--space-8) * 3)", justifyContent: "center", padding: "0 var(--space-2)", fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}
+                aria-label={label}
+                onClick={event => {
+                    event.stopPropagation();
+                    onClick();
+                }}
             >
-                {isStaged ? "Unstage" : "Stage"}
-            </Button>
+                <FontAwesomeIcon icon={isStaged ? faMinus : faPlus} />
+            </IconButton>
         </Tooltip>
     );
 }
@@ -471,6 +468,13 @@ export interface IFileDiffCardHandle {
     // or returns false for any other key.
     //
     handleOptionKey: (key: string) => boolean;
+
+    //
+    // Acts on a key in the line selection mode, `key` as KeyboardEvent.key names it and `isShift`
+    // true while Shift is held, and returns true, or returns false outside the mode and for any
+    // other key.
+    //
+    handleLineKey: (key: string, isShift: boolean) => boolean;
 }
 
 //
@@ -614,8 +618,9 @@ function isOwnKeyTarget(target: EventTarget): boolean {
 // ways to copy the path or open the file, the line counts, the diff options button and, at the far
 // right for a stageable change, a button that stages or unstages the whole file, then a close
 // button when the card can close. The options keys work while the keys are on the card. In the
-// line selection mode each changed line has a box, Shift picks a run, and a bar above the diff
-// stages, unstages or discards the picked lines. Each hunk of a stageable change has its own Stage or Unstage button at its top right. A
+// line selection mode lines are picked as hunks are: a click picks a line, Shift a run and Ctrl or
+// Cmd adds a line, Up and Down move the pick, and a bar above the diff stages, unstages or discards
+// the picked lines. Each hunk of a stageable change has its own Stage or Unstage button at its top right. A
 // card that answers its own keys takes the focus: Up and Down step through its hunks, marking the
 // current one, and Space stages or unstages the current hunk, or the file when none is current. The header wraps onto a second line on a narrow
 // screen. A file with no lines to show says what changed in its place: a rename with no changes, a
@@ -682,12 +687,14 @@ export function FileDiffCard({
     const [isSelectingLines, setIsSelectingLines] = useState(false);
     const [selectedLines, setSelectedLines] = useState<ReadonlySet<string>>(new Set());
     const [rangeStart, setRangeStart] = useState<string | undefined>(undefined);
+    const [focusLine, setFocusLine] = useState<string | undefined>(undefined);
     const canSelectLines = stageable || onDiscardLines !== undefined;
 
     function changeSelectingLines(isOn: boolean): void {
         setIsSelectingLines(isOn);
         setSelectedLines(new Set());
         setRangeStart(undefined);
+        setFocusLine(undefined);
     }
 
     function handleOptionKey(key: string): boolean {
@@ -710,7 +717,7 @@ export function FileDiffCard({
         return true;
     }
 
-    useImperativeHandle(ref, () => ({ toggleGap, handleOptionKey }));
+    useImperativeHandle(ref, () => ({ toggleGap, handleOptionKey, handleLineKey }));
     const id = useId();
     const [search, setSearch] = useState("");
     const [currentMatch, setCurrentMatch] = useState(0);
@@ -773,7 +780,7 @@ export function FileDiffCard({
     const fileStaged = isFileStaged(staging, hunkCount);
 
     //
-    // Returns true when the hunk's Stage or Unstage button reads "Unstage": on the staged side of
+    // Returns true when the hunk's stage button unstages: on the staged side of
     // the split, and in the whole change for a hunk staged whole.
     //
     function isHunkButtonStaged(index: number): boolean {
@@ -830,24 +837,82 @@ export function FileDiffCard({
         return ids;
     }, [hunks, staging]);
 
-    function toggleLine(id: string, isRange: boolean): void {
-        const next = new Set(selectedLines);
-        const start = rangeStart === undefined ? -1 : selectableIds.indexOf(rangeStart);
-        const end = selectableIds.indexOf(id);
-        if (isRange && start >= 0 && end >= 0) {
-            for (let index = Math.min(start, end); index <= Math.max(start, end); index++) {
-                next.add(selectableIds[index]);
-            }
+    //
+    // Returns the ids from `from` to `to` in the order the diff draws them, both included.
+    //
+    function idsBetween(from: string, to: string): string[] {
+        const start = selectableIds.indexOf(from);
+        const end = selectableIds.indexOf(to);
+        if (start < 0 || end < 0) {
+            return [to];
         }
-        else if (next.has(id)) {
-            next.delete(id);
+        return selectableIds.slice(Math.min(start, end), Math.max(start, end) + 1);
+    }
+
+    //
+    // Picks lines as a click does: just the line, the line added or taken out, or the run from the
+    // line picked first to this one. The line becomes the one the keys move from.
+    //
+    function pickLine(id: string, pick: LinePick): void {
+        if (pick === "range") {
+            setSelectedLines(new Set(idsBetween(rangeStart ?? id, id)));
+        }
+        else if (pick === "toggle") {
+            const next = new Set(selectedLines);
+            if (next.has(id)) {
+                next.delete(id);
+            }
+            else {
+                next.add(id);
+            }
+            setSelectedLines(next);
+            setRangeStart(id);
         }
         else {
-            next.add(id);
+            setSelectedLines(new Set([id]));
+            setRangeStart(id);
         }
-        setSelectedLines(next);
-        setRangeStart(id);
+        setFocusLine(id);
     }
+
+    //
+    // Acts on a key in the line selection mode and returns true, or returns false outside the mode
+    // and for any other key. Up and Down pick the line above or below, Shift with them stretches
+    // the run, and Space stages the picked lines, or unstages them when they are all staged.
+    //
+    function handleLineKey(key: string, isShift: boolean): boolean {
+        if (!isSelectingLines) {
+            return false;
+        }
+        if (key === "ArrowUp" || key === "ArrowDown") {
+            if (selectableIds.length === 0) {
+                return true;
+            }
+            const index = focusLine === undefined ? -1 : selectableIds.indexOf(focusLine);
+            const nextIndex = index < 0 ? (key === "ArrowDown" ? 0 : selectableIds.length - 1) : Math.min(Math.max(index + (key === "ArrowDown" ? 1 : -1), 0), selectableIds.length - 1);
+            pickLine(selectableIds[nextIndex], isShift ? "range" : "only");
+            return true;
+        }
+        if (key === " " && stageable) {
+            if (selectedLines.size > 0) {
+                stageSelectedLines(selectedUnstagedCount > 0);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    useEffect(() => {
+        const element = focusLine ? bodyRef.current?.querySelector(`[data-line-id="${focusLine}"]`) : undefined;
+        if (element instanceof HTMLElement) {
+            if (element.closest("[data-pane-scroll]")) {
+                scrollSelectionIntoView(element);
+            }
+            else {
+                element.scrollIntoView({ block: "nearest" });
+            }
+        }
+    }, [focusLine]);
 
     //
     // Returns the selected lines grouped by hunk position, each with its line positions.
@@ -872,12 +937,36 @@ export function FileDiffCard({
 
     const selectedStagedCount = [...selectedLines].filter(id => stagedIds.has(id)).length;
     const selectedUnstagedCount = selectedLines.size - selectedStagedCount;
+    const pickedName = selectedLines.size === 1 ? "line" : "selection";
+
+    //
+    // The picked lines' buttons: Discard, then Stage, or Unstage when every picked line is staged.
+    //
+    const lineActions =
+        selectedLines.size > 0 ? (
+            <>
+                {onDiscardLines ? (
+                    <DiscardButton
+                        what={pickedName}
+                        onClick={() => {
+                            onDiscardLines(selectedByHunk());
+                            setSelectedLines(new Set());
+                        }}
+                    />
+                ) : undefined}
+                {stageable ? <StageButton isStaged={selectedUnstagedCount === 0} what={pickedName} onClick={() => stageSelectedLines(selectedUnstagedCount > 0)} /> : undefined}
+            </>
+        ) : undefined;
 
     function onKeyDown(event: KeyboardEvent): void {
         if (!answersKeys || event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target)) {
             return;
         }
         if (!event.shiftKey && handleOptionKey(event.key)) {
+            event.preventDefault();
+            return;
+        }
+        if (handleLineKey(event.key, event.shiftKey)) {
             event.preventDefault();
             return;
         }
@@ -960,7 +1049,6 @@ export function FileDiffCard({
                     <FilePathMenu path={file.path} />
                 </span>
                 <DiffInfo file={file} counts={shownCounts} hunkCount={parseHunks(shownDiff ?? "").length} staging={stageable && section === undefined ? staging : undefined} section={section} />
-                {file.diff !== undefined && canSelectLines ? <PickModeSwitch isSelectingLines={isSelectingLines} onSelectingLines={changeSelectingLines} /> : undefined}
                 {file.diff !== undefined ? (
                     <DiffOptions
                         layout={layout}
@@ -986,7 +1074,7 @@ export function FileDiffCard({
                 ) : undefined}
             </div>
             {isOpen && hasLines ? (
-                <div className="flex flex-none items-center" style={{ gap: "var(--space-1)", padding: "var(--space-2)", background: "var(--color-panel)", borderBottom: "1px solid var(--color-border)" }}>
+                <div className="flex flex-none items-center" style={{ gap: "var(--space-2)", padding: "var(--space-2)", background: "var(--color-panel)", borderBottom: "1px solid var(--color-border)" }}>
                     <TextField
                         size="small"
                         fullWidth
@@ -1041,33 +1129,8 @@ export function FileDiffCard({
                     style={{ gap: "var(--space-2)", padding: "var(--space-2)", background: "var(--color-raised)", borderBottom: "1px solid var(--color-border)", fontSize: "var(--text-sm)" }}
                 >
                     <span aria-live="polite" className="flex-1" style={{ color: "var(--color-text-muted)", minWidth: "calc(var(--space-8) * 4)" }}>
-                        {selectedLines.size === 0 ? "Tick lines to pick them. Shift picks a run." : `${selectedLines.size} ${selectedLines.size === 1 ? "line" : "lines"} picked`}
+                        {selectedLines.size === 0 ? "Click a line to pick it. Shift picks a run, Ctrl adds a line." : `${selectedLines.size} ${selectedLines.size === 1 ? "line" : "lines"} picked`}
                     </span>
-                    {stageable ? (
-                        <>
-                            <Button size="small" variant="outlined" startIcon={<FontAwesomeIcon icon={faPlus} />} disabled={selectedUnstagedCount === 0} onClick={() => stageSelectedLines(true)}>
-                                Stage lines
-                            </Button>
-                            <Button size="small" variant="outlined" startIcon={<FontAwesomeIcon icon={faMinus} />} disabled={selectedStagedCount === 0} onClick={() => stageSelectedLines(false)}>
-                                Unstage lines
-                            </Button>
-                        </>
-                    ) : undefined}
-                    {onDiscardLines ? (
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            startIcon={<FontAwesomeIcon icon={faTrashCan} />}
-                            disabled={selectedLines.size === 0}
-                            onClick={() => {
-                                onDiscardLines(selectedByHunk());
-                                setSelectedLines(new Set());
-                            }}
-                        >
-                            Discard lines
-                        </Button>
-                    ) : undefined}
                     <Tooltip title={<Tip title="Stop selecting lines" detail={`Key: ${DIFF_OPTION_KEYS.selectLines.toUpperCase()}`} />}>
                         <IconButton size="small" aria-label="Stop selecting lines" onClick={() => changeSelectingLines(false)}>
                             <FontAwesomeIcon icon={faXmark} />
@@ -1111,19 +1174,20 @@ export function FileDiffCard({
                             diff={shownDiff ?? ""}
                             hunkIndexes={shownHunkIndexes}
                             lineIndexes={shown?.lineIndexes}
-                            lineSelection={isSelectingLines ? { selected: selectedLines, staged: stageable && section === undefined ? stagedIds : undefined, onToggle: toggleLine } : undefined}
+                            lineSelection={isSelectingLines ? { selected: selectedLines, onPick: pickLine, actionsLine: selectableIds.find(id => selectedLines.has(id)), actions: lineActions } : undefined}
+                            hideHunkActions={isSelectingLines}
                             search={search}
                             currentMatch={isSearching ? currentMatch : undefined}
                             onMatchCount={setMatchCount}
                             onSelectHunk={answersKeys ? hunk => setOwnStop({ kind: "hunk", hunk }) : onSelectHunk}
                             onSelectGap={answersKeys ? gap => setOwnStop({ kind: "gap", gap }) : onSelectGap}
-                            currentGap={shownGap}
+                            currentGap={isSelectingLines ? undefined : shownGap}
                             gapStates={gapStates}
                             onGapStateChange={setGapState}
                             layout={layout}
                             wrap={wrap}
                             oldFileLines={file.oldFileLines}
-                            currentHunk={shownHunk}
+                            currentHunk={isSelectingLines ? undefined : shownHunk}
                             showAllLines={showAllLines}
                             hunkAction={
                                 stageable || onDiscardHunk

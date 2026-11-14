@@ -831,17 +831,17 @@ test.describe("File paths, staging and tooltips", () => {
     test("Stage and Unstage buttons flip on a click, and some changes start staged", async ({ page }) => {
         await page.goto("/page/diff?components=light");
         const card = page.getByRole("application", { name: "Diff explorer" }).getByRole("region", { name: "frontend/src/lib/zoom.ts" });
-        const hunkButtons = card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage)$/ });
-        await expect(hunkButtons).toHaveText(["Unstage", "Stage"]);
-        const fileButton = card.getByRole("button", { name: /^(Stage|Unstage)$/ }).first();
-        await expect(fileButton).toHaveText("Stage");
+        const hunkButtons = card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage) this hunk$/ });
+        await expect.poll(() => hunkButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(["Unstage this hunk", "Stage this hunk"]);
+        const fileButton = card.getByRole("button", { name: /^(Stage|Unstage) this file$/ }).first();
+        await expect(fileButton).toHaveAttribute("aria-label", "Stage this file");
         const width = (await fileButton.boundingBox())!.width;
         await hunkButtons.nth(1).click();
-        await expect(hunkButtons).toHaveText(["Unstage", "Unstage"]);
-        await expect(fileButton).toHaveText("Unstage");
+        await expect.poll(() => hunkButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(["Unstage this hunk", "Unstage this hunk"]);
+        await expect(fileButton).toHaveAttribute("aria-label", "Unstage this file");
         expect((await fileButton.boundingBox())!.width).toBe(width);
         await fileButton.click();
-        await expect(hunkButtons).toHaveText(["Stage", "Stage"]);
+        await expect.poll(() => hunkButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(["Stage this hunk", "Stage this hunk"]);
     });
 
     test("the diff explorer steps from change to change and file to file", async ({ page }) => {
@@ -880,15 +880,15 @@ test.describe("File paths, staging and tooltips", () => {
         await page.goto("/page/diff?components=light");
         const explorer = page.getByRole("application", { name: "Diff explorer" });
         const card = explorer.getByRole("region", { name: "frontend/src/lib/zoom.ts" });
-        const hunkButtons = card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage)$/ });
+        const hunkButtons = card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage) this hunk$/ });
         await explorer.focus();
         for (let step = 0; step < 4; step++) {
             await page.keyboard.press("ArrowDown");
         }
         await page.keyboard.press("Space");
-        await expect(hunkButtons).toHaveText(["Unstage", "Unstage"]);
+        await expect.poll(() => hunkButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(["Unstage this hunk", "Unstage this hunk"]);
         await page.keyboard.press("Space");
-        await expect(hunkButtons).toHaveText(["Unstage", "Stage"]);
+        await expect.poll(() => hunkButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(["Unstage this hunk", "Stage this hunk"]);
     });
 
     test("a standalone card steps through its changes with Up and Down and stages with Space", async ({ page }) => {
@@ -900,7 +900,7 @@ test.describe("File paths, staging and tooltips", () => {
         }
         await expect(card.locator('[data-current="true"][data-hunk-index="1"]')).toHaveCount(1);
         await page.keyboard.press("Space");
-        await expect(card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage)$/ })).toHaveText(["Unstage", "Unstage"]);
+        await expect.poll(() => card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage) this hunk$/ }).evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(["Unstage this hunk", "Unstage this hunk"]);
     });
 
     test("the whole-file switch shows every unchanged line and folds them back", async ({ page }) => {
@@ -975,7 +975,7 @@ test.describe("Changes and commit", () => {
         await expect(area.getByText("Unstaged (7)")).toBeVisible();
         await expect(area.getByRole("region", { name: "Staged changes", exact: true })).toBeVisible();
         await expect(area.getByRole("region", { name: "Unstaged changes" })).toBeVisible();
-        await area.getByRole("region", { name: "Unstaged changes" }).getByRole("button", { name: /^Stage$/ }).last().click();
+        await area.getByRole("region", { name: "Unstaged changes" }).getByRole("button", { name: "Stage this hunk" }).last().click();
         await expect(area.getByText("Unstaged (6)")).toBeVisible();
     });
 
@@ -1174,10 +1174,12 @@ test.describe("Diff options and picking lines", () => {
         const area = page.getByRole("application", { name: "Changes" });
         await area.getByRole("button", { name: ".gitignore", exact: true }).click();
         const diff = area.getByRole("region", { name: "File diff" });
-        await diff.getByRole("button", { name: "Pick lines" }).click();
-        await diff.getByLabel("Select line 3").click();
-        await diff.getByRole("button", { name: "Stage lines", exact: true }).click();
-        await expect(diff.getByLabel("Staged")).toHaveCount(1);
+        await diff.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
+        await page.keyboard.press("Escape");
+        await diff.locator('[data-line-id][data-line="added"]').filter({ hasText: "tmp/" }).click();
+        await expect(diff.locator('[data-picked="true"]')).toHaveCount(1);
+        await diff.getByRole("button", { name: "Stage this line", exact: true }).click();
         await area.getByRole("button", { name: "Staged and unstaged" }).click();
         const staged = area.getByRole("region", { name: "Staged diff", exact: true });
         await expect(staged.locator('[data-line="added"]')).toHaveCount(1);
@@ -1191,9 +1193,11 @@ test.describe("Diff options and picking lines", () => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" });
         const diff = area.getByRole("region", { name: "File diff" });
-        await diff.getByRole("button", { name: "Pick lines" }).click();
-        await diff.getByLabel("Select line 8").click();
-        await diff.getByRole("button", { name: "Discard lines" }).click();
+        await diff.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
+        await page.keyboard.press("Escape");
+        await diff.locator('[data-line-id]').filter({ hasText: "DEFAULT_LEVEL = 1" }).click();
+        await diff.getByRole("button", { name: "Discard this line" }).click();
         await area.getByRole("dialog", { name: "Discard 1 line?" }).getByRole("button", { name: "Discard" }).click();
         await expect(diff).not.toContainText("DEFAULT_LEVEL = 1");
         await expect(diff.locator('[data-line="added"]')).toHaveCount(4);
@@ -1225,5 +1229,45 @@ test.describe("Danger icon buttons", () => {
         });
         expect(colours.color).toBe(colours.danger);
         expect(colours.shadow).toContain(colours.danger);
+    });
+});
+
+test.describe("Picking lines like hunks", () => {
+    test("a click picks a line, Shift picks a run, Ctrl adds a line and the keys move the pick", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" });
+        const diff = area.getByRole("region", { name: "File diff" });
+        await diff.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
+        await page.keyboard.press("Escape");
+        const lines = diff.locator("[data-line-id]");
+        const picked = diff.locator('[data-picked="true"]');
+        await expect(diff.getByRole("checkbox")).toHaveCount(0);
+        await lines.nth(0).click();
+        await expect(picked).toHaveCount(1);
+        await lines.nth(2).click({ modifiers: ["Shift"] });
+        await expect(picked).toHaveCount(3);
+        await lines.nth(5).click({ modifiers: ["ControlOrMeta"] });
+        await expect(picked).toHaveCount(4);
+        await lines.nth(0).click();
+        await page.keyboard.press("ArrowDown");
+        await expect(picked).toHaveCount(1);
+        await expect(lines.nth(1)).toHaveAttribute("data-picked", "true");
+        await page.keyboard.press("Shift+ArrowDown");
+        await expect(picked).toHaveCount(2);
+    });
+});
+
+test.describe("One selection at a time", () => {
+    test("the lines mode shows only the picked lines' border, not the current hunk's", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" });
+        const diff = area.getByRole("region", { name: "File diff" });
+        await diff.locator('[data-hunk-index="1"]').click();
+        await expect(diff.locator('[data-current="true"][data-hunk-index="1"]')).toHaveCount(1);
+        await diff.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
+        await page.keyboard.press("Escape");
+        await expect(diff.locator('[data-current="true"][data-hunk-index]')).toHaveCount(0);
     });
 });

@@ -39,7 +39,7 @@ export function DiffPage(): ReactNode {
 
             <Section
                 title="Diff explorer"
-                description="The changed files of a change in the working tree, one card each, with every kind of change: modified, added, deleted and folded away, renamed, renamed with no changes, binary, a mode change, a file with no line break at its end and a lock file too large to show until asked. Click the explorer, then press Up and Down to step from change to change across the files, or Shift with Up and Down to step from file to file; the toolbar does the same and says where you are. Stage and Unstage at a file's right and at each change's top right add it to the next commit or take it back out, and some start staged."
+                description="The changed files of a change in the working tree, one card each, with every kind of change: modified, added, deleted and folded away, renamed, renamed with no changes, binary, a mode change, a file with no line break at its end and a lock file too large to show until asked. Click the explorer, then press Up and Down to step from change to change across the files, or Shift with Up and Down to step from file to file; the toolbar does the same and says where you are. The plus and minus buttons at a file's right and at each change's top right stage it for the next commit or take it back out, and some start staged."
             >
                 <DiffExplorer files={[zoomChange, ...commitFiles]} />
             </Section>

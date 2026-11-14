@@ -5,13 +5,12 @@
 // lines between hunks collapsed behind a button that shows them.
 //
 
-import { createContext, Fragment, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import ButtonBase from "@mui/material/ButtonBase";
 import Tooltip from "@mui/material/Tooltip";
 import { Tip } from "../../../components/tip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowsUpDown, faCheck, faCompress, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
-import Checkbox from "@mui/material/Checkbox";
+import { faArrowsUpDown, faCompress, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { changePartners, gapBefore, parseHunks, splitRows, wordPieces, type IDiffLine, type IGap, type IHunk } from "../model";
 
 //
@@ -83,7 +82,13 @@ export interface IDiffViewProps {
     // The line selection, which turns on the line selection mode: a box before each changed line.
     // Absent outside the mode.
     //
-    lineSelection?: Omit<ILineSelection, "idOf">;
+    lineSelection?: Omit<ILineSelection, "idOf" | "neighbours">;
+
+    //
+    // True to leave out each hunk's buttons, as the line selection mode does, where the buttons
+    // sit on the picked lines.
+    //
+    hideHunkActions?: boolean;
 
     //
     // For each hunk of `diff`, the position each of its lines has in that hunk's lines in the
@@ -190,32 +195,46 @@ export interface IDiffSearch {
 export const DiffSearchContext = createContext<IDiffSearch>({ needle: "", current: undefined, firstMatch: new Map() });
 
 //
-// The line selection of a diff in its line selection mode: a line's id from the line, which lines
-// are selected and staged, and what a click on a line's box does. Absent outside the mode.
+// How a click picks lines: "only" picks just the clicked line, "toggle" adds it to the picked lines
+// or takes it out, and "range" picks every line from the last one picked to the clicked one.
+//
+export type LinePick = "only" | "toggle" | "range";
+
+//
+// The line selection of a diff in its line selection mode, where lines are picked as hunks are:
+// a line's id from the line, which lines are picked, and what a click on a line does. Absent
+// outside the mode.
 //
 export interface ILineSelection {
     //
     // Returns a changed line's id, "hunk:line" with the hunk's and the line's positions in the
-    // whole file's diff, or undefined for a line that cannot be selected.
+    // whole file's diff, or undefined for a line that cannot be picked.
     //
     idOf: (line: IDiffLine) => string | undefined;
 
     //
-    // The ids of the selected lines.
+    // The ids of the picked lines.
     //
     selected: ReadonlySet<string>;
 
     //
-    // The ids of the staged lines, marked beside their boxes, or undefined where the card's own
-    // section says it.
+    // Called with a line's id and how the click picks lines: Shift picks a run and Ctrl or Cmd
+    // adds a line or takes it out.
     //
-    staged: ReadonlySet<string> | undefined;
+    onPick: (id: string, pick: LinePick) => void;
 
     //
-    // Called with a line's id when its box is clicked, and whether Shift was held, which selects
-    // every line from the last one clicked.
+    // Returns whether the line before and the line after `line` on the same side are picked too,
+    // so a run of picked lines draws one border round it.
     //
-    onToggle: (id: string, isRange: boolean) => void;
+    neighbours: (line: IDiffLine) => { before: boolean; after: boolean };
+
+    //
+    // The id of the line that carries the picked lines' buttons, the first picked line the diff
+    // draws, and the buttons: Discard and Stage or Unstage for the picked lines.
+    //
+    actionsLine: string | undefined;
+    actions: ReactNode;
 }
 
 //
@@ -224,55 +243,70 @@ export interface ILineSelection {
 export const LineSelectionContext = createContext<ILineSelection | undefined>(undefined);
 
 //
-// Renders a line's selection box in the line selection mode: a checkbox for a changed line, with a
-// mark for a staged line, and an empty cell of the same width for a kept line, so the columns line
-// up. Renders nothing outside the mode.
+// What a changed line takes from the line selection mode: its id, whether it is picked, the click
+// that picks it and the border drawn round a run of picked lines, open where the run carries on.
+// Returns undefined outside the mode and for a kept line.
 //
-export function LineSelectCell({ line }: { line: IDiffLine | undefined }): ReactNode {
-    const selection = useContext(LineSelectionContext);
-    if (!selection) {
-        return undefined;
-    }
-    const id = line ? selection.idOf(line) : undefined;
-    const isStaged = id !== undefined && selection.staged?.has(id) === true;
-    return (
-        <span className="flex flex-none select-none items-center" style={{ width: "calc(var(--space-8) + var(--space-2))", gap: "var(--space-1)", paddingLeft: "var(--space-1)" }}>
-            {id !== undefined ? (
-                <>
-                    <Checkbox
-                        size="small"
-                        checked={selection.selected.has(id)}
-                        onClick={event => {
-                            event.stopPropagation();
-                            selection.onToggle(id, event.shiftKey);
-                        }}
-                        slotProps={{ input: { "aria-label": `Select line ${line?.newNumber ?? line?.oldNumber}` } }}
-                        sx={{ padding: 0, "& .MuiSvgIcon-root": { fontSize: "var(--icon-md)" } }}
-                    />
-                    {isStaged ? (
-                        <Tooltip title="Staged">
-                            <span aria-label="Staged" style={{ color: "var(--color-success)", fontSize: "var(--icon-sm)" }}>
-                                <FontAwesomeIcon icon={faCheck} />
-                            </span>
-                        </Tooltip>
-                    ) : undefined}
-                </>
-            ) : undefined}
-        </span>
-    );
-}
-
-//
-// Returns the background of a selected line in the line selection mode: the selected wash laid
-// over the line's own colour. Returns the line's own colour for a line that is not selected.
-//
-function useLineBackground(line: IDiffLine | undefined, background: string): string {
+function useLinePick(line: IDiffLine | undefined): { id: string; isPicked: boolean; onClick: (event: MouseEvent) => void; onMouseDown: (event: MouseEvent) => void; border: ReactNode; padding: CSSProperties; actions: ReactNode } | undefined {
     const selection = useContext(LineSelectionContext);
     const id = line && selection ? selection.idOf(line) : undefined;
-    if (id !== undefined && selection?.selected.has(id)) {
-        return `linear-gradient(var(--color-selected), var(--color-selected)), ${background}`;
+    if (!line || !selection || id === undefined) {
+        return undefined;
     }
-    return background;
+    const isPicked = selection.selected.has(id);
+    const { before, after } = selection.neighbours(line);
+    const side = "2px solid var(--color-select-item)";
+    return {
+        id,
+        isPicked,
+        //
+        // The picked lines' buttons sit at the top right of the first picked line, inside the
+        // border, with room round them.
+        //
+        actions:
+            id === selection.actionsLine && selection.actions ? (
+                <div
+                    className="flex justify-end"
+                    onClick={event => event.stopPropagation()}
+                    style={{ gap: "var(--space-2)", padding: "0 var(--space-4) var(--space-2) var(--space-2)", fontFamily: "var(--font-sans)" }}
+                >
+                    {selection.actions}
+                </div>
+            ) : undefined,
+        //
+        // A run of picked lines has room inside its border above its first line and below its
+        // last, as a hunk has inside the current hunk's border.
+        //
+        padding: isPicked ? { paddingTop: before ? undefined : "var(--space-2)", paddingBottom: after ? undefined : "var(--space-2)" } : {},
+        //
+        // Shift and Ctrl clicks pick lines, so they leave the page's text unselected.
+        //
+        onMouseDown: event => {
+            if (event.shiftKey || event.ctrlKey || event.metaKey) {
+                event.preventDefault();
+            }
+        },
+        onClick: event => {
+            event.stopPropagation();
+            selection.onPick(id, event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle" : "only");
+        },
+        border: isPicked ? (
+            <span
+                aria-hidden="true"
+                style={{
+                    position: "absolute",
+                    inset: `${before ? 0 : "calc(var(--space-1) / 2)"} var(--space-1) ${after ? 0 : "calc(var(--space-1) / 2)"}`,
+                    borderLeft: side,
+                    borderRight: side,
+                    borderTop: before ? "none" : side,
+                    borderBottom: after ? "none" : side,
+                    borderRadius: `${before ? 0 : "var(--radius-sm)"} ${before ? 0 : "var(--radius-sm)"} ${after ? 0 : "var(--radius-sm)"} ${after ? 0 : "var(--radius-sm)"}`,
+                    pointerEvents: "none",
+                    zIndex: 1,
+                }}
+            />
+        ) : undefined,
+    };
 }
 
 //
@@ -424,14 +458,28 @@ export function Marker({ line }: { line: IDiffLine }): ReactNode {
 // Renders one row of the unified view: both line numbers, the marker and the text.
 //
 export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: IDiffLine | undefined; wrap: boolean }): ReactNode {
-    const background = useLineBackground(line, lineStyles[line.kind].background);
+    const pick = useLinePick(line);
     return (
-        <div role="row" data-line={line.kind} className="flex" style={{ background }}>
-            <LineSelectCell line={line} />
-            <Gutter number={line.oldNumber} />
-            <Gutter number={line.newNumber} />
-            <Marker line={line} />
-            <LineText line={line} partner={partner} wrap={wrap} />
+        <div
+            role="row"
+            data-line={line.kind}
+            data-line-id={pick?.id}
+            data-picked={pick?.isPicked}
+            onClick={pick?.onClick}
+            onMouseDown={pick?.onMouseDown}
+            className="flex"
+            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, ...pick?.padding }}
+        >
+            {pick?.border}
+            <div className="flex min-w-0 flex-1 flex-col">
+                {pick?.actions}
+                <div className="flex">
+                    <Gutter number={line.oldNumber} />
+                    <Gutter number={line.newNumber} />
+                    <Marker line={line} />
+                    <LineText line={line} partner={partner} wrap={wrap} />
+                </div>
+            </div>
         </div>
     );
 }
@@ -441,16 +489,30 @@ export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: 
 // and its text, or the striped fill where the side has no line.
 //
 export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | undefined; side: "old" | "new"; partner: IDiffLine | undefined; wrap: boolean }): ReactNode {
-    const background = useLineBackground(line, line ? lineStyles[line.kind].background : EMPTY_SIDE);
+    const pick = useLinePick(line);
     if (!line) {
         return <div className="min-w-0 flex-1" data-side={side} data-empty="true" style={{ background: EMPTY_SIDE }} />;
     }
     return (
-        <div className="flex min-w-0 flex-1" data-side={side} data-line={line.kind} style={{ background }}>
-            <LineSelectCell line={line.kind === "context" && side === "new" ? undefined : line} />
-            <Gutter number={side === "old" ? line.oldNumber : line.newNumber} />
-            <Marker line={line} />
-            <LineText line={line} partner={partner} wrap={wrap} />
+        <div
+            className="flex min-w-0 flex-1"
+            data-side={side}
+            data-line={line.kind}
+            data-line-id={pick?.id}
+            data-picked={pick?.isPicked}
+            onClick={pick?.onClick}
+            onMouseDown={pick?.onMouseDown}
+            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, ...pick?.padding }}
+        >
+            {pick?.border}
+            <div className="flex min-w-0 flex-1 flex-col">
+                {pick?.actions}
+                <div className="flex">
+                    <Gutter number={side === "old" ? line.oldNumber : line.newNumber} />
+                    <Marker line={line} />
+                    <LineText line={line} partner={partner} wrap={wrap} />
+                </div>
+            </div>
         </div>
     );
 }
@@ -549,7 +611,6 @@ export function GapRows({
         <div role="rowgroup" data-gap-index={position} data-current={isCurrent} onClick={lines ? onSelect : undefined} style={{ position: "relative", cursor: lines && onSelect ? "pointer" : undefined }}>
             {isCurrent ? <CurrentBorder /> : undefined}
             <div role="row" data-line="gap" className="flex items-center" style={{ gap: "var(--space-3)", minHeight: "calc(var(--space-6) + var(--space-1))", background: "var(--color-raised)", color: "var(--color-text-muted)" }}>
-                <LineSelectCell line={undefined} />
                 {lines ? (
                     isShown ? (
                         <GapButton layout={layout} label={`Hide ${count}`} detail="Folds these lines away again." icon={faCompress} onClick={onToggle} />
@@ -592,7 +653,6 @@ export function HunkHeader({ hunk, layout, action }: { hunk: IHunk; layout: Diff
             className="flex items-center"
             style={{ gap: "var(--space-3)", minHeight: "calc(var(--space-6) + var(--space-1))", background: "var(--color-raised)", color: "var(--color-text-muted)" }}
         >
-            <LineSelectCell line={undefined} />
             <span className="flex-none" style={{ width: `calc(${GUTTER_WIDTH} * ${layout === "unified" ? 2 : 1})` }} />
             <span style={{ whiteSpace: "pre" }}>
                 {range}
@@ -610,7 +670,7 @@ export function HunkHeader({ hunk, layout, action }: { hunk: IHunk; layout: Diff
                         // Room on the right and above and below, so the buttons stay clear of the
                         // current hunk's border.
                         //
-                        padding: "var(--space-1) var(--space-3) var(--space-1) var(--space-2)",
+                        padding: "var(--space-3) var(--space-4) var(--space-2) var(--space-2)",
                         background: "var(--color-raised)",
                         fontFamily: "var(--font-sans)",
                     }}
@@ -647,6 +707,7 @@ export function DiffView({
     onSelectGap,
     lineSelection,
     lineIndexes,
+    hideHunkActions = false,
 }: IDiffViewProps): ReactNode {
     const hunks = useMemo(() => parseHunks(diff), [diff]);
     const lineIds = useMemo(() => {
@@ -660,6 +721,24 @@ export function DiffView({
         });
         return ids;
     }, [hunks, hunkIndexes, lineIndexes]);
+
+    //
+    // Returns whether the lines before and after `line` are picked too: the neighbouring lines of
+    // its hunk in the unified layout, and the neighbouring lines of the same kind in the
+    // side-by-side layout, where added and deleted lines sit on different sides.
+    //
+    function pickedNeighbours(line: IDiffLine, shownLayout: DiffLayout): { before: boolean; after: boolean } {
+        const hunk = hunks.find(each => each.lines.includes(line));
+        if (!hunk || !lineSelection) {
+            return { before: false, after: false };
+        }
+        const index = hunk.lines.indexOf(line);
+        const isPicked = (other: IDiffLine | undefined): boolean => {
+            const id = other ? lineIds.get(other) : undefined;
+            return id !== undefined && lineSelection.selected.has(id) && (shownLayout === "unified" || other?.kind === line.kind);
+        };
+        return { before: isPicked(hunk.lines[index - 1]), after: isPicked(hunk.lines[index + 1]) };
+    }
     const gapCount = hunks.length + 1;
     const gaps = useMemo(() => Array.from({ length: gapCount }, (_, position) => gapBefore(hunks, position, oldFileLines?.length)), [hunks, gapCount, oldFileLines]);
     const allGapLines = useMemo(() => gaps.map(gap => (oldFileLines && gap.count > 0 ? gapLines(gap, oldFileLines) : undefined)), [gaps, oldFileLines]);
@@ -707,7 +786,7 @@ export function DiffView({
 
     return (
         <DiffSearchContext.Provider value={{ needle: search.trim(), current: currentMatch, firstMatch }}>
-        <LineSelectionContext.Provider value={lineSelection ? { ...lineSelection, idOf: line => lineIds.get(line) } : undefined}>
+        <LineSelectionContext.Provider value={lineSelection ? { ...lineSelection, idOf: line => lineIds.get(line), neighbours: line => pickedNeighbours(line, layout) } : undefined}>
         <div
             role="table"
             aria-label={layout === "unified" ? "Unified diff" : "Side-by-side diff"}
@@ -732,7 +811,7 @@ export function DiffView({
                             style={{ position: "relative", cursor: onSelectHunk ? "pointer" : undefined }}
                         >
                             {currentHunk === index ? <CurrentBorder /> : undefined}
-                            <HunkHeader hunk={hunk} layout={layout} action={hunkAction?.(index)} />
+                            <HunkHeader hunk={hunk} layout={layout} action={hideHunkActions ? undefined : hunkAction?.(index)} />
                             {layout === "unified"
                                 ? hunk.lines.map((line, lineIndex) => <UnifiedRow key={lineIndex} line={line} partner={partners.get(line)} wrap={wrap} />)
                                 : splitRows(hunk.lines).map((row, rowIndex) => (

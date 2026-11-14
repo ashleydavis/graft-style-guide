@@ -79,7 +79,7 @@ export function TooltipPage(): ReactNode {
             </Section>
 
             <Section title="On hover and focus" description="Rest the pointer on a button, or move to it with Tab, to show its tooltip after a short delay.">
-                <div className="flex flex-wrap" style={{ gap: "var(--space-1)" }}>
+                <div className="flex flex-wrap" style={{ gap: "var(--space-2)" }}>
                     {toolbarButtons.map(button => (
                         <Tooltip key={button.label} title={<TooltipWithShortcut label={button.label} shortcut={button.shortcut} />} arrow>
                             <IconButton aria-label={button.label}>

@@ -71,7 +71,7 @@ export function ButtonPage(): ReactNode {
                 title="Icon buttons"
                 description="An icon with no label, in muted text until the pointer is on it. Each has a tooltip and an accessible name. Medium in toolbars, small inside rows and panels."
             >
-                <div className="flex flex-wrap items-center gap-1">
+                <div className="flex flex-wrap items-center gap-2">
                     {[
                         { label: "Fetch", icon: faArrowsRotate },
                         { label: "Settings", icon: faGear },

@@ -2,6 +2,8 @@
 
 Follow [process.md](process.md), one step per message.
 
+Load [ux-rules.md](ux-rules.md) in full at the start of every session, and follow it in all UI work.
+
 - Never read `../mockup/`, `../playbook/project/` or any other Graft UI, its code or screenshots, unless the developer asks in that message. Token values come from the intent and the developer's choices only.
 - `graft.css` is the only source of token values. `style-guide.md` and `areas/*.md` refer to tokens by name and never repeat a value.
 - Raw palette tokens hold values. Role tokens point at raw palette tokens. Components and rules use role tokens only.
@@ -17,6 +19,7 @@ Follow [process.md](process.md), one step per message.
 - `docs/` holds the built site for GitHub Pages, written by `bun run build`. Rebuild it after every change to `graft.css` or `src/`, so the committed site matches the source.
 - While working with the developer, keep the dev server running (`bun run dev`, port 5199) and the explorer open in Chrome at http://localhost:5199/. At the start of a session, start the server if it is down and open the page with `google-chrome --new-window`. After any change to `vite.config.ts`, stop the dev server process and start a new one: Vite's restart inside the same process leaves open browser connections on the closed server, which answers "The server is being restarted or closed". After moving, renaming or deleting a file under `src/`, do the same, then load the pages that import it on port 5199 and check they render.
 - The pre-commit hook runs `scripts/test-everything.sh`. Install it in every new clone or worktree with `./scripts/install-hooks.sh`, and never commit with `--no-verify`. When the hook refuses a commit, fix the cause and commit again.
+- A message from the developer starting `UX:` is a UX rule: add it to `ux-rules.md` in the developer's own words, under the section it belongs to, and apply it straight away.
 - Keep updating `how-we-built-it.md` as the style guide work continues: after every pick, setup change, new tool or problem solved, add it there in simple terms, in the same reply as the change.
 - Run commands through mise. The explorer's dev server is `bun run dev` on port 5199.
 - Never use `bun --bun`. This project uses Bun: scripts in `package.json` run a tool by passing its script file to `bun`, as in `bun node_modules/vite/bin/vite.js`.

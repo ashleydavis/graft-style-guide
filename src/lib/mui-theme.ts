@@ -699,7 +699,7 @@ export const graftTheme: Theme = createTheme({
                 dense: {
                     minHeight: "auto",
                     padding: "var(--space-1) var(--space-2)",
-                    gap: "var(--space-1)",
+                    gap: "var(--space-2)",
                     flexWrap: "wrap",
                 },
             },
