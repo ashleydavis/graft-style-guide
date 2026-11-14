@@ -1,6 +1,7 @@
 //
-// The example repository the commit explorer shows: its path, its commits newest first, the files
-// each commit changed and each file's diff, as Git would report them for a small Git client.
+// The small example history the commit explorer shows: its commits newest first, the files each
+// commit changed and each file's diff, as Git would report them for a small Git client. The
+// lookups here serve every example history.
 //
 
 import type { ILaneShape } from "../commit-graph/components/graph-row";
@@ -107,9 +108,29 @@ export interface ICommit {
 }
 
 //
-// How many lanes the example history's graph is wide: main, and the feature branch beside it.
+// One example repository's history as the commit explorer shows it.
 //
-export const graphLaneCount = 2;
+export interface IHistory {
+    //
+    // The repository's name, shown in the explorer's title bar.
+    //
+    name: string;
+
+    //
+    // The checked-out branch, shown beside the name.
+    //
+    branch: string;
+
+    //
+    // How many lanes the history's commit graph is wide.
+    //
+    laneCount: number;
+
+    //
+    // The commits, newest first.
+    //
+    commits: ICommit[];
+}
 
 //
 // Returns the graph row of a commit on lane 1, main, joined to the rows above and below unless
@@ -133,9 +154,10 @@ function onMain(options: Partial<ILaneShape> = {}): ILaneShape {
 export const repoPath = "~/projects/graft";
 
 //
-// The example commits, newest first.
+// The commits of the small example history, newest first: main, with one feature branch that
+// leaves it and merges back.
 //
-export const commits: ICommit[] = [
+const graftCommits: ICommit[] = [
     {
         hash: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
         graph: onMain({ joinsAbove: false }),
@@ -396,23 +418,33 @@ export const commits: ICommit[] = [
 ];
 
 //
-// Returns the commit with the hash. The explorer opens only hashes it lists, so the commit is
-// always there.
+// The small example history: main, with one feature branch that leaves it and merges back.
 //
-export function commitByHash(hash: string): ICommit {
-    const commit = commits.find(candidate => candidate.hash === hash);
+export const graftHistory: IHistory = {
+    name: "graft",
+    branch: "main",
+    laneCount: 2,
+    commits: graftCommits,
+};
+
+//
+// Returns the commit of `history` with the hash. The explorer opens only hashes it lists, so the
+// commit is always there.
+//
+export function commitByHash(history: IHistory, hash: string): ICommit {
+    const commit = history.commits.find(candidate => candidate.hash === hash);
     if (!commit) {
-        throw new Error(`The example repository has no commit ${hash}. The explorer opens only the hashes in its commit list, so look at where the hash came from.`);
+        throw new Error(`The example repository ${history.name} has no commit ${hash}. The explorer opens only the hashes in its commit list, so look at where the hash came from.`);
     }
     return commit;
 }
 
 //
-// Returns the file the commit changed at the path. The explorer opens only paths the commit lists,
-// so the file is always there.
+// Returns the file the commit of `history` changed at the path. The explorer opens only paths the
+// commit lists, so the file is always there.
 //
-export function changedFile(hash: string, path: string): IChangedFile {
-    const file = commitByHash(hash).files.find(candidate => candidate.path === path);
+export function changedFile(history: IHistory, hash: string, path: string): IChangedFile {
+    const file = commitByHash(history, hash).files.find(candidate => candidate.path === path);
     if (!file) {
         throw new Error(`Commit ${hash} changed no file ${path}. The explorer opens only the paths in the commit's file list, so look at where the path came from.`);
     }

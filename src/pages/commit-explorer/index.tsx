@@ -6,12 +6,13 @@
 import type { ReactNode } from "react";
 import { Section } from "../../components/section";
 import { CommitExplorer } from "./components/commit-explorer";
-import { commits } from "./data";
+import { graftHistory } from "./data";
+import { longBranchHistory, releaseHistory } from "./histories";
 
 //
 // The commit and file the second and third examples open: the newest commit and its first file.
 //
-const exampleCommit = commits[0];
+const exampleCommit = graftHistory.commits[0];
 const exampleFile = exampleCommit.files[0];
 
 //
@@ -56,6 +57,29 @@ export function CommitExplorerPage(): ReactNode {
                         openPath: exampleFile.path,
                     }}
                 />
+            </Section>
+
+            <Section
+                title="Several branches at once"
+                description="Four lanes. A blame view is in progress on its own branch while two other branches are merged past it, so each merge's curve crosses the lanes between, and the stash branch crosses the blame branch on its way back to main. The open commit has a long title, cut short in the list and wrapped in full in its details, and a description of several paragraphs and a list."
+            >
+                <CommitExplorer
+                    history={releaseHistory}
+                    initialState={{
+                        activePaneIndex: 1,
+                        selectedHash: releaseHistory.commits[2].hash,
+                        openHash: releaseHistory.commits[2].hash,
+                        selectedPath: undefined,
+                        openPath: undefined,
+                    }}
+                />
+            </Section>
+
+            <Section
+                title="A long-running branch"
+                description="A settings branch takes main's changes part way through with a merge of its own, while a hotfix leaves main and comes back, its curves crossing the settings lane, before main takes the finished branch."
+            >
+                <CommitExplorer history={longBranchHistory} />
             </Section>
         </div>
     );

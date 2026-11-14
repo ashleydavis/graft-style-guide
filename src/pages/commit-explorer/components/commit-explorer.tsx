@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCodeBranch } from "@fortawesome/free-solid-svg-icons";
 import { KeyCaps } from "../../../components/shortcut";
-import { changedFile, commitByHash, commits } from "../data";
+import { changedFile, commitByHash, graftHistory, type IHistory } from "../data";
 import { closeCommitDetailsPane, closeFilePane, explorerKeys, initialExplorerState, selectCommit, selectFile, stateAfterKey, type IExplorerState } from "../explorer-state";
 import { scrollLastChildIntoView } from "../scroll";
 import { CommitDetailsPane } from "./commit-details-pane";
@@ -37,14 +37,16 @@ function isOwnKeyTarget(target: EventTarget): boolean {
 // Renders the explorer in a window frame: a title bar with the repository and branch, the panes
 // and the key hints. The explorer
 // answers its keys while the focus is anywhere inside it; click a commit or move to the explorer
-// with Tab to use them. It starts as `initialState` sets it, which by default selects the newest
-// commit and opens nothing. When a pane opens, the panes scroll sideways to bring it into view.
+// with Tab to use them. It shows `history`, the small example history by default, and starts as
+// `initialState` sets it, which by default selects the newest commit and opens nothing. When a
+// pane opens, the panes scroll sideways to bring it into view.
 //
-export function CommitExplorer({ initialState = { ...initialExplorerState, selectedHash: commits[0].hash } }: { initialState?: IExplorerState }): ReactNode {
-    const [state, setState] = useState<IExplorerState>(initialState);
+export function CommitExplorer({ history = graftHistory, initialState }: { history?: IHistory; initialState?: IExplorerState }): ReactNode {
+    const [state, setState] = useState<IExplorerState>(initialState ?? { ...initialExplorerState, selectedHash: history.commits[0].hash });
+    const commits = history.commits;
     const columnsRef = useRef<HTMLDivElement>(null);
-    const openCommit = state.openHash !== undefined ? commitByHash(state.openHash) : undefined;
-    const openFile = state.openHash !== undefined && state.openPath !== undefined ? changedFile(state.openHash, state.openPath) : undefined;
+    const openCommit = state.openHash !== undefined ? commitByHash(history, state.openHash) : undefined;
+    const openFile = state.openHash !== undefined && state.openPath !== undefined ? changedFile(history, state.openHash, state.openPath) : undefined;
 
     useEffect(() => {
         if (columnsRef.current) {
@@ -61,7 +63,7 @@ export function CommitExplorer({ initialState = { ...initialExplorerState, selec
         setState(current =>
             stateAfterKey(current, event.key, {
                 commitHashes: commits.map(commit => commit.hash),
-                filePaths: current.openHash !== undefined ? commitByHash(current.openHash).files.map(file => file.path) : [],
+                filePaths: current.openHash !== undefined ? commitByHash(history, current.openHash).files.map(file => file.path) : [],
             }),
         );
     }
@@ -96,7 +98,7 @@ export function CommitExplorer({ initialState = { ...initialExplorerState, selec
                 <span className="flex min-w-0 items-center truncate" style={{ gap: "var(--space-1)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
                     <FontAwesomeIcon icon={faCodeBranch} style={{ fontSize: "var(--icon-sm)" }} />
                     <span className="truncate" style={{ fontFamily: "var(--font-mono)" }}>
-                        graft · main
+                        {history.name} · {history.branch}
                     </span>
                 </span>
             </div>
@@ -104,6 +106,7 @@ export function CommitExplorer({ initialState = { ...initialExplorerState, selec
             <div ref={columnsRef} className="flex min-h-0 flex-1 items-stretch overflow-x-auto" style={{ gap: "var(--space-3)", padding: "var(--space-3)" }}>
                 <CommitPane
                     commits={commits}
+                    laneCount={history.laneCount}
                     selectedHash={state.selectedHash}
                     openHash={state.openHash}
                     isActive={state.activePaneIndex === 0}

@@ -7,7 +7,8 @@
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { choices } from "../../pages/choices/options";
-import { commits as exampleCommits } from "../../pages/commit-explorer/data";
+import { graftHistory } from "../../pages/commit-explorer/data";
+import { longBranchHistory, releaseHistory } from "../../pages/commit-explorer/histories";
 
 //
 // Returns the computed value of a CSS property on the element `locator` points at, so a test
@@ -653,7 +654,7 @@ test.describe("Commit explorer", () => {
             boxes.push((await segments.nth(index).boundingBox())!);
         }
         boxes.sort((a, b) => a.y - b.y);
-        expect(boxes.length).toBeGreaterThan(exampleCommits.length);
+        expect(boxes.length).toBeGreaterThan(graftHistory.commits.length);
         for (let index = 1; index < boxes.length; index++) {
             expect(boxes[index].y).toBeLessThanOrEqual(boxes[index - 1].y + boxes[index - 1].height + 0.5);
         }
@@ -662,7 +663,7 @@ test.describe("Commit explorer", () => {
     });
 
     test("every example file's added and deleted counts match its diff", () => {
-        for (const commit of exampleCommits) {
+        for (const commit of [graftHistory, releaseHistory, longBranchHistory].flatMap(history => history.commits)) {
             for (const file of commit.files) {
                 const lines = file.diff.split("\n").filter(line => !line.startsWith("@@"));
                 expect(lines.filter(line => line.startsWith("+")).length, `${file.path} added`).toBe(file.linesAdded);

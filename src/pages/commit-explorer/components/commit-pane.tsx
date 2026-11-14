@@ -8,7 +8,7 @@ import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import { RefBadge, type RefKind } from "../../badges";
 import { GraphLanes } from "../../commit-graph/components/graph-row";
-import { graphLaneCount, type ICommit } from "../data";
+import type { ICommit } from "../data";
 import { Pane } from "./pane";
 import { scrollSelectionIntoView } from "../scroll";
 
@@ -50,6 +50,11 @@ export interface ICommitPaneProps {
     commits: ICommit[];
 
     //
+    // How many lanes the commits' graph is wide.
+    //
+    laneCount: number;
+
+    //
     // The hash of the selected commit, drawn on the selected background, or undefined.
     //
     selectedHash: string | undefined;
@@ -75,7 +80,7 @@ export interface ICommitPaneProps {
 // Renders the pane. The selected row scrolls into view when the keys move the selection past the
 // top or bottom of the pane.
 //
-export function CommitPane({ commits, selectedHash, openHash, isActive, onSelectCommit }: ICommitPaneProps): ReactNode {
+export function CommitPane({ commits, laneCount, selectedHash, openHash, isActive, onSelectCommit }: ICommitPaneProps): ReactNode {
     const selectedRef = useRef<HTMLLIElement>(null);
 
     useEffect(() => {
@@ -116,7 +121,7 @@ export function CommitPane({ commits, selectedHash, openHash, isActive, onSelect
                                 },
                             }}
                         >
-                            <GraphLanes shape={commit.graph} laneCount={graphLaneCount} ringColour="var(--row-background)" />
+                            <GraphLanes shape={commit.graph} laneCount={laneCount} ringColour="var(--row-background)" />
                             <span className="flex min-w-0 flex-1 items-center" style={{ gap: "var(--space-2)" }}>
                                 <span className="truncate" style={{ fontWeight: isOpen ? "var(--weight-bold)" : "var(--weight-normal)" }}>
                                     {commit.title}
