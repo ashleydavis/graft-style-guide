@@ -26,7 +26,7 @@ jobs:
 
       # Keeps the logs and Playwright's failure screenshots and traces for reading after a
       # failed run.
-      - name: Upload the test output
+      - name: Upload the test output (only when the checks fail)
         if: failure()
         uses: actions/upload-artifact@v7.0.2
         with:
