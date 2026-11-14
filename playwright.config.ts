@@ -26,6 +26,13 @@ export default defineConfig({
         //
         channel: "chrome",
         headless: true,
+        //
+        // Headless Chrome draws scrollbars as on a desktop browser, so tests see layout shifts
+        // that a scrollbar appearing or disappearing causes.
+        //
+        launchOptions: {
+            ignoreDefaultArgs: ["--hide-scrollbars"],
+        },
     },
     webServer: {
         //

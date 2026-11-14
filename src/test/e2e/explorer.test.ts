@@ -44,19 +44,44 @@ test.describe("Opening pages", () => {
     });
 });
 
+test.describe("Sidebar", () => {
+    test("minimising hides the page list and puts the setting in the URL", async ({ page }) => {
+        await page.goto("/page/button");
+        const navigation = page.getByRole("navigation");
+        await navigation.getByRole("button", { name: "Minimise sidebar" }).click();
+        await expect(page).toHaveURL(/sidebar=minimised/);
+        await expect(navigation.getByRole("link")).toHaveCount(0);
+        await expect(page.getByRole("heading", { level: 1, name: "Button" })).toBeVisible();
+    });
+
+    test("restoring brings back the page list", async ({ page }) => {
+        await page.goto("/page/button?sidebar=minimised");
+        const navigation = page.getByRole("navigation");
+        await navigation.getByRole("button", { name: "Restore sidebar" }).click();
+        await expect(page).toHaveURL(/sidebar=open/);
+        await expect(navigation.getByRole("link", { name: "Button" })).toBeVisible();
+    });
+
+    test("the sidebar stays minimised when changing a setting", async ({ page }) => {
+        await page.goto("/page/button?sidebar=minimised&explorer=dark");
+        await expect(page.getByRole("navigation").getByRole("button", { name: "Restore sidebar" })).toBeVisible();
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    });
+});
+
 test.describe("Searching", () => {
     test("typing filters the page list by title", async ({ page }) => {
         await page.goto("/");
         const navigation = page.getByRole("navigation");
         await navigation.getByPlaceholder("Search components").fill("butt");
-        await expect(navigation.getByRole("link")).toHaveText(["Button"]);
+        await expect(navigation.getByRole("list", { name: "Pages" }).getByRole("link")).toHaveText(["Button"]);
     });
 
     test("typing matches keywords as well as titles", async ({ page }) => {
         await page.goto("/");
         const navigation = page.getByRole("navigation");
         await navigation.getByPlaceholder("Search components").fill("input");
-        await expect(navigation.getByRole("link")).toHaveText(["Text box"]);
+        await expect(navigation.getByRole("list", { name: "Pages" }).getByRole("link")).toHaveText(["Text box"]);
     });
 
     test("pressing Enter opens the first match", async ({ page }) => {
@@ -71,7 +96,7 @@ test.describe("Searching", () => {
         await page.goto("/");
         const navigation = page.getByRole("navigation");
         await navigation.getByPlaceholder("Search components").fill("zzzz");
-        await expect(navigation.getByRole("link")).toHaveCount(0);
+        await expect(navigation.getByRole("list", { name: "Pages" }).getByRole("link")).toHaveCount(0);
         await expect(navigation.getByText("No components match.")).toBeVisible();
     });
 });
@@ -120,13 +145,24 @@ test.describe("Themes", () => {
 });
 
 test.describe("Component mode and explorer theme", () => {
-    test("a URL naming neither shows light next to dark in a light explorer", async ({ page }) => {
+    test("a URL naming neither shows dark next to light in a light explorer", async ({ page }) => {
         await page.goto("/page/button");
         const componentSwitch = page.getByRole("group", { name: "Components" });
         const explorerSwitch = page.getByRole("group", { name: "Explorer" });
-        await expect(componentSwitch.getByRole("button", { name: "Light next to dark" })).toHaveAttribute("aria-pressed", "true");
+        await expect(componentSwitch.getByRole("button", { name: "Dark next to light" })).toHaveAttribute("aria-pressed", "true");
         await expect(explorerSwitch.getByRole("button", { name: "Light", exact: true })).toHaveAttribute("aria-pressed", "true");
         await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    });
+
+    test("dark next to light draws the dark panel on the left", async ({ page }) => {
+        await page.goto("/page/button");
+        const panels = page.locator("main section").first().locator("[data-theme]");
+        await expect(panels).toHaveCount(2);
+        await expect(panels.nth(0)).toHaveAttribute("data-theme", "dark");
+        await expect(panels.nth(1)).toHaveAttribute("data-theme", "light");
+        const darkBox = await panels.nth(0).boundingBox();
+        const lightBox = await panels.nth(1).boundingBox();
+        expect(darkBox!.x).toBeLessThan(lightBox!.x);
     });
 
     test("dark component mode shows only dark panels and leaves the explorer light", async ({ page }) => {
@@ -191,7 +227,7 @@ test.describe("Dialog", () => {
         await page.goto("/");
         const navigation = page.getByRole("navigation");
         await navigation.getByPlaceholder("Search components").fill("modal");
-        await expect(navigation.getByRole("link")).toHaveText(["Dialog"]);
+        await expect(navigation.getByRole("list", { name: "Pages" }).getByRole("link")).toHaveText(["Dialog"]);
     });
 
     test("the danger button takes the danger token, which differs from the accent", async ({ page }) => {
@@ -227,11 +263,59 @@ test.describe("Dialog", () => {
 });
 
 test.describe("About", () => {
-    test("the about page links to Graft on GitHub and to the YouTube channel", async ({ page }) => {
-        await page.goto("/page/about");
-        await expect(page.getByRole("heading", { level: 1, name: "About" })).toBeVisible();
-        await expect(page.getByRole("link", { name: "github.com/ashleydavis/Graft" })).toHaveAttribute("href", "https://github.com/ashleydavis/Graft");
-        await expect(page.getByRole("link", { name: "Code Capers" })).toHaveAttribute("href", "https://www.youtube.com/@CodeCapers");
+    test("the info button in the top-right corner opens the about popup centred on the page", async ({ page }) => {
+        await page.goto("/page/button?explorer=dark");
+        const info = page.getByRole("button", { name: "About" });
+        const infoBox = await info.boundingBox();
+        const viewport = page.viewportSize()!;
+        expect(infoBox!.y).toBeLessThan(20);
+        expect(infoBox!.x + infoBox!.width).toBeGreaterThan(viewport.width - 40);
+        await info.click();
+        const popup = page.getByRole("dialog", { name: "About" });
+        await expect(popup).toBeVisible();
+        await expect(page).toHaveURL(/\/page\/button\?explorer=dark$/);
+        const popupBox = await popup.boundingBox();
+        expect(popupBox!.width).toBeLessThanOrEqual(600);
+        const centreX = popupBox!.x + popupBox!.width / 2;
+        const centreY = popupBox!.y + popupBox!.height / 2;
+        expect(Math.abs(centreX - viewport.width / 2)).toBeLessThan(20);
+        expect(Math.abs(centreY - viewport.height / 2)).toBeLessThan(20);
+    });
+
+    test("the about popup links to Graft on GitHub and to the YouTube channel and closes on Close", async ({ page }) => {
+        await page.goto("/page/button");
+        await page.getByRole("button", { name: "About" }).click();
+        const popup = page.getByRole("dialog", { name: "About" });
+        await expect(popup.getByRole("link", { name: "github.com/ashleydavis/Graft" })).toHaveAttribute("href", "https://github.com/ashleydavis/Graft");
+        await expect(popup.getByRole("link", { name: "Code Capers" })).toHaveAttribute("href", "https://www.youtube.com/@CodeCapers");
+        await popup.getByRole("button", { name: "Close" }).click();
+        await expect(popup).toHaveCount(0);
+    });
+
+    test("the page keeps its scrollbar and the info button stays put while the about popup is open", async ({ page }) => {
+        await page.goto("/page/overview");
+        const info = page.getByRole("button", { name: "About", includeHidden: true });
+        const scrollbarWidth = () => page.evaluate(() => window.innerWidth - document.documentElement.clientWidth);
+        const widthBefore = await scrollbarWidth();
+        expect(widthBefore).toBeGreaterThan(0);
+        const boxBefore = await info.boundingBox();
+        await info.click();
+        await expect(page.getByRole("dialog", { name: "About" })).toBeVisible();
+        expect(await scrollbarWidth()).toBe(widthBefore);
+        expect(await info.boundingBox()).toEqual(boxBefore);
+    });
+
+    test("the info button stays when the sidebar is minimised", async ({ page }) => {
+        await page.goto("/page/button?sidebar=minimised");
+        await expect(page.getByRole("button", { name: "About" })).toBeVisible();
+    });
+
+    test("the info button stays in the same place on a short page and a long page", async ({ page }) => {
+        await page.goto("/page/choices");
+        const shortPageBox = await page.getByRole("button", { name: "About" }).boundingBox();
+        await page.goto("/page/overview");
+        const longPageBox = await page.getByRole("button", { name: "About" }).boundingBox();
+        expect(longPageBox).toEqual(shortPageBox);
     });
 });
 

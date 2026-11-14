@@ -18,8 +18,10 @@ bun run dev
 
 Open http://localhost:5199/. Search for a component in the sidebar and choose it. The page shown is in the URL, as in `/page/button`. Two switches at the bottom of the sidebar set how the page looks, and both settings go in the URL:
 
-- **Components** shows the examples in the light theme, the dark theme or light next to dark, as in `?components=dark`. A URL without it shows light next to dark.
+- **Components** shows the examples in the light theme, the dark theme or dark next to light, as in `?components=dark`. A URL without it shows dark next to light.
 - **Explorer** sets the theme of the explorer's own sidebar, headings and background to light or dark, as in `?explorer=dark`. A URL without it shows light. The page reloads its styles when `graft.css` changes.
+
+The button at the top of the sidebar hides it and gives the page the full width, and the button left in the top-left corner restores it. This also goes in the URL, as in `?sidebar=minimised`.
 
 ## Publishing on GitHub Pages
 

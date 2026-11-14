@@ -5,30 +5,36 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { SettingSwitch } from "./setting-switch";
+import { AboutDialog } from "./about-dialog";
 import { Link, Outlet, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import TextField from "@mui/material/TextField";
 import InputAdornment from "@mui/material/InputAdornment";
+import IconButton from "@mui/material/IconButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
-import { explorerPages } from "../explorer-pages";
+import { faAnglesLeft, faAnglesRight, faCircleInfo, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { explorerPages, type IExplorerPage } from "../explorer-pages";
 import { readExplorerSearch } from "../lib/explorer-mode";
 
 //
 // Renders the sidebar and the page the router has chosen. Pressing Enter in the search box
 // opens the first page that matches. The component mode switch sets ?components= in the URL
-// and the explorer theme switch sets ?explorer=, which also sets data-theme on the page.
+// and the explorer theme switch sets ?explorer=, which also sets data-theme on the page. The
+// minimise button hides the sidebar, gives the page the full width with a restore button
+// floating in its top-left corner and sets ?sidebar=minimised.
 //
 export function ExplorerLayout(): ReactNode {
     const [search, setSearch] = useState("");
+    const [aboutOpen, setAboutOpen] = useState(false);
     const navigate = useNavigate();
     const { pageId } = useParams({
         strict: false,
     });
-    const { components, explorer } = useSearch({
+    const { components, explorer, sidebar } = useSearch({
         strict: false,
     });
     const componentMode = components ?? "both";
     const explorerTheme = explorer ?? "light";
+    const sidebarState = sidebar ?? "open";
 
     useEffect(() => {
         document.documentElement.dataset.theme = explorerTheme;
@@ -44,6 +50,29 @@ export function ExplorerLayout(): ReactNode {
         }
         return page.keywords.some(keyword => keyword.includes(query));
     });
+
+    //
+    // Renders the sidebar link to `page`, filled with the accent colour when it is the open page.
+    //
+    function pageLink(page: IExplorerPage): ReactNode {
+        return (
+            <Link
+                to="/page/$pageId"
+                params={{
+                    pageId: page.id,
+                }}
+                search={true}
+                className="block px-3 py-1.5"
+                style={{
+                    borderRadius: "var(--radius-md)",
+                    color: page.id === pageId ? "var(--color-on-accent)" : "var(--color-text)",
+                    background: page.id === pageId ? "var(--color-accent)" : "transparent",
+                }}
+            >
+                {page.title}
+            </Link>
+        );
+    }
 
     async function openFirstMatch(): Promise<void> {
         const firstMatch = matches[0];
@@ -65,27 +94,70 @@ export function ExplorerLayout(): ReactNode {
             search: readExplorerSearch({
                 components,
                 explorer,
+                sidebar,
                 [name]: value,
             }),
         });
     }
 
+    function setSidebar(value: string): void {
+        changeSetting("sidebar", value).catch(error => console.error("Could not change the sidebar.", error));
+    }
+
+    const aboutButton = (
+        <IconButton
+            onClick={() => setAboutOpen(true)}
+            aria-label="About"
+            title="About"
+            className="fixed top-2 right-2 z-10"
+        >
+            <FontAwesomeIcon icon={faCircleInfo} />
+        </IconButton>
+    );
+    const aboutDialog = <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />;
+
+    const navStyle = {
+        background: "var(--color-panel)",
+        borderRight: "1px solid var(--color-border)",
+    };
+
+    if (sidebarState === "minimised") {
+        return (
+            <div className="min-h-screen">
+                <nav className="fixed top-2 left-2 z-10">
+                    <IconButton aria-label="Restore sidebar" title="Restore sidebar" onClick={() => setSidebar("open")}>
+                        <FontAwesomeIcon icon={faAnglesRight} />
+                    </IconButton>
+                </nav>
+                <main className="min-w-0 p-8 pt-3.5 pl-16">
+                    {aboutButton}
+                    {aboutDialog}
+                    <Outlet />
+                </main>
+            </div>
+        );
+    }
+
     return (
         <div className="flex min-h-screen">
-            <nav
-                className="sticky top-0 flex h-screen w-64 shrink-0 flex-col gap-3 p-4"
-                style={{
-                    background: "var(--color-panel)",
-                    borderRight: "1px solid var(--color-border)",
-                }}
-            >
-                <div
-                    style={{
-                        fontSize: "var(--text-lg)",
-                        fontWeight: "var(--weight-bold)",
-                    }}
-                >
-                    Graft style explorer
+            <nav className="sticky top-0 flex h-screen w-64 shrink-0 flex-col gap-3 p-4" style={navStyle}>
+                <div className="flex items-center justify-between gap-2">
+                    <div
+                        style={{
+                            fontSize: "var(--text-lg)",
+                            fontWeight: "var(--weight-bold)",
+                        }}
+                    >
+                        Graft Style Explorer
+                    </div>
+                    <IconButton
+                        aria-label="Minimise sidebar"
+                        title="Minimise sidebar"
+                        size="small"
+                        onClick={() => setSidebar("minimised")}
+                    >
+                        <FontAwesomeIcon icon={faAnglesLeft} />
+                    </IconButton>
                 </div>
                 <TextField
                     placeholder="Search components"
@@ -107,25 +179,9 @@ export function ExplorerLayout(): ReactNode {
                         },
                     }}
                 />
-                <ul className="flex flex-col gap-1">
+                <ul aria-label="Pages" className="flex flex-col gap-1">
                     {matches.map(page => (
-                        <li key={page.id}>
-                            <Link
-                                to="/page/$pageId"
-                                params={{
-                                    pageId: page.id,
-                                }}
-                                search={true}
-                                className="block px-3 py-1.5"
-                                style={{
-                                    borderRadius: "var(--radius-md)",
-                                    color: page.id === pageId ? "var(--color-on-accent)" : "var(--color-text)",
-                                    background: page.id === pageId ? "var(--color-accent)" : "transparent",
-                                }}
-                            >
-                                {page.title}
-                            </Link>
-                        </li>
+                        <li key={page.id}>{pageLink(page)}</li>
                     ))}
                 </ul>
                 {matches.length === 0 ? (
@@ -152,7 +208,7 @@ export function ExplorerLayout(): ReactNode {
                             },
                             {
                                 value: "both",
-                                label: "Light next to dark",
+                                label: "Dark next to light",
                             },
                         ]}
                         onChange={value => {
@@ -178,7 +234,9 @@ export function ExplorerLayout(): ReactNode {
                     />
                 </div>
             </nav>
-            <main className="min-w-0 flex-1 p-8">
+            <main className="min-w-0 flex-1 p-8 pt-3.5">
+                {aboutButton}
+                {aboutDialog}
                 <Outlet />
             </main>
         </div>

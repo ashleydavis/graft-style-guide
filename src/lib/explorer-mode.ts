@@ -1,6 +1,7 @@
 //
-// The explorer's two display settings and the reading of them from the URL: the theme the
-// component examples are shown in and the theme of the explorer's own frame.
+// The explorer's display settings and the reading of them from the URL: the theme the
+// component examples are shown in, the theme of the explorer's own frame and whether the
+// sidebar is open.
 //
 
 //
@@ -15,7 +16,13 @@ export type ComponentMode = "light" | "dark" | "both";
 export type ExplorerTheme = "light" | "dark";
 
 //
-// The search part of the explorer's URL, as in ?components=dark&explorer=light.
+// Whether the sidebar is shown, or minimised to a restore button floating over the page's
+// top-left corner.
+//
+export type SidebarState = "open" | "minimised";
+
+//
+// The search part of the explorer's URL, as in ?components=dark&explorer=light&sidebar=minimised.
 //
 export interface IExplorerSearch {
     //
@@ -27,10 +34,15 @@ export interface IExplorerSearch {
     // The theme of the explorer's frame. Absent means "light".
     //
     explorer?: ExplorerTheme;
+
+    //
+    // Whether the sidebar is open. Absent means "open".
+    //
+    sidebar?: SidebarState;
 }
 
 //
-// Reads both settings from the URL's search values, so a link to
+// Reads every setting from the URL's search values, so a link to
 // /page/button?components=dark&explorer=dark opens with both set. A value outside the known
 // settings reads as absent.
 //
@@ -43,6 +55,10 @@ export function readExplorerSearch(search: Record<string, unknown>): IExplorerSe
     const explorer = search.explorer;
     if (explorer === "light" || explorer === "dark") {
         result.explorer = explorer;
+    }
+    const sidebar = search.sidebar;
+    if (sidebar === "open" || sidebar === "minimised") {
+        result.sidebar = sidebar;
     }
     return result;
 }
@@ -58,5 +74,5 @@ export function modeThemes(mode: ComponentMode | undefined): string[] {
     if (mode === "dark") {
         return ["dark"];
     }
-    return ["light", "dark"];
+    return ["dark", "light"];
 }

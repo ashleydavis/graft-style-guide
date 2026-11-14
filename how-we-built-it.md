@@ -31,9 +31,10 @@ To judge styles you have to see them, so we built a small web app, the style exp
 - **Same tools as Graft.** A subagent read Graft's frontend setup without looking at any of its styling, you checked the list, and the explorer copies it: Bun, TypeScript, Vite, React, MUI, Tailwind, TanStack Router and Font Awesome, at the same versions.
 - **One page per component.** A sidebar search finds a component and opens its page. The page is in the URL, as in `/page/button`.
 - **An overview page** shows every token with a small example of its use.
-- **Two switches.** "Components" shows examples in light, dark or light next to dark. "Explorer" sets the explorer's own frame to light or dark. Both go in the URL.
+- **Two switches.** "Components" shows examples in light, dark or dark next to light. "Explorer" sets the explorer's own frame to light or dark. Both go in the URL.
+- **A sidebar that minimises.** A button at the top of the sidebar hides it and gives the examples the full width. A small button left floating in the top-left corner brings it back. The first version left an empty strip down the side, which was wasted space. This is in the URL too.
 - **Live reload.** Editing `graft.css` updates the open page straight away.
-- **An about page** links to Graft on GitHub and the YouTube channel.
+- **An about popup**, opened from an info button in the top-right corner, links to Graft on GitHub and the YouTube channel. It is sized to its text and centred on the page.
 
 How components are styled, in order of preference:
 
@@ -59,6 +60,8 @@ A component MUI does not have is built in React and HTML with Tailwind, and a co
 - **MUI styles losing to Tailwind.** MUI put its styles at the top of the page, below Tailwind's base styles, so buttons showed with no colour. Declaring the order of the style layers through MUI fixed it. A test caught this one.
 - **A flash from light to dark on refresh.** The page drew in light first, then switched once the app loaded. A tiny script in `index.html` now sets the theme before anything is drawn.
 - **"This page isn't working" after config changes.** Vite restarted itself inside the same process and the open browser stayed connected to the old, closed server. The fix is to fully restart the dev server after any change to `vite.config.ts`.
+- **A blank page after moving a file.** A shared component was moved to a new folder. The running dev server kept serving an old copy of the page that pointed at the old location, so the page came up blank however often it was refreshed. The tests passed because they start their own fresh server. Restarting the dev server fixed it, and Claude now restarts it and checks the open pages after moving or renaming a file.
+- **Floating buttons jumping sideways.** The info button moved between pages and when the about popup opened, because the scrollbar came and went: short pages have none, and MUI removes it while a popup is open. Every page now keeps room for the scrollbar, and the about popup leaves the scrollbar in place. The tests missed it at first because Playwright hides scrollbars in headless Chrome, so they now run with scrollbars shown.
 - **The page reloading for no reason.** Tailwind was scanning the whole repo, including the built site and the docs, so every build reloaded the page. It now scans only `src/`.
 - **Node.js.** The tools start with Node.js by default. Since `bun --bun` is not used here, the scripts start each tool by handing its file to Bun, and the project needs only Bun.
 

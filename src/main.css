@@ -14,3 +14,11 @@ body {
     font-family: var(--font-sans);
     font-size: var(--text-md);
 }
+
+/*
+ * Keeps room for the scrollbar on every page, so a page short enough to need none has the
+ * same width as a long one and the floating buttons stay in the same place between pages.
+ */
+html {
+    scrollbar-gutter: stable;
+}
