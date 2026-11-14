@@ -4,9 +4,9 @@
     "type": "module",
     "scripts": {
         "dev": "bun node_modules/vite/bin/vite.js",
-        "compile": "bun node_modules/typescript/bin/tsc --noEmit",
+        "compile": "bun node_modules/typescript/bin/tsc --noEmit && what-changed baseline capture compile",
         "build": "bun node_modules/typescript/bin/tsc --noEmit && bun node_modules/vite/bin/vite.js build",
-        "test:e2e": "bun node_modules/@playwright/test/cli.js test"
+        "test:e2e": "bun node_modules/@playwright/test/cli.js test && what-changed baseline capture e2e"
     },
     "dependencies": {
         "@emotion/react": "11.14.0",

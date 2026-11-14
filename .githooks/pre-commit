@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Runs scripts/test-everything.sh before every commit and refuses the commit when a check fails.
+# The script runs the type check and the end-to-end tests when their files changed.
+#
+
+set -uo pipefail
+
+REPO_DIR="$(git rev-parse --show-toplevel)"
+
+# Git exports these to hooks. Commands that run git would otherwise act on this commit's index.
+unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE GIT_PREFIX
+
+cd "$REPO_DIR"
+
+# mise puts the Bun and what-changed versions locked in mise.toml on the PATH, whichever shell
+# or tool started the commit.
+if ! mise exec -- ./scripts/test-everything.sh; then
+    echo "pre-commit FAILED. Commit anyway with: git commit --no-verify" >&2
+    exit 1
+fi

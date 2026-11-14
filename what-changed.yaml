@@ -1,0 +1,34 @@
+# what-changed configuration.
+#
+# Each target names a check that scripts/test-everything.sh runs, and the paths whose content
+# decides whether that check runs again. The pre-commit hook runs that script, so a commit runs
+# only the checks its changes affect.
+
+# Changes to dependencies, tool versions or compiler settings affect every check.
+always:
+  - package.json
+  - bun.lock
+  - mise.toml
+  - tsconfig.json
+
+ignore:
+  - .md
+  - .txt
+  - .log
+
+targets:
+  # The TypeScript type check of the explorer, its tests and its configs.
+  - name: compile
+    paths:
+      - src
+      - vite.config.ts
+      - playwright.config.ts
+
+  # The Playwright end-to-end tests, which load the explorer and the tokens in a browser.
+  - name: e2e
+    paths:
+      - src
+      - graft.css
+      - index.html
+      - vite.config.ts
+      - playwright.config.ts

@@ -57,6 +57,20 @@ bun run test:e2e
 
 The Playwright end-to-end tests start their own dev server on a free port and run in the Chrome installed on the machine.
 
+```bash
+./scripts/test-everything.sh
+```
+
+Runs the type check and the end-to-end tests when their files changed since they last passed, using [what-changed](https://github.com/ashleydavis/what-changed). `what-changed.yaml` lists the checks and the files each one watches.
+
+## Pre-commit hook
+
+```bash
+./scripts/install-hooks.sh
+```
+
+Run this once per clone. It installs `.githooks/pre-commit`, which runs `./scripts/test-everything.sh` before every commit and refuses the commit when a check fails.
+
 ## Using it in a web page
 
 Link the stylesheet and use the variables:
