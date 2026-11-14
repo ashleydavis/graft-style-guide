@@ -23,6 +23,8 @@ Open http://localhost:5199/. Search for a component in the sidebar and choose it
 
 The button at the top of the sidebar hides it and gives the page the full width, and the button left in the top-left corner restores it. This also goes in the URL, as in `?sidebar=minimised`.
 
+On a screen narrower than 1024 pixels, such as a phone or an upright tablet, the sidebar starts closed. The menu button in the top-left corner opens it as a drawer over the page, and choosing a page closes it.
+
 ## Publishing on GitHub Pages
 
 ```bash
@@ -58,7 +60,7 @@ bun node_modules/vite/bin/vite.js preview --outDir docs
 bun run test:e2e
 ```
 
-The Playwright end-to-end tests start their own dev server on a free port and run in the Chrome installed on the machine.
+The Playwright end-to-end tests start their own dev server on a free port and run in the Chrome installed on the machine. `src/test/e2e/explorer.test.ts` runs at desktop size. `src/test/e2e/mobile.test.ts` runs as a touch phone 390 by 844 pixels, once upright and once on its side, and checks that every page fits the screen width, the sidebar drawer, the floating buttons and the popups.
 
 ```bash
 ./scripts/test-everything.sh

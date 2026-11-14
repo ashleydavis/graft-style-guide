@@ -166,6 +166,17 @@ export const graftTheme: Theme = createTheme({
                 },
             },
         },
+        MuiDrawer: {
+            styleOverrides: {
+                paper: {
+                    backgroundColor: "var(--color-panel)",
+                    backgroundImage: "none",
+                    color: "var(--color-text)",
+                    borderRight: "1px solid var(--color-border)",
+                    boxShadow: "var(--shadow-overlay)",
+                },
+            },
+        },
         MuiIconButton: {
             styleOverrides: {
                 root: {

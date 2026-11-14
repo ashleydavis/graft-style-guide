@@ -33,6 +33,7 @@ To judge styles you have to see them, so we built a small web app, the style exp
 - **An overview page** shows every token with a small example of its use.
 - **Two switches.** "Components" shows examples in light, dark or dark next to light. "Explorer" sets the explorer's own frame to light or dark. Both go in the URL.
 - **A sidebar that minimises.** A button at the top of the sidebar hides it and gives the examples the full width. A small button left floating in the top-left corner brings it back. The first version left an empty strip down the side, which was wasted space. This is in the URL too.
+- **Phones.** On a screen narrower than 1024 pixels the sidebar becomes a drawer that slides over the page from a menu button and closes when you choose a page. The panels stack, and the page title moves over to clear the menu button while the rest of the page uses the full width.
 - **Live reload.** Editing `graft.css` updates the open page straight away.
 - **An about popup**, opened from an info button in the top-right corner, links to Graft on GitHub and the YouTube channel. It is sized to its text and centred on the page.
 
@@ -46,7 +47,7 @@ A component MUI does not have is built in React and HTML with Tailwind, and a co
 
 ## Testing
 
-- **Playwright end-to-end tests** open the explorer in Chrome and check it like a person would: finding pages, the switches, the dialog, the choices page and that colours come from the right tokens.
+- **Playwright end-to-end tests** open the explorer in Chrome and check it like a person would: finding pages, the switches, the dialog, the choices page and that colours come from the right tokens. A second set runs as a phone held upright and on its side, and checks that every page fits the screen with no sideways scrolling and that the drawer, buttons and popups work by touch.
 - **what-changed** remembers which checks have passed against which files, so a run only repeats the checks a change affects.
 - **A pre-commit hook** runs the type check and the tests before every commit and refuses the commit if they fail. Each clone installs it once with `./scripts/install-hooks.sh`.
 - **A GitHub Actions workflow** runs the same checks on every push. When a run fails, it keeps the logs and Playwright's screenshots for reading.
@@ -62,6 +63,7 @@ A component MUI does not have is built in React and HTML with Tailwind, and a co
 - **"This page isn't working" after config changes.** Vite restarted itself inside the same process and the open browser stayed connected to the old, closed server. The fix is to fully restart the dev server after any change to `vite.config.ts`.
 - **A blank page after moving a file.** A shared component was moved to a new folder. The running dev server kept serving an old copy of the page that pointed at the old location, so the page came up blank however often it was refreshed. The tests passed because they start their own fresh server. Restarting the dev server fixed it, and Claude now restarts it and checks the open pages after moving or renaming a file.
 - **Floating buttons jumping sideways.** The info button moved between pages and when the about popup opened, because the scrollbar came and went: short pages have none, and MUI removes it while a popup is open. Every page now keeps room for the scrollbar, and the about popup leaves the scrollbar in place. The tests missed it at first because Playwright hides scrollbars in headless Chrome, so they now run with scrollbars shown.
+- **Enter reopening the drawer on a phone.** Pressing Enter in the drawer's search box opened the page and closed the drawer. The browser then moved focus back to the menu button, and the rest of the same key press pressed that button and opened the drawer again. The search box now ends the key press once it has used it.
 - **The page reloading for no reason.** Tailwind was scanning the whole repo, including the built site and the docs, so every build reloaded the page. It now scans only `src/`.
 - **Node.js.** The tools start with Node.js by default. Since `bun --bun` is not used here, the scripts start each tool by handing its file to Bun, and the project needs only Bun.
 
