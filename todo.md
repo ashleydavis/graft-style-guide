@@ -4,7 +4,7 @@ The work to flesh out the Graft style guide, in the order of `process.md`. Each 
 
 ## Intent
 
-- [ ] Write the one-sentence intent for how Graft should feel.
+- [x] Write the one-sentence intent for how Graft should feel.
 
 ## Raw palette
 
