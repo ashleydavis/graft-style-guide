@@ -16,19 +16,10 @@ const LANE_GAP = 12;
 const FIRST_LANE_X = 7;
 
 //
-// One commit and the lanes drawn beside it.
+// The lanes of one commit's row: the commit's own lane and how it joins the rows above and
+// below, and the other lanes that pass through, end or start at the row.
 //
-export interface IGraphRow {
-    //
-    // The commit message.
-    //
-    message: string;
-
-    //
-    // The short hash.
-    //
-    hash: string;
-
+export interface ILaneShape {
     //
     // The lane the commit sits on, from 1.
     //
@@ -63,6 +54,21 @@ export interface IGraphRow {
 }
 
 //
+// One commit and the lanes drawn beside it.
+//
+export interface IGraphRow extends ILaneShape {
+    //
+    // The commit message.
+    //
+    message: string;
+
+    //
+    // The short hash.
+    //
+    hash: string;
+}
+
+//
 // Returns the x position of `lane` in the graph.
 //
 export function laneX(lane: number): number {
@@ -84,14 +90,117 @@ export function laneColour(lane: number): string {
 }
 
 //
-// Renders the row. The graph is drawn on a 100-unit-high canvas stretched to the row's height,
-// so every line meets the lines of the rows above and below whatever height the row has. Lines
-// keep their width as the canvas stretches.
+// Renders the lanes of one row, stretched to the row's full height. The graph is drawn on a
+// 100-unit-high canvas stretched to the row's height, so every line meets the lines of the rows
+// above and below whatever height the row has. Lines keep their width as the canvas stretches.
+// The commit's dot sits in the middle of the row, with a ring in `ringColour`, the row's
+// background, so it stands clear of the lines.
+//
+export function GraphLanes({ shape, laneCount, ringColour = "var(--color-panel)" }: { shape: ILaneShape; laneCount: number; ringColour?: string }): ReactNode {
+    const width = graphWidth(laneCount);
+    const commitX = laneX(shape.lane);
+
+    return (
+        <div
+            aria-hidden="true"
+            className="relative shrink-0 self-stretch"
+            style={{
+                width: `${width}px`,
+            }}
+        >
+            <svg
+                className="absolute inset-0 h-full w-full"
+                viewBox={`0 0 ${width} 100`}
+                preserveAspectRatio="none"
+            >
+                {shape.through.map(lane => (
+                    <line
+                        key={`through-${lane}`}
+                        data-lane={lane}
+                        x1={laneX(lane)}
+                        y1="0"
+                        x2={laneX(lane)}
+                        y2="100"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
+                        style={{
+                            stroke: laneColour(lane),
+                        }}
+                    />
+                ))}
+                {shape.joinsAbove ? (
+                    <line
+                        data-lane={shape.lane}
+                        x1={commitX}
+                        y1="0"
+                        x2={commitX}
+                        y2="50"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
+                        style={{
+                            stroke: laneColour(shape.lane),
+                        }}
+                    />
+                ) : undefined}
+                {shape.joinsBelow ? (
+                    <line
+                        data-lane={shape.lane}
+                        x1={commitX}
+                        y1="50"
+                        x2={commitX}
+                        y2="100"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
+                        style={{
+                            stroke: laneColour(shape.lane),
+                        }}
+                    />
+                ) : undefined}
+                {shape.endsHere.map(lane => (
+                    <path
+                        key={`ends-${lane}`}
+                        d={`M ${laneX(lane)} 0 C ${laneX(lane)} 35, ${commitX} 20, ${commitX} 50`}
+                        fill="none"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
+                        style={{
+                            stroke: laneColour(lane),
+                        }}
+                    />
+                ))}
+                {shape.startsHere.map(lane => (
+                    <path
+                        key={`starts-${lane}`}
+                        d={`M ${commitX} 50 C ${commitX} 80, ${laneX(lane)} 65, ${laneX(lane)} 100`}
+                        fill="none"
+                        strokeWidth="2"
+                        vectorEffect="non-scaling-stroke"
+                        style={{
+                            stroke: laneColour(lane),
+                        }}
+                    />
+                ))}
+            </svg>
+            <div
+                className="absolute"
+                style={{
+                    left: `${commitX - 5}px`,
+                    top: "calc(50% - 5px)",
+                    width: "10px",
+                    height: "10px",
+                    borderRadius: "var(--radius-full)",
+                    background: laneColour(shape.lane),
+                    boxShadow: `0 0 0 2px ${ringColour}`,
+                }}
+            />
+        </div>
+    );
+}
+
+//
+// Renders the row: the lanes, then the commit message and short hash.
 //
 export function GraphRow({ row, laneCount }: { row: IGraphRow; laneCount: number }): ReactNode {
-    const width = graphWidth(laneCount);
-    const commitX = laneX(row.lane);
-
     return (
         <div
             className="flex"
@@ -100,99 +209,7 @@ export function GraphRow({ row, laneCount }: { row: IGraphRow; laneCount: number
                 padding: "0 var(--space-3)",
             }}
         >
-            <div
-                aria-hidden="true"
-                className="relative shrink-0"
-                style={{
-                    width: `${width}px`,
-                }}
-            >
-                <svg
-                    className="absolute inset-0 h-full w-full"
-                    viewBox={`0 0 ${width} 100`}
-                    preserveAspectRatio="none"
-                >
-                    {row.through.map(lane => (
-                        <line
-                            key={`through-${lane}`}
-                            data-lane={lane}
-                            x1={laneX(lane)}
-                            y1="0"
-                            x2={laneX(lane)}
-                            y2="100"
-                            strokeWidth="2"
-                            vectorEffect="non-scaling-stroke"
-                            style={{
-                                stroke: laneColour(lane),
-                            }}
-                        />
-                    ))}
-                    {row.joinsAbove ? (
-                        <line
-                            data-lane={row.lane}
-                            x1={commitX}
-                            y1="0"
-                            x2={commitX}
-                            y2="50"
-                            strokeWidth="2"
-                            vectorEffect="non-scaling-stroke"
-                            style={{
-                                stroke: laneColour(row.lane),
-                            }}
-                        />
-                    ) : undefined}
-                    {row.joinsBelow ? (
-                        <line
-                            data-lane={row.lane}
-                            x1={commitX}
-                            y1="50"
-                            x2={commitX}
-                            y2="100"
-                            strokeWidth="2"
-                            vectorEffect="non-scaling-stroke"
-                            style={{
-                                stroke: laneColour(row.lane),
-                            }}
-                        />
-                    ) : undefined}
-                    {row.endsHere.map(lane => (
-                        <path
-                            key={`ends-${lane}`}
-                            d={`M ${laneX(lane)} 0 C ${laneX(lane)} 35, ${commitX} 20, ${commitX} 50`}
-                            fill="none"
-                            strokeWidth="2"
-                            vectorEffect="non-scaling-stroke"
-                            style={{
-                                stroke: laneColour(lane),
-                            }}
-                        />
-                    ))}
-                    {row.startsHere.map(lane => (
-                        <path
-                            key={`starts-${lane}`}
-                            d={`M ${commitX} 50 C ${commitX} 80, ${laneX(lane)} 65, ${laneX(lane)} 100`}
-                            fill="none"
-                            strokeWidth="2"
-                            vectorEffect="non-scaling-stroke"
-                            style={{
-                                stroke: laneColour(lane),
-                            }}
-                        />
-                    ))}
-                </svg>
-                <div
-                    className="absolute"
-                    style={{
-                        left: `${commitX - 5}px`,
-                        top: "calc(50% - 5px)",
-                        width: "10px",
-                        height: "10px",
-                        borderRadius: "var(--radius-full)",
-                        background: laneColour(row.lane),
-                        boxShadow: "0 0 0 2px var(--color-panel)",
-                    }}
-                />
-            </div>
+            <GraphLanes shape={row} laneCount={laneCount} />
             <div
                 className="flex min-w-0 flex-1 items-center"
                 style={{

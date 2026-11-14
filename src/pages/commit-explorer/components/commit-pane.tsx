@@ -1,13 +1,14 @@
 //
 // The commit pane: the first column of the commit explorer, listing the commits newest first, one
-// row each with its title, refs, author, date and short hash.
+// row each with its lanes of the commit graph, title, refs, author, date and short hash.
 //
 
 import { useEffect, useRef, type ReactNode } from "react";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import { RefBadge, type RefKind } from "../../badges";
-import type { ICommit } from "../data";
+import { GraphLanes } from "../../commit-graph/components/graph-row";
+import { graphLaneCount, type ICommit } from "../data";
 import { Pane } from "./pane";
 import { scrollSelectionIntoView } from "../scroll";
 
@@ -83,7 +84,7 @@ export function CommitPane({ commits, selectedHash, openHash, isActive, onSelect
 
     return (
         <Pane label="Commits" width="680px" isActive={isActive}>
-            <List aria-label="Commits" sx={{ padding: "var(--space-1)" }}>
+            <List aria-label="Commits" sx={{ padding: "var(--space-2) 0" }}>
                 {commits.map(commit => {
                     const isOpen = commit.hash === openHash;
                     const isSelected = commit.hash === selectedHash;
@@ -98,9 +99,24 @@ export function CommitPane({ commits, selectedHash, openHash, isActive, onSelect
                             sx={{
                                 gap: "var(--space-3)",
                                 minHeight: "calc(var(--space-8) + var(--space-1))",
+                                paddingTop: 0,
+                                paddingBottom: 0,
+                                borderRadius: 0,
                                 boxShadow: isOpen ? "inset 2px 0 0 var(--color-accent)" : "none",
+                                //
+                                // The row's background, which the commit's dot rings itself in so it
+                                // stands clear of the lane lines on a plain, hovered or selected row.
+                                //
+                                "--row-background": "var(--color-panel)",
+                                "&:hover": {
+                                    "--row-background": "var(--color-hover)",
+                                },
+                                "&.Mui-selected, &.Mui-selected:hover": {
+                                    "--row-background": "var(--color-selected)",
+                                },
                             }}
                         >
+                            <GraphLanes shape={commit.graph} laneCount={graphLaneCount} ringColour="var(--row-background)" />
                             <span className="flex min-w-0 flex-1 items-center" style={{ gap: "var(--space-2)" }}>
                                 <span className="truncate" style={{ fontWeight: isOpen ? "var(--weight-bold)" : "var(--weight-normal)" }}>
                                     {commit.title}

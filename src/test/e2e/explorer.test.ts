@@ -644,6 +644,23 @@ test.describe("Commit explorer", () => {
         await expect(details).toHaveCount(0);
     });
 
+    test("the main lane runs unbroken from the newest commit to the first, with the feature branch beside it", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const commitPane = page.getByRole("application", { name: "Commit explorer" }).first().getByRole("region", { name: "Commits" });
+        const segments = commitPane.locator('line[data-lane="1"]');
+        const boxes = [];
+        for (let index = 0; index < (await segments.count()); index++) {
+            boxes.push((await segments.nth(index).boundingBox())!);
+        }
+        boxes.sort((a, b) => a.y - b.y);
+        expect(boxes.length).toBeGreaterThan(exampleCommits.length);
+        for (let index = 1; index < boxes.length; index++) {
+            expect(boxes[index].y).toBeLessThanOrEqual(boxes[index - 1].y + boxes[index - 1].height + 0.5);
+        }
+        await expect(commitPane.locator('line[data-lane="2"]')).toHaveCount(2);
+        await expect(commitPane.locator('svg[preserveAspectRatio="none"] path')).toHaveCount(2);
+    });
+
     test("every example file's added and deleted counts match its diff", () => {
         for (const commit of exampleCommits) {
             for (const file of commit.files) {

@@ -3,6 +3,8 @@
 // each commit changed and each file's diff, as Git would report them for a small Git client.
 //
 
+import type { ILaneShape } from "../commit-graph/components/graph-row";
+
 //
 // One file a commit changed.
 //
@@ -97,6 +99,32 @@ export interface ICommit {
     // The files the commit changed, in the order Git lists them.
     //
     files: IChangedFile[];
+
+    //
+    // The commit's row of the commit graph: its lane and the lanes around it.
+    //
+    graph: ILaneShape;
+}
+
+//
+// How many lanes the example history's graph is wide: main, and the feature branch beside it.
+//
+export const graphLaneCount = 2;
+
+//
+// Returns the graph row of a commit on lane 1, main, joined to the rows above and below unless
+// `options` says otherwise.
+//
+function onMain(options: Partial<ILaneShape> = {}): ILaneShape {
+    return {
+        lane: 1,
+        joinsAbove: true,
+        joinsBelow: true,
+        through: [],
+        endsHere: [],
+        startsHere: [],
+        ...options,
+    };
 }
 
 //
@@ -110,6 +138,7 @@ export const repoPath = "~/projects/graft";
 export const commits: ICommit[] = [
     {
         hash: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+        graph: onMain({ joinsAbove: false }),
         title: "Show the Git commands each page runs",
         description: "The help panel in the right sidebar lists the commands, newest first, each with a button that copies it.",
         refs: ["HEAD -> main", "origin/main"],
@@ -162,6 +191,7 @@ export const commits: ICommit[] = [
     },
     {
         hash: "e4f5a6b7c8d9e0f1a2b3c4d5e6f708192a3b4c5d",
+        graph: onMain(),
         title: "Move through the panes with the arrow keys",
         description: "Up and Down move the selection, Left and Right move between panes, Enter opens and Escape closes the rightmost pane, as in the column view of a file browser.",
         refs: [],
@@ -202,6 +232,7 @@ export const commits: ICommit[] = [
     },
     {
         hash: "c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        graph: onMain({ startsHere: [2] }),
         title: "Merge branch 'feature/file-pane'",
         description: "",
         refs: ["tag: v0.3.0"],
@@ -216,6 +247,7 @@ export const commits: ICommit[] = [
     },
     {
         hash: "b4a59687c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1",
+        graph: onMain({ lane: 2, through: [1] }),
         title: "Show a changed file's diff in the file pane",
         description: "Clicking a changed file opens its diff in a third column to the right of the commit.",
         refs: ["origin/feature/file-pane"],
@@ -278,6 +310,7 @@ export const commits: ICommit[] = [
     },
     {
         hash: "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
+        graph: onMain({ endsHere: [2] }),
         title: "Remove the old commit table",
         description: "The commit pane's list replaces it.",
         refs: [],
@@ -308,6 +341,7 @@ export const commits: ICommit[] = [
     },
     {
         hash: "8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b",
+        graph: onMain(),
         title: "Read the first page of commits with git log",
         description: "",
         refs: [],
@@ -338,6 +372,7 @@ export const commits: ICommit[] = [
     },
     {
         hash: "2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e",
+        graph: onMain({ joinsBelow: false }),
         title: "Initial commit",
         description: "",
         refs: ["tag: v0.1.0"],
