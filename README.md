@@ -90,3 +90,5 @@ Link the stylesheet and use the variables:
 ```
 
 Set `data-theme="dark"` on the `html` element for the dark theme.
+
+`graft.css` names the fonts Mona Sans and Monaspace Neon. A page loads them itself, for example from the `@fontsource/mona-sans` and `@fontsource/monaspace-neon` packages, as the explorer does in `src/main.tsx`.

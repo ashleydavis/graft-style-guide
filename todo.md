@@ -12,7 +12,7 @@ The work to flesh out the Graft style guide, in the order of `process.md`. Each 
 - [x] Accent colour.
 - [x] Status colours: success, warning, danger and info.
 - [x] Git colours: diff added, diff removed, conflict and the branch lane colours of the commit graph.
-- [ ] Fonts: the UI font and the monospace font for code, hashes and diffs.
+- [x] Fonts: the UI font and the monospace font for code, hashes and diffs.
 - [ ] Type scale, weights and line heights.
 - [ ] Spacing scale and how dense the UI is.
 - [ ] Corner radius.

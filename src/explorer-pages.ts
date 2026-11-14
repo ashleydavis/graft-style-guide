@@ -9,6 +9,7 @@ import { TextBoxPage } from "./pages/text-box";
 import { DialogPage } from "./pages/dialog";
 import { AboutPage } from "./pages/about";
 import { ChoicesPage } from "./pages/choices";
+import { FontsPage } from "./pages/fonts";
 
 //
 // One page in the explorer.
@@ -45,6 +46,12 @@ export const explorerPages: IExplorerPage[] = [
         title: "Overview",
         keywords: ["colour", "color", "palette", "type", "spacing", "radius", "shadow", "motion"],
         component: OverviewPage,
+    },
+    {
+        id: "fonts",
+        title: "Fonts",
+        keywords: ["type", "typography", "text", "mono", "monospace", "code", "mona", "monaspace"],
+        component: FontsPage,
     },
     {
         id: "choices",

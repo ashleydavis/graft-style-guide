@@ -76,7 +76,9 @@ Picks so far:
 - **Accent colour:** Violet.
 - **Status colours:** Classic, clear saturated colours that are easy to tell apart. This added an `info` colour for states such as fetching.
 - **Git colours:** Green and red for added and removed lines, amber for conflicts and a balanced set of six graph lane colours.
-- **Fonts:** you asked for fonts close to GitHub so Graft feels familiar, so the options became GitHub's own system font list, GitHub's open-source Mona Sans and Monaspace Neon, and Noto Sans, the font GitHub shows on Linux.
+- **Fonts:** Mona Sans for the interface and Monaspace Neon for code. You asked for fonts close to GitHub so Graft feels familiar, so the options were GitHub's own system font list, GitHub's open-source Mona Sans and Monaspace Neon, and Noto Sans, the font GitHub shows on Linux. The chosen fonts ship with the explorer as packages (`@fontsource/mona-sans` and `@fontsource/monaspace-neon`), so they look the same on every computer. A Fonts page in the explorer shows both in use, with every size and weight and the characters that are easy to mix up in hashes.
+
+With these picks made, the choices page is empty until the next set of choices is ready.
 
 The rest of the work, in order, is in `todo.md`.
 

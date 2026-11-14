@@ -284,6 +284,15 @@ test.describe("Fonts", () => {
         expect(await isFontLoaded(page, "Mona Sans")).toBe(true);
         expect(await isFontLoaded(page, "Monaspace Neon")).toBe(true);
     });
+
+    test("the fonts page shows each font in use", async ({ page }) => {
+        await page.goto("/page/fonts?components=light");
+        await expect(page.getByRole("heading", { level: 1, name: "Fonts" })).toBeVisible();
+        const uiSample = page.getByText("Fixed the merge base lookup").first();
+        const codeSample = page.getByText("a1b2c3d feature/style-guide src/lib/graph.ts").first();
+        expect(await computedStyle(uiSample, "font-family")).toContain("Mona Sans");
+        expect(await computedStyle(codeSample, "font-family")).toContain("Monaspace Neon");
+    });
 });
 
 //

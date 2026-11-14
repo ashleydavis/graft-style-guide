@@ -6,7 +6,7 @@
 import type { ReactNode } from "react";
 import { Section } from "../../components/section";
 import { Swatch } from "./components/swatch";
-import { TokenLabel } from "./components/token-label";
+import { TokenLabel } from "../../components/token-label";
 
 //
 // Renders one section per kind of token, each with the tokens and an example of their use.

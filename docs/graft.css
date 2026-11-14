@@ -5,7 +5,7 @@
  * dark value (under [data-theme="dark"]), so a page or a single panel switches theme by
  * setting data-theme.
  *
- * The greys, accent, status colours and Git colours are the developer's picks. The other
+ * The greys, accent, status colours, Git colours and fonts are the developer's picks. The other
  * values are starting values that the developer's picks replace.
  */
 
@@ -56,8 +56,8 @@
     --black-40: rgb(0 0 0 / 0.4);
     --black-60: rgb(0 0 0 / 0.6);
 
-    --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
-    --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+    --font-sans: "Mona Sans", system-ui, sans-serif;
+    --font-mono: "Monaspace Neon", ui-monospace, monospace;
 
     --text-xs: 11px;
     --text-sm: 12px;

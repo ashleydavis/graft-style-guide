@@ -3,7 +3,7 @@
 //
 
 import { useRef, type ReactNode } from "react";
-import { useCssVariable } from "../../../lib/use-css-variable";
+import { useCssVariable } from "../lib/use-css-variable";
 
 //
 // Renders the token `name` and its current value in monospace, so each example on the
