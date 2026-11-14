@@ -8,6 +8,7 @@ import { ButtonPage } from "./pages/button";
 import { TextBoxPage } from "./pages/text-box";
 import { DialogPage } from "./pages/dialog";
 import { AboutPage } from "./pages/about";
+import { ChoicesPage } from "./pages/choices";
 
 //
 // One page in the explorer.
@@ -44,6 +45,12 @@ export const explorerPages: IExplorerPage[] = [
         title: "Overview",
         keywords: ["colour", "color", "palette", "type", "spacing", "radius", "shadow", "motion"],
         component: OverviewPage,
+    },
+    {
+        id: "choices",
+        title: "Choices",
+        keywords: ["options", "pick", "decide", "grey", "accent", "status", "git", "fonts"],
+        component: ChoicesPage,
     },
     {
         id: "button",

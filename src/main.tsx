@@ -1,6 +1,6 @@
 //
-// Starts the style explorer: loads the explorer's styles, sets up MUI and renders the router.
-// index.html loads the tokens in graft.css.
+// Starts the style explorer: loads the fonts graft.css names and the explorer's styles, sets up
+// MUI and renders the router. index.html loads the tokens in graft.css.
 //
 
 import { StrictMode } from "react";
@@ -8,6 +8,11 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { StyledEngineProvider, ThemeProvider } from "@mui/material/styles";
 import GlobalStyles from "@mui/material/GlobalStyles";
+import "@fontsource/mona-sans/400.css";
+import "@fontsource/mona-sans/500.css";
+import "@fontsource/mona-sans/600.css";
+import "@fontsource/monaspace-neon/400.css";
+import "@fontsource/monaspace-neon/600.css";
 import "./main.css";
 import { graftTheme } from "./lib/mui-theme";
 import { STYLES_UPDATED_EVENT } from "./lib/use-css-variable";

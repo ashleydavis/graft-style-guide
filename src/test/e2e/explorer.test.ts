@@ -5,7 +5,8 @@
 // Playwright, then click, type and read computed styles the way a person would see them.
 //
 
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { choices } from "../../pages/choices/options";
 
 //
 // Returns the computed value of a CSS property on the element `locator` points at, so a test
@@ -233,3 +234,65 @@ test.describe("About", () => {
         await expect(page.getByRole("link", { name: "Code Capers" })).toHaveAttribute("href", "https://www.youtube.com/@CodeCapers");
     });
 });
+
+test.describe("Choices", () => {
+    test("every open choice shows each of its options in each theme panel", async ({ page }) => {
+        await page.goto("/page/choices");
+        const sections = page.locator("main section");
+        await expect(sections).toHaveCount(choices.length);
+        for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex++) {
+            for (const theme of ["light", "dark"]) {
+                const panel = sections.nth(choiceIndex).locator(`[data-theme="${theme}"]`);
+                await expect(panel.locator("[data-option]")).toHaveCount(choices[choiceIndex].options.length);
+            }
+        }
+    });
+
+    test("every option sets its own light or dark token values on its preview", async ({ page }) => {
+        await page.goto("/page/choices");
+        const sections = page.locator("main section");
+        for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex++) {
+            for (const option of choices[choiceIndex].options) {
+                for (const theme of ["light", "dark"] as const) {
+                    const card = sections.nth(choiceIndex).locator(`[data-theme="${theme}"] [data-option="${option.id}"]`);
+                    for (const [name, value] of Object.entries(option[theme])) {
+                        expect(await computedStyle(card, name)).toBe(value);
+                    }
+                }
+            }
+        }
+    });
+
+    test("the page says so when every choice is made", async ({ page }) => {
+        await page.goto("/page/choices");
+        if (choices.length === 0) {
+            await expect(page.getByText("Every choice is made.")).toBeVisible();
+        }
+        else {
+            await expect(page.getByText("Every choice is made.")).toHaveCount(0);
+        }
+    });
+});
+
+test.describe("Fonts", () => {
+    test("text and code use the chosen fonts and both fonts load", async ({ page }) => {
+        await page.goto("/page/overview");
+        await page.evaluate(() => document.fonts.ready);
+        expect(await computedStyle(page.locator("body"), "font-family")).toContain("Mona Sans");
+        const codeSample = page.getByText("a1b2c3d Fixed the merge base lookup").first();
+        expect(await computedStyle(codeSample, "font-family")).toContain("Monaspace Neon");
+        expect(await isFontLoaded(page, "Mona Sans")).toBe(true);
+        expect(await isFontLoaded(page, "Monaspace Neon")).toBe(true);
+    });
+});
+
+//
+// Returns whether the page has loaded a font face of `family`, so a test can tell a font that
+// downloaded from one the browser replaced with a fallback.
+//
+export async function isFontLoaded(page: Page, family: string): Promise<boolean> {
+    return page.evaluate(
+        name => Array.from(document.fonts).some(fontFace => fontFace.family.replace(/"/g, "") === name && fontFace.status === "loaded"),
+        family,
+    );
+}

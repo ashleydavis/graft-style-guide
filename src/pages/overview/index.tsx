@@ -22,10 +22,12 @@ export function OverviewPage(): ReactNode {
                     {[
                         ["--gray-0", "--gray-50", "--gray-100", "--gray-200", "--gray-300", "--gray-400"],
                         ["--gray-500", "--gray-600", "--gray-700", "--gray-800", "--gray-900", "--gray-950"],
-                        ["--teal-300", "--teal-400", "--teal-500", "--teal-600", "--teal-700"],
-                        ["--green-100", "--green-300", "--green-600", "--green-950"],
-                        ["--red-100", "--red-300", "--red-600", "--red-950"],
-                        ["--amber-300", "--amber-600"],
+                        ["--violet-300", "--violet-400", "--violet-500", "--violet-600", "--violet-700", "--violet-950"],
+                        ["--green-100", "--green-400", "--green-600", "--green-700", "--green-950"],
+                        ["--red-100", "--red-400", "--red-600", "--red-950", "--red-975"],
+                        ["--amber-400", "--amber-600", "--amber-700"],
+                        ["--blue-400", "--blue-600"],
+                        ["--cyan-400", "--cyan-600"],
                         ["--black-40", "--black-60"],
                     ].map(names => (
                         <div key={names[0]} className="flex flex-wrap gap-3">
@@ -58,8 +60,18 @@ export function OverviewPage(): ReactNode {
                         "--color-danger",
                         "--color-on-danger",
                         "--color-scrim",
+                        "--color-info",
                         "--color-diff-added",
                         "--color-diff-removed",
+                        "--color-diff-added-line",
+                        "--color-diff-removed-line",
+                        "--color-conflict",
+                        "--color-lane-1",
+                        "--color-lane-2",
+                        "--color-lane-3",
+                        "--color-lane-4",
+                        "--color-lane-5",
+                        "--color-lane-6",
                     ].map(name => (
                         <Swatch key={name} name={name} />
                     ))}

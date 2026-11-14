@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import { useSearch } from "@tanstack/react-router";
 import { modeThemes } from "../lib/explorer-mode";
+import { PanelThemeContext } from "../lib/panel-theme";
 
 //
 // Renders `children` once per theme of the component mode in the URL. Each panel sets data-theme, so the
@@ -53,7 +54,7 @@ export function ThemePanel({ theme, children }: { theme: string; children: React
             >
                 {theme}
             </div>
-            {children}
+            <PanelThemeContext.Provider value={theme}>{children}</PanelThemeContext.Provider>
         </div>
     );
 }

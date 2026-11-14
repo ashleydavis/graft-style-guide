@@ -8,10 +8,10 @@ The work to flesh out the Graft style guide, in the order of `process.md`. Each 
 
 ## Raw palette
 
-- [ ] Grey ramp: the neutral greys for backgrounds, panels, borders and text.
-- [ ] Accent colour.
-- [ ] Status colours: success, warning, danger and info.
-- [ ] Git colours: diff added, diff removed, conflict and the branch lane colours of the commit graph.
+- [x] Grey ramp: the neutral greys for backgrounds, panels, borders and text.
+- [x] Accent colour.
+- [x] Status colours: success, warning, danger and info.
+- [x] Git colours: diff added, diff removed, conflict and the branch lane colours of the commit graph.
 - [ ] Fonts: the UI font and the monospace font for code, hashes and diffs.
 - [ ] Type scale, weights and line heights.
 - [ ] Spacing scale and how dense the UI is.

@@ -1,0 +1,56 @@
+//
+// One candidate option for a choice: its letter, name and description above the Graft preview
+// drawn with the option's tokens.
+//
+
+import { useContext, type CSSProperties, type ReactNode } from "react";
+import { PanelThemeContext } from "../../../lib/panel-theme";
+import type { ITokenOption } from "../options";
+import { MiniGraft } from "./mini-graft";
+
+//
+// Renders the option. Its tokens are set on the card for the theme of the panel it sits in,
+// so everything inside the card uses the option's values and the rest of the page stays as
+// graft.css sets it.
+//
+export function OptionCard({ option }: { option: ITokenOption }): ReactNode {
+    const theme = useContext(PanelThemeContext);
+    const tokens = theme === "dark" ? option.dark : option.light;
+
+    return (
+        <div
+            data-option={option.id}
+            className="flex flex-col"
+            //
+            // React's style type lists only standard CSS properties, so the custom properties of
+            // the option need a cast to be set inline.
+            //
+            style={
+                {
+                    ...tokens,
+                    gap: "var(--space-2)",
+                    minWidth: 0,
+                } as CSSProperties
+            }
+        >
+            <div>
+                <span
+                    style={{
+                        fontWeight: "var(--weight-bold)",
+                    }}
+                >
+                    {option.id}. {option.name}
+                </span>
+                <div
+                    style={{
+                        color: "var(--color-text-muted)",
+                        fontSize: "var(--text-sm)",
+                    }}
+                >
+                    {option.description}
+                </div>
+            </div>
+            <MiniGraft />
+        </div>
+    );
+}

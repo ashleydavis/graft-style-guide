@@ -7,6 +7,7 @@ The visual style of Graft, the Git client: design tokens as CSS variables and th
 - `areas/`: rules for one area of the app, such as the diff view, that take priority over `style-guide.md` there.
 - `src/`: the style explorer, a web app that shows every token on an overview page and each component on its own page, in both themes.
 - [process.md](process.md): how the style guide is made.
+- [how-we-built-it.md](how-we-built-it.md): a plain account of how the style guide and explorer were built and how the styles are chosen.
 
 ## Running the style explorer
 
