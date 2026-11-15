@@ -72,3 +72,19 @@ html {
         animation: none;
     }
 }
+
+/*
+ * A hunk, a run of unchanged lines or a line that a click picks shows the hover wash under the
+ * pointer, laid over its own colours.
+ */
+.graft-hoverable {
+    position: relative;
+}
+
+.graft-hoverable:hover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--color-hover);
+    pointer-events: none;
+}

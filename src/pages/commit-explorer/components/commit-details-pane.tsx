@@ -216,6 +216,16 @@ export interface ICommitDetailsPaneProps {
     onToggleMaximise: () => void;
 
     //
+    // True while the pane is collapsed into a narrow strip at its left.
+    //
+    isCollapsed: boolean;
+
+    //
+    // Called by the collapse button and the strip's restore button.
+    //
+    onToggleCollapse: () => void;
+
+    //
     // Called by the close button.
     //
     onClose: () => void;
@@ -227,7 +237,7 @@ export interface ICommitDetailsPaneProps {
 // name and folder in two columns, or as a tree of folders, as the switch above them picks. The
 // selected file scrolls into view when the keys move the selection.
 //
-export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, fileView, onChangeFileView, onSelectFile, onClose }: ICommitDetailsPaneProps): ReactNode {
+export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, fileView, onChangeFileView, onSelectFile, onClose }: ICommitDetailsPaneProps): ReactNode {
     const selectedRef = useRef<HTMLLIElement>(null);
     const totalAdded = commit.files.reduce((total, file) => total + file.linesAdded, 0);
     const totalDeleted = commit.files.reduce((total, file) => total + file.linesDeleted, 0);
@@ -253,6 +263,9 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
             label="Commit details"
             isMaximised={isMaximised}
             onToggleMaximise={onToggleMaximise}
+            isCollapsed={isCollapsed}
+            onToggleCollapse={onToggleCollapse}
+            railTitle="Commit"
             width={`${width}px`}
             isActive={isActive}
             title={
@@ -396,6 +409,16 @@ export interface ICommitInfoPaneProps {
     onToggleMaximise: () => void;
 
     //
+    // True while the pane is collapsed into a narrow strip at its left.
+    //
+    isCollapsed: boolean;
+
+    //
+    // Called by the collapse button and the strip's restore button.
+    //
+    onToggleCollapse: () => void;
+
+    //
     // Called by the close button.
     //
     onClose: () => void;
@@ -408,10 +431,10 @@ export interface ICommitInfoPaneProps {
 // committer apart only when they differ from the author, its hash with a copy button and its
 // parents.
 //
-export function CommitInfoPane({ commit, isActive, isMaximised, onToggleMaximise, onClose }: ICommitInfoPaneProps): ReactNode {
+export function CommitInfoPane({ commit, isActive, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, onClose }: ICommitInfoPaneProps): ReactNode {
     const isSamePerson = commit.authorName === commit.committerName && commit.authorDate.getTime() === commit.committerDate.getTime();
     return (
-        <div style={{ flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
+        <div style={isCollapsed ? { flex: "none", height: "100%" } : { flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
         <Pane
             label="Full commit details"
             width="100%"
@@ -419,6 +442,9 @@ export function CommitInfoPane({ commit, isActive, isMaximised, onToggleMaximise
             isActive={isActive}
             isMaximised={isMaximised}
             onToggleMaximise={onToggleMaximise}
+            isCollapsed={isCollapsed}
+            onToggleCollapse={onToggleCollapse}
+            railTitle="Commit details"
             title="Commit details"
             onClose={onClose}
         >

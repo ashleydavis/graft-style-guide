@@ -11,6 +11,7 @@ import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { MaximiseButton } from "../../../components/maximise-button";
+import { CollapseButton, CollapsedRail, type CollapseSide } from "../../../components/collapse";
 
 //
 // What a pane shows.
@@ -74,6 +75,33 @@ export interface IPaneProps {
     onClose?: () => void;
 
     //
+    // True while the pane is collapsed into a narrow strip.
+    //
+    isCollapsed?: boolean;
+
+    //
+    // Called by the collapse button and the strip's restore button, absent for a pane that cannot
+    // collapse.
+    //
+    onToggleCollapse?: () => void;
+
+    //
+    // The side the pane collapses towards.
+    //
+    collapseSide?: CollapseSide;
+
+    //
+    // The title the collapsed strip writes down its length, the pane's label by default.
+    //
+    railTitle?: string;
+
+    //
+    // True for a pane in an area that stacks its panes on a narrow screen, whose collapsed strip
+    // lies across the area there.
+    //
+    isRailResponsive?: boolean;
+
+    //
     // The pane's content, which scrolls inside the pane when it is taller than the pane.
     //
     children: ReactNode;
@@ -81,13 +109,40 @@ export interface IPaneProps {
 
 //
 // Renders the pane: an outlined card whose border turns the accent colour and gains an accent
-// ring while the pane is active. A maximise button sits in the header, or beside the toolbar of a
-// pane with no header, and a maximised pane fills its explorer. The header sits on the panel colour above a divider, with the
+// ring while the pane is active. A collapse button and a maximise button sit in the header, or beside
+// the toolbar of a pane with no header; a maximised pane fills its explorer and a collapsed pane
+// shows as a narrow strip with its title and a restore button. The header sits on the panel colour above a divider, with the
 // title cut short when it is wider than the pane.
 //
-export function Pane({ label, width, shrinksTo, isActive, title, headerExtra, toolbar, isMaximised = false, fillsHeight = false, onToggleMaximise, onClose, children }: IPaneProps): ReactNode {
-    const maximiseButton = onToggleMaximise ? <MaximiseButton isMaximised={isMaximised} onClick={onToggleMaximise} /> : undefined;
+export function Pane({
+    label,
+    width,
+    shrinksTo,
+    isActive,
+    title,
+    headerExtra,
+    toolbar,
+    isMaximised = false,
+    fillsHeight = false,
+    onToggleMaximise,
+    onClose,
+    isCollapsed = false,
+    onToggleCollapse,
+    collapseSide = "left",
+    railTitle,
+    isRailResponsive = false,
+    children,
+}: IPaneProps): ReactNode {
     const id = useId();
+    if (isCollapsed && onToggleCollapse) {
+        return <CollapsedRail label={label} title={railTitle ?? label} side={collapseSide} isActive={isActive} onRestore={onToggleCollapse} isResponsive={isRailResponsive} />;
+    }
+    const maximiseButton = (
+        <>
+            {onToggleCollapse && !isMaximised ? <CollapseButton side={collapseSide} onClick={onToggleCollapse} /> : undefined}
+            {onToggleMaximise ? <MaximiseButton isMaximised={isMaximised} onClick={onToggleMaximise} /> : undefined}
+        </>
+    );
     return (
         <Paper
             component="section"

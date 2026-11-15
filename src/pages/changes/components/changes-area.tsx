@@ -14,13 +14,12 @@ import InputAdornment from "@mui/material/InputAdornment";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
-import ListSubheader from "@mui/material/ListSubheader";
 import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faFileLines, faLayerGroup, faMagnifyingGlass, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faChevronDown, faChevronUp, faDownLeftAndUpRightToCenter, faFileLines, faLayerGroup, faMagnifyingGlass, faUpRightAndDownLeftFromCenter, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { KeyCaps } from "../../../components/shortcut";
 import { Tip } from "../../../components/tip";
@@ -31,6 +30,7 @@ import { noDiscards, withFileDiscarded, withHunkMarked, type IDiscards } from ".
 import { parseHunks, sectionDiff, type ISectionDiff } from "../../diff/model";
 import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
 import { withViewTransition } from "../../../lib/view-transition";
+import { COLLAPSE_KEY } from "../../../components/collapse";
 
 //
 // The message of the last commit, which ticking "Amend the last commit" brings into an empty
@@ -46,10 +46,13 @@ const lastCommit = {
 //
 const keyHints = [
     { keys: ["↑", "↓"], action: "File to file, or change to change in the diff" },
-    { keys: ["←", "→"], action: "Files or diff" },
+    { keys: ["←", "→"], action: "Files, diff or commit" },
+    { keys: ["Enter"], action: "Write the commit message" },
+    { keys: ["Esc"], action: "Leave the message" },
     { keys: ["Space"], action: "Stage or unstage" },
     { keys: ["Shift", "↑", "↓"], action: "File to file from the diff" },
     { keys: ["M"], action: "Maximise or restore" },
+    { keys: [COLLAPSE_KEY], action: "Collapse or restore the files or the commit pane" },
 ];
 
 //
@@ -255,6 +258,28 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [committed, setCommitted] = useState<string | undefined>(undefined);
     const [diffMode, setDiffMode] = useState<"one" | "split">("one");
     const [maximised, setMaximised] = useState<0 | 1 | 2 | undefined>(undefined);
+    const [collapsed, setCollapsed] = useState<ReadonlySet<0 | 2>>(new Set());
+    const [panelCollapsed, setPanelCollapsed] = useState<ReadonlySet<"staged" | "unstaged">>(new Set());
+    const [panelMaximised, setPanelMaximised] = useState<"staged" | "unstaged" | undefined>(undefined);
+
+    //
+    // Folds the Staged or the Unstaged panel of the file list down to its heading, so the other
+    // panel takes the room, or opens it again.
+    //
+    function togglePanelCollapse(panel: "staged" | "unstaged"): void {
+        withViewTransition(() =>
+            setPanelCollapsed(current => {
+                const next = new Set(current);
+                if (next.has(panel)) {
+                    next.delete(panel);
+                }
+                else {
+                    next.add(panel);
+                }
+                return next;
+            }),
+        );
+    }
     const [fileSearch, setFileSearch] = useState("");
     const [discardsByPath, setDiscardsByPath] = useState<ReadonlyMap<string, IDiscards>>(new Map());
     const discardsOf = (path: string): IDiscards => discardsByPath.get(path) ?? noDiscards();
@@ -263,6 +288,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         setDiscardsByPath(current => new Map(current).set(path, discards));
     }
     const areaRef = useRef<HTMLDivElement>(null);
+    const summaryRef = useRef<HTMLInputElement>(null);
     const shownFiles = files.filter(file => `${file.oldPath ?? ""} ${file.path}`.toLowerCase().includes(fileSearch.trim().toLowerCase()));
     const selectedFile = files.find(file => file.path === selectedPath);
     const hunkCountOf = (file: IFileDiff): number => parseHunks(file.diff ?? "").length;
@@ -283,13 +309,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     // file under Staged and each unstaged file under Unstaged, so a file staged in part shows in
     // both.
     //
-    const entries: IListEntry[] =
-        diffMode === "one"
-            ? shownFiles.map(file => ({ file, section: "all" }))
-            : [
-                  ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
-                  ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "all").map(file => ({ file, section: "unstaged" as const })),
-              ];
+    const entries: IListEntry[] = [
+        ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
+        ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "all").map(file => ({ file, section: "unstaged" as const })),
+    ];
     const selectedEntry = entries.find(entry => entry.file.path === selectedPath && entry.section === selectedSection) ?? entries.find(entry => entry.file.path === selectedPath);
 
     function selectFile(path: string, section: ListSection, pane: 0 | 1): void {
@@ -348,6 +371,32 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
 
     function moveHunk(step: number): void {
         setCurrentStop(stopAfterMove(stopOrder(), currentStop, step));
+    }
+
+    //
+    // Collapses the files pane or the commit pane into a strip at its side, or restores it. A pane
+    // stays as it is while one pane is maximised.
+    //
+    function toggleCollapse(pane: 0 | 2): void {
+        if (maximised !== undefined) {
+            return;
+        }
+        //
+        // The pane's rows go as it collapses, so the keys move to the area to keep working.
+        //
+        areaRef.current?.focus();
+        withViewTransition(() =>
+            setCollapsed(current => {
+                const next = new Set(current);
+                if (next.has(pane)) {
+                    next.delete(pane);
+                }
+                else {
+                    next.add(pane);
+                }
+                return next;
+            }),
+        );
     }
 
     function toggleMaximise(pane: 0 | 1 | 2): void {
@@ -419,6 +468,11 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             toggleMaximise(activePane);
             return;
         }
+        if (key.toUpperCase() === COLLAPSE_KEY && activePane !== 1) {
+            event.preventDefault();
+            toggleCollapse(activePane);
+            return;
+        }
         if (DISCARD_KEYS.includes(key) && activePane !== 2) {
             event.preventDefault();
             discardCurrent();
@@ -439,7 +493,18 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 return;
             }
         }
-        if (activePane === 2 || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Escape", " "].includes(key)) {
+        if (activePane === 2) {
+            if (key === "ArrowLeft") {
+                event.preventDefault();
+                setActivePane(1);
+            }
+            else if (key === "Enter") {
+                event.preventDefault();
+                summaryRef.current?.focus();
+            }
+            return;
+        }
+        if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Escape", " "].includes(key)) {
             return;
         }
         event.preventDefault();
@@ -473,6 +538,70 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         else if (key === "ArrowLeft" || key === "Escape") {
             setActivePane(0);
         }
+        else if (key === "ArrowRight") {
+            moveToCommit();
+        }
+    }
+
+    //
+    // Makes the Commit pane the active pane and puts the keys in the summary, ready to type.
+    //
+    function moveToCommit(): void {
+        setActivePane(2);
+        summaryRef.current?.focus();
+    }
+
+    //
+    // Takes the keys out of a text box of the Commit pane on Escape, back to the area with the
+    // Commit pane active, so the arrow keys move between the panes again.
+    //
+    function onMessageKey(event: KeyboardEvent): void {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            setActivePane(2);
+            areaRef.current?.focus();
+        }
+    }
+
+    //
+    // Renders one file's row in the Staged or the Unstaged panel: its path, its path menu, then
+    // Discard, or Undo once it is discarded, and the button that stages or unstages it.
+    //
+    function fileRow(entry: IListEntry): ReactNode {
+        const { file, section } = entry;
+        const isChecked = section === "staged";
+        return (
+            <ListItemButton
+                key={`${section}:${file.path}`}
+                className={discardsOf(file.path).isFile ? "graft-discarded" : undefined}
+                data-discarded={discardsOf(file.path).isFile || undefined}
+                component="li"
+                aria-label={file.path}
+                selected={entry === selectedEntry}
+                onClick={() => selectFile(file.path, section, 0)}
+                sx={{
+                    gap: "var(--space-2)",
+                    fontSize: "var(--text-sm)",
+                    paddingRight: "var(--space-2)",
+                    "& .file-path-menu": { opacity: 0 },
+                    "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
+                }}
+            >
+                <span className="min-w-0 flex-1">
+                    <FilePath path={file.path} />
+                </span>
+                <FilePathMenu path={file.path} />
+                <span data-floating-actions className="flex flex-none items-center" style={{ gap: "var(--space-2)" }}>
+                    {discardsOf(file.path).isFile ? (
+                        <UndoButton what="file" onClick={() => setDiscards(file.path, noDiscards())} />
+                    ) : (
+                        <DiscardButton what="file" onClick={() => setDiscards(file.path, withFileDiscarded(discardsOf(file.path), true))} />
+                    )}
+                    {discardsOf(file.path).isFile ? undefined : <StageButton isStaged={isChecked} what="file" onClick={() => toggleEntry(entry)} />}
+                </span>
+            </ListItemButton>
+        );
     }
 
     return (
@@ -492,12 +621,28 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             }}
         >
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row" style={{ gap: "var(--space-3)", padding: "var(--space-3)" }}>
-                <div className={maximised === 1 || maximised === 2 ? "hidden" : maximised === 0 ? "flex min-h-0 flex-1 flex-col" : "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[280px] lg:flex-none 2xl:w-[360px]"} style={{ gap: "var(--space-3)" }}>
+                <div
+                    className={
+                        maximised === 1 || maximised === 2
+                            ? "hidden"
+                            : maximised === 0
+                              ? "flex min-h-0 flex-1 flex-col"
+                              : collapsed.has(0)
+                                ? "flex flex-none flex-col lg:min-h-0"
+                                : "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[280px] lg:flex-none 2xl:w-[360px]"
+                    }
+                    style={{ gap: "var(--space-3)" }}
+                >
                     <div className="flex min-h-0 flex-1 flex-col" style={{ maxHeight: "100%" }} onPointerDown={() => setActivePane(0)}>
                         <Pane
                             label="Changed files"
                             width="100%"
                             fillsHeight
+                            isCollapsed={collapsed.has(0)}
+                            onToggleCollapse={() => toggleCollapse(0)}
+                            collapseSide="left"
+                            railTitle="Changes"
+                            isRailResponsive
                             isActive={activePane === 0}
                             isMaximised={maximised === 0}
                             onToggleMaximise={() => toggleMaximise(0)}
@@ -574,55 +719,86 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     No changes. The working tree matches the last commit.
                                 </p>
                             ) : (
-                                <List aria-label="Changed files" sx={{ padding: "var(--space-1)" }}>
+                                <div className="flex h-full flex-col" style={{ gap: "var(--space-2)", padding: "var(--space-2)" }}>
                                     {shownFiles.length === 0 ? (
-                                        <li style={{ padding: "var(--space-4) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", textAlign: "center" }}>
-                                            No changed file matches the search.
-                                        </li>
-                                    ) : undefined}
-                                    {entries.map((entry, index) => {
-                                        const { file, section } = entry;
-                                        const state = stagedState(stagingOf(file), hunkCountOf(file));
-                                        const heading = section !== "all" && entries[index - 1]?.section !== section;
-                                        const isChecked = section === "staged" ? true : section === "unstaged" ? false : state === "all";
-                                        return [
-                                            heading ? (
-                                                <ListSubheader key={`${section}-heading`} component="li">
-                                                    {section === "staged" ? "Staged" : "Unstaged"} ({entries.filter(other => other.section === section).length})
-                                                </ListSubheader>
-                                            ) : undefined,
-                                            <ListItemButton
-                                                key={`${section}:${file.path}`}
-                                                className={discardsOf(file.path).isFile ? "graft-discarded" : undefined}
-                                                data-discarded={discardsOf(file.path).isFile || undefined}
-                                                component="li"
-                                                aria-label={section === "all" ? file.path : `${section === "staged" ? "Staged" : "Unstaged"} ${file.path}`}
-                                                selected={entry === selectedEntry}
-                                                onClick={() => selectFile(file.path, section, 0)}
-                                                sx={{
-                                                    gap: "var(--space-2)",
-                                                    fontSize: "var(--text-sm)",
-                                                    paddingRight: "var(--space-2)",
-                                                    "& .file-path-menu": { opacity: 0 },
-                                                    "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
-                                                }}
-                                            >
-                                                <span className="min-w-0 flex-1">
-                                                    <FilePath path={file.path} />
-                                                </span>
-                                                <FilePathMenu path={file.path} />
-                                                <span data-floating-actions className="flex flex-none items-center" style={{ gap: "var(--space-2)" }}>
-                                                    {discardsOf(file.path).isFile ? (
-                                                        <UndoButton what="file" onClick={() => setDiscards(file.path, noDiscards())} />
-                                                    ) : (
-                                                        <DiscardButton what="file" onClick={() => setDiscards(file.path, withFileDiscarded(discardsOf(file.path), true))} />
-                                                    )}
-                                                    {discardsOf(file.path).isFile ? undefined : <StageButton isStaged={isChecked} what="file" onClick={() => toggleEntry(entry)} />}
-                                                </span>
-                                            </ListItemButton>,
-                                        ];
-                                    })}
-                                </List>
+                                        <p style={{ padding: "var(--space-4) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", textAlign: "center" }}>No changed file matches the search.</p>
+                                    ) : (
+                                        (["staged", "unstaged"] as const).map(section => {
+                                            const sectionEntries = entries.filter(entry => entry.section === section);
+                                            const title = section === "staged" ? "Staged" : "Unstaged";
+                                            const isPanelCollapsed = panelCollapsed.has(section) && panelMaximised !== section;
+                                            if (panelMaximised !== undefined && panelMaximised !== section) {
+                                                return undefined;
+                                            }
+                                            return (
+                                                <section
+                                                    key={section}
+                                                    aria-label={`${title} files`}
+                                                    data-collapsed={isPanelCollapsed || undefined}
+                                                    data-maximised={panelMaximised === section || undefined}
+                                                    className={isPanelCollapsed ? "flex flex-none flex-col" : "flex min-h-[120px] flex-1 flex-col"}
+                                                    style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}
+                                                >
+                                                    <div
+                                                        className="flex flex-none items-center"
+                                                        style={{
+                                                            gap: "var(--space-2)",
+                                                            padding: "var(--space-1) var(--space-1) var(--space-1) var(--space-3)",
+                                                            background: "var(--color-raised)",
+                                                            borderBottom: isPanelCollapsed ? "none" : "1px solid var(--color-border)",
+                                                        }}
+                                                    >
+                                                        <h3
+                                                            className="min-w-0 flex-1 truncate"
+                                                            style={{
+                                                                fontSize: "var(--text-xs)",
+                                                                fontWeight: "var(--weight-bold)",
+                                                                textTransform: "uppercase",
+                                                                letterSpacing: "0.05em",
+                                                                color: "var(--color-text-muted)",
+                                                            }}
+                                                        >
+                                                            {title} ({sectionEntries.length})
+                                                        </h3>
+                                                        {panelMaximised === section ? undefined : (
+                                                            <Tooltip title={isPanelCollapsed ? `Restore the ${title.toLowerCase()} files` : `Collapse the ${title.toLowerCase()} files`}>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    aria-label={isPanelCollapsed ? `Restore the ${title.toLowerCase()} files` : `Collapse the ${title.toLowerCase()} files`}
+                                                                    aria-expanded={!isPanelCollapsed}
+                                                                    onClick={() => togglePanelCollapse(section)}
+                                                                >
+                                                                    <FontAwesomeIcon icon={isPanelCollapsed ? faChevronDown : faChevronUp} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+                                                        <Tooltip title={panelMaximised === section ? `Restore the ${title.toLowerCase()} files` : `Maximise the ${title.toLowerCase()} files`}>
+                                                            <IconButton
+                                                                size="small"
+                                                                aria-label={panelMaximised === section ? `Put the ${title.toLowerCase()} files back` : `Maximise the ${title.toLowerCase()} files`}
+                                                                aria-pressed={panelMaximised === section}
+                                                                onClick={() => withViewTransition(() => setPanelMaximised(panelMaximised === section ? undefined : section))}
+                                                            >
+                                                                <FontAwesomeIcon icon={panelMaximised === section ? faDownLeftAndUpRightToCenter : faUpRightAndDownLeftFromCenter} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </div>
+                                                    <div data-pane-scroll className={isPanelCollapsed ? "hidden" : "min-h-0 flex-1 overflow-auto"}>
+                                                        {sectionEntries.length === 0 ? (
+                                                            <p style={{ padding: "var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", textAlign: "center" }}>
+                                                                {section === "staged" ? "Nothing staged yet." : "Everything is staged."}
+                                                            </p>
+                                                        ) : (
+                                                            <List aria-label={`${title} files`} sx={{ padding: "var(--space-1)" }}>
+                                                                {sectionEntries.map(entry => fileRow(entry))}
+                                                            </List>
+                                                        )}
+                                                    </div>
+                                                </section>
+                                            );
+                                        })
+                                    )}
+                                </div>
                             )}
                         </Pane>
                     </div>
@@ -689,10 +865,30 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 </div>
 
                 <div
-                    className={maximised === 2 ? "flex min-h-0 flex-1 flex-col" : maximised === undefined ? "flex min-h-0 flex-none flex-col lg:w-[240px] 2xl:w-[300px]" : "hidden"}
+                    className={
+                        maximised === 2
+                            ? "flex min-h-0 flex-1 flex-col"
+                            : maximised !== undefined
+                              ? "hidden"
+                              : collapsed.has(2)
+                                ? "flex flex-none flex-col lg:min-h-0"
+                                : "flex min-h-0 flex-none flex-col lg:w-[240px] 2xl:w-[300px]"
+                    }
                     onPointerDown={() => setActivePane(2)}
                 >
-                <Pane label="Commit" title="Commit" width="100%" fillsHeight isActive={activePane === 2} isMaximised={maximised === 2} onToggleMaximise={() => toggleMaximise(2)}>
+                <Pane
+                    label="Commit"
+                    title="Commit"
+                    width="100%"
+                    fillsHeight
+                    isActive={activePane === 2}
+                    isMaximised={maximised === 2}
+                    onToggleMaximise={() => toggleMaximise(2)}
+                    isCollapsed={collapsed.has(2)}
+                    onToggleCollapse={() => toggleCollapse(2)}
+                    collapseSide="right"
+                    isRailResponsive
+                >
                 <div className="flex h-full flex-col" style={{ gap: "var(--space-4)", padding: "var(--space-4) var(--space-3) var(--space-3)" }}>
                     {committed ? (
                         <Alert severity="success" onClose={() => setCommitted(undefined)}>
@@ -704,6 +900,9 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         fullWidth
                         label="Summary"
                         value={summary}
+                        inputRef={summaryRef}
+                        onKeyDown={onMessageKey}
+                        onFocus={() => setActivePane(2)}
                         onChange={event => setSummary(event.target.value)}
                     />
                     <TextField
@@ -713,6 +912,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         minRows={2}
                         label="Description"
                         value={description}
+                        onKeyDown={onMessageKey}
+                        onFocus={() => setActivePane(2)}
                         onChange={event => setDescription(event.target.value)}
                         //
                         // The description takes the height the commit box has left over, so a long

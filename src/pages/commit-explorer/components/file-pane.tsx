@@ -8,6 +8,7 @@ import type { ReactNode, Ref } from "react";
 import { exampleOldFile } from "../../diff/example-old-file";
 import { FileDiffCard, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import type { IChangedFile } from "../data";
+import { CollapsedRail } from "../../../components/collapse";
 
 //
 // What the file pane shows and reports.
@@ -37,6 +38,16 @@ export interface IFilePaneProps {
     // Called by the pane's maximise button.
     //
     onToggleMaximise: () => void;
+
+    //
+    // True while the pane is collapsed into a narrow strip at its left.
+    //
+    isCollapsed: boolean;
+
+    //
+    // Called by the collapse button and the strip's restore button.
+    //
+    onToggleCollapse: () => void;
 
     //
     // Called with a hunk's position when it is clicked.
@@ -70,7 +81,10 @@ export interface IFilePaneProps {
 // the diff uses the room there is and scrolls sideways only when wrapping is switched off. A
 // commit is history, already made, so the card has no Stage or Unstage buttons.
 //
-export function FilePane({ file, isActive, currentHunk, currentGap, cardRef, isMaximised, onToggleMaximise, onSelectHunk, onSelectGap, onClose }: IFilePaneProps): ReactNode {
+export function FilePane({ file, isActive, currentHunk, currentGap, cardRef, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, onSelectHunk, onSelectGap, onClose }: IFilePaneProps): ReactNode {
+    if (isCollapsed) {
+        return <CollapsedRail label="File diff" title={file.path.slice(file.path.lastIndexOf("/") + 1)} side="left" isActive={isActive} onRestore={onToggleCollapse} />;
+    }
     return (
         <div style={{ flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
             <FileDiffCard
@@ -88,6 +102,7 @@ export function FilePane({ file, isActive, currentHunk, currentGap, cardRef, isM
                 fillHeight
                 isMaximised={isMaximised}
                 onToggleMaximise={onToggleMaximise}
+                onCollapse={onToggleCollapse}
                 onClose={onClose}
             />
         </div>

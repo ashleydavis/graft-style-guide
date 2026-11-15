@@ -165,12 +165,13 @@ for (const orientation of orientations) {
             await expect(page).toHaveURL(/sidebar=minimised/);
         });
 
-        test("the settings at the bottom of the drawer can be reached and changed", async ({ page }) => {
-            await page.goto("/page/button?sidebar=open");
-            const explorerSwitch = page.getByRole("group", { name: "Explorer" });
+        test("the Configuration dropdown can be reached and changed", async ({ page }) => {
+            await page.goto("/page/button");
+            await page.getByRole("button", { name: "Configuration" }).tap();
+            const explorerSwitch = page.getByRole("dialog", { name: "Configuration" }).getByRole("group", { name: "Explorer" });
             await explorerSwitch.getByRole("button", { name: "Dark", exact: true }).tap();
             await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-            await page.getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).tap();
+            await page.getByRole("dialog", { name: "Configuration" }).getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).tap();
             await expect(page).toHaveURL(/components=light/);
             await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
         });

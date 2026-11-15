@@ -1,6 +1,7 @@
 //
-// The explorer's frame: a sidebar to search for and choose a page, the component mode and
-// explorer theme switches and the chosen page beside them.
+// The explorer's frame: a sidebar to search for and choose a page, and the chosen page beside it,
+// with Configuration, holding the component mode and explorer theme switches, and About at the
+// page's top right.
 //
 
 import { useEffect, useState, type ReactNode } from "react";
@@ -10,11 +11,12 @@ import { Link, Outlet, useNavigate, useParams, useSearch } from "@tanstack/react
 import TextField from "@mui/material/TextField";
 import InputAdornment from "@mui/material/InputAdornment";
 import IconButton from "@mui/material/IconButton";
+import Popover from "@mui/material/Popover";
 import Tooltip from "@mui/material/Tooltip";
 import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAnglesLeft, faAnglesRight, faBars, faCircleInfo, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faAnglesLeft, faAnglesRight, faBars, faCircleInfo, faGear, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import { explorerPages, type IExplorerPage } from "../explorer-pages";
 import { readExplorerSearch } from "../lib/explorer-mode";
 
@@ -35,6 +37,7 @@ const NARROW_SCREEN = "(max-width: 1023.98px)";
 export function ExplorerLayout(): ReactNode {
     const [search, setSearch] = useState("");
     const [aboutOpen, setAboutOpen] = useState(false);
+    const [configurationAnchor, setConfigurationAnchor] = useState<HTMLElement | undefined>(undefined);
     const navigate = useNavigate();
     const { pageId } = useParams({
         strict: false,
@@ -127,12 +130,72 @@ export function ExplorerLayout(): ReactNode {
         changeSetting("sidebar", value).catch(error => console.error("Could not change the sidebar.", error));
     }
 
+    //
+    // The buttons at the page's top right: Configuration, which opens a dropdown with the light and
+    // dark settings, and About.
+    //
     const aboutButton = (
-        <Tooltip title="About this style guide" placement="left">
-            <IconButton onClick={() => setAboutOpen(true)} aria-label="About" className="fixed top-2 right-2 z-10">
-                <FontAwesomeIcon icon={faCircleInfo} />
-            </IconButton>
-        </Tooltip>
+        <div className="fixed top-2 right-2 z-10 flex items-center gap-2">
+            <Tooltip title="Configuration" placement="bottom">
+                <IconButton onClick={event => setConfigurationAnchor(event.currentTarget)} aria-label="Configuration" aria-haspopup="dialog" aria-expanded={configurationAnchor !== undefined}>
+                    <FontAwesomeIcon icon={faGear} />
+                </IconButton>
+            </Tooltip>
+            <Tooltip title="About this style guide" placement="left">
+                <IconButton onClick={() => setAboutOpen(true)} aria-label="About">
+                    <FontAwesomeIcon icon={faCircleInfo} />
+                </IconButton>
+            </Tooltip>
+            <Popover
+                open={configurationAnchor !== undefined}
+                anchorEl={configurationAnchor}
+                onClose={() => setConfigurationAnchor(undefined)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                slotProps={{ paper: { role: "dialog", "aria-label": "Configuration" } }}
+            >
+            <div className="flex flex-col gap-4" style={{ padding: "var(--space-4)", width: "min(calc(var(--space-8) * 10), calc(100vw - var(--space-8)))" }}>
+                <SettingSwitch
+                    label="Components"
+                    value={componentMode}
+                    options={[
+                        {
+                            value: "light",
+                            label: "Light",
+                        },
+                        {
+                            value: "dark",
+                            label: "Dark",
+                        },
+                        {
+                            value: "both",
+                            label: "Dark next to light",
+                        },
+                    ]}
+                    onChange={value => {
+                        changeSetting("components", value).catch(error => console.error("Could not change the component mode.", error));
+                    }}
+                />
+                <SettingSwitch
+                    label="Explorer"
+                    value={explorerTheme}
+                    options={[
+                        {
+                            value: "light",
+                            label: "Light",
+                        },
+                        {
+                            value: "dark",
+                            label: "Dark",
+                        },
+                    ]}
+                    onChange={value => {
+                        changeSetting("explorer", value).catch(error => console.error("Could not change the explorer theme.", error));
+                    }}
+                />
+            </div>
+            </Popover>
+        </div>
     );
     const aboutDialog = <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />;
 
@@ -193,46 +256,6 @@ export function ExplorerLayout(): ReactNode {
                     No components match.
                 </div>
             ) : undefined}
-            <div className="mt-auto flex flex-col gap-4">
-                <SettingSwitch
-                    label="Components"
-                    value={componentMode}
-                    options={[
-                        {
-                            value: "light",
-                            label: "Light",
-                        },
-                        {
-                            value: "dark",
-                            label: "Dark",
-                        },
-                        {
-                            value: "both",
-                            label: "Dark next to light",
-                        },
-                    ]}
-                    onChange={value => {
-                        changeSetting("components", value).catch(error => console.error("Could not change the component mode.", error));
-                    }}
-                />
-                <SettingSwitch
-                    label="Explorer"
-                    value={explorerTheme}
-                    options={[
-                        {
-                            value: "light",
-                            label: "Light",
-                        },
-                        {
-                            value: "dark",
-                            label: "Dark",
-                        },
-                    ]}
-                    onChange={value => {
-                        changeSetting("explorer", value).catch(error => console.error("Could not change the explorer theme.", error));
-                    }}
-                />
-            </div>
         </>
     );
 

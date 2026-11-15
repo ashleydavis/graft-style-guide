@@ -22,6 +22,7 @@ import { FilePathMenu } from "../../../components/file-path-menu";
 import { MaximiseButton } from "../../../components/maximise-button";
 import { Tip } from "../../../components/tip";
 import { KeyCaps } from "../../../components/shortcut";
+import { CollapseButton } from "../../../components/collapse";
 import { FilePath } from "../../commit-explorer/components/file-path";
 import { statusColour } from "../../tree";
 import { gapBefore, parseHunks, sectionDiff } from "../model";
@@ -592,6 +593,12 @@ export interface IFileDiffCardProps {
     onToggleMaximise?: () => void;
 
     //
+    // Called by a collapse button before the maximise button, for a card in an explorer whose
+    // panes collapse to the left. Absent for a card with none.
+    //
+    onCollapse?: () => void;
+
+    //
     // What is staged of the file, for a card whose staging an explorer around it keeps. Absent for
     // a card that keeps its own, starting from the file's staged hunks.
     //
@@ -672,6 +679,7 @@ export function FileDiffCard({
     onClose,
     isMaximised = false,
     onToggleMaximise,
+    onCollapse,
     section,
     discards,
     onDiscardsChange,
@@ -1173,6 +1181,7 @@ export function FileDiffCard({
                     )
                 ) : undefined}
                 {stageable && discards?.isFile !== true ? <StageButton isStaged={section === undefined ? fileStaged : section === "staged"} what="file" onClick={toggleFile} /> : undefined}
+                {onCollapse && !isMaximised ? <CollapseButton side="left" onClick={onCollapse} /> : undefined}
                 {onToggleMaximise ? <MaximiseButton isMaximised={isMaximised} onClick={onToggleMaximise} /> : undefined}
                 {onClose ? (
                     <Tooltip title="Close">

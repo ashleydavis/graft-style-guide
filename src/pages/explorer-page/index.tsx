@@ -27,6 +27,11 @@ export function ExplorerPage(): ReactNode {
                 style={{
                     fontSize: "var(--text-2xl)",
                     fontWeight: "var(--weight-bold)",
+                    //
+                    // Room on the right for the Configuration and About buttons at the page's top
+                    // right.
+                    //
+                    paddingRight: "calc(var(--space-8) * 3)",
                 }}
             >
                 {page.title}

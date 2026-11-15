@@ -121,6 +121,16 @@ export interface ICommitPaneProps {
     onToggleMaximise: () => void;
 
     //
+    // True while the pane is collapsed into a narrow strip at its left.
+    //
+    isCollapsed: boolean;
+
+    //
+    // Called by the collapse button and the strip's restore button.
+    //
+    onToggleCollapse: () => void;
+
+    //
     // Called with the hash of the commit the person clicks.
     //
     onSelectCommit: (hash: string) => void;
@@ -132,7 +142,7 @@ export interface ICommitPaneProps {
 // commit's details show both. The selected row scrolls into view when the keys move the selection past the
 // top or bottom of the pane.
 //
-export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMaximise, matchingHashes, search, matchCount, totalCount, onSearch, selectedHash, openHash, isActive, onSelectCommit }: ICommitPaneProps): ReactNode {
+export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, matchingHashes, search, matchCount, totalCount, onSearch, selectedHash, openHash, isActive, onSelectCommit }: ICommitPaneProps): ReactNode {
     const isSearching = search.trim() !== "";
     const selectedRef = useRef<HTMLLIElement>(null);
 
@@ -145,6 +155,9 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
             label="Commits"
             isMaximised={isMaximised}
             onToggleMaximise={onToggleMaximise}
+            isCollapsed={isCollapsed}
+            onToggleCollapse={onToggleCollapse}
+            railTitle="Commits"
             width={width === undefined ? "680px" : `${width}px`}
             shrinksTo={width === undefined ? "320px" : undefined}
             isActive={isActive}

@@ -21,6 +21,17 @@ export async function computedStyle(locator: Locator, property: string): Promise
     );
 }
 
+//
+// Opens the Configuration dropdown at the page's top right, once, and returns it.
+//
+async function openConfiguration(page: Page): Promise<Locator> {
+    const dialog = page.getByRole("dialog", { name: "Configuration" });
+    if ((await dialog.count()) === 0) {
+        await page.getByRole("button", { name: "Configuration" }).click();
+    }
+    return dialog;
+}
+
 test.describe("Opening pages", () => {
     test("the bare URL opens the overview", async ({ page }) => {
         await page.goto("/");
@@ -149,8 +160,8 @@ test.describe("Themes", () => {
 test.describe("Component mode and explorer theme", () => {
     test("a URL naming neither shows dark next to light in a light explorer", async ({ page }) => {
         await page.goto("/page/button");
-        const componentSwitch = page.getByRole("group", { name: "Components" });
-        const explorerSwitch = page.getByRole("group", { name: "Explorer" });
+        const componentSwitch = (await openConfiguration(page)).getByRole("group", { name: "Components" });
+        const explorerSwitch = (await openConfiguration(page)).getByRole("group", { name: "Explorer" });
         await expect(componentSwitch.getByRole("button", { name: "Dark next to light" })).toHaveAttribute("aria-pressed", "true");
         await expect(explorerSwitch.getByRole("button", { name: "Light", exact: true })).toHaveAttribute("aria-pressed", "true");
         await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
@@ -169,7 +180,7 @@ test.describe("Component mode and explorer theme", () => {
 
     test("dark component mode shows only dark panels and leaves the explorer light", async ({ page }) => {
         await page.goto("/page/button");
-        await page.getByRole("group", { name: "Components" }).getByRole("button", { name: "Dark", exact: true }).click();
+        await (await openConfiguration(page)).getByRole("group", { name: "Components" }).getByRole("button", { name: "Dark", exact: true }).click();
         await expect(page).toHaveURL(/\/page\/button\?components=dark$/);
         await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
         await expect(page.locator('main [data-theme="light"]')).toHaveCount(0);
@@ -178,7 +189,7 @@ test.describe("Component mode and explorer theme", () => {
 
     test("light component mode shows only light panels", async ({ page }) => {
         await page.goto("/page/button");
-        await page.getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).click();
+        await (await openConfiguration(page)).getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).click();
         await expect(page).toHaveURL(/\/page\/button\?components=light$/);
         await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
         await expect(page.locator('main [data-theme="light"]').first()).toBeVisible();
@@ -186,7 +197,7 @@ test.describe("Component mode and explorer theme", () => {
 
     test("the dark explorer theme darkens the frame and leaves the component mode as it was", async ({ page }) => {
         await page.goto("/page/button?components=light");
-        await page.getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Dark", exact: true }).click();
+        await (await openConfiguration(page)).getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Dark", exact: true }).click();
         await expect(page).toHaveURL(/\/page\/button\?components=light&explorer=dark$/);
         await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
         await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
@@ -195,8 +206,8 @@ test.describe("Component mode and explorer theme", () => {
 
     test("opening a URL with both settings shows them", async ({ page }) => {
         await page.goto("/page/text-box?components=dark&explorer=dark");
-        await expect(page.getByRole("group", { name: "Components" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
-        await expect(page.getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
+        await expect((await openConfiguration(page)).getByRole("group", { name: "Components" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
+        await expect((await openConfiguration(page)).getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
         await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
         await expect(page.locator('main [data-theme="light"]')).toHaveCount(0);
     });
@@ -947,9 +958,11 @@ test.describe("Changes and commit", () => {
         await area.focus();
         await page.keyboard.press("ArrowDown");
         await expect(area.getByRole("region", { name: "File diff" })).toContainText("theme-names.ts");
-        await page.keyboard.press("ArrowDown");
+        for (let step = 0; step < 3; step++) {
+            await page.keyboard.press("ArrowDown");
+        }
         await page.keyboard.press("Space");
-        await expect(area.getByRole("button", { name: "frontend/src/lib/old-theme.ts", exact: true }).getByRole("button", { name: "Unstage this file" })).toBeVisible();
+        await expect(area.getByRole("region", { name: "Staged files" }).getByRole("button", { name: "frontend/src/lib/old-theme.ts", exact: true }).getByRole("button", { name: "Unstage this file" })).toBeVisible();
         await expect(area.getByRole("button", { name: "Commit 4 files" })).toBeDisabled();
         await area.getByRole("textbox", { name: "Summary" }).fill("Tidy the themes");
         await area.getByRole("button", { name: "Commit 4 files" }).click();
@@ -983,14 +996,14 @@ test.describe("Changes and commit", () => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("textbox", { name: "Search changed files" }).fill("theme");
-        await expect(area.getByRole("list", { name: "Changed files" }).locator(":scope > li")).toHaveCount(3);
+        await expect(area.getByRole("region", { name: "Changed files" }).locator("li")).toHaveCount(3);
         await expect(area).toContainText("3 of 9");
     });
 
     test("an image file shows its old and new versions side by side", async ({ page }) => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
-        await area.getByRole("button", { name: "assets/graft-512.png" }).click();
+        await area.getByRole("button", { name: "assets/graft-512.png" }).getByText("graft-512.png").click();
         await expect(area.getByRole("img", { name: /^Before/ })).toBeVisible();
         await expect(area.getByRole("img", { name: /^After/ })).toBeVisible();
     });
@@ -1103,7 +1116,7 @@ test.describe("Discarding changes", () => {
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
         await card.getByRole("button", { name: "Discard this file" }).click();
-        const row = area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
+        const row = area.getByRole("region", { name: "Unstaged files" }).getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
         await expect(row).toHaveAttribute("data-discarded", "true");
         await expect(card.locator('[data-discarded="true"][data-hunk-index]')).toHaveCount(2);
         await row.getByRole("button", { name: "Undo the discard of this file" }).click();
@@ -1115,7 +1128,7 @@ test.describe("Discarding changes", () => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
-        const row = area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
+        const row = area.getByRole("region", { name: "Unstaged files" }).getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
         await area.focus();
         await page.keyboard.press("Delete");
         await expect(row).toHaveAttribute("data-discarded", "true");
@@ -1344,5 +1357,102 @@ test.describe("Nothing to commit", () => {
         await expect(area).toContainText("No changes. The working tree matches the last commit.");
         await expect(area).toContainText("Nothing to commit.");
         await expect(area.getByRole("button", { name: "Nothing to commit" })).toBeDisabled();
+    });
+});
+
+test.describe("Collapsing panes", () => {
+    test("the Changes and Commit panes collapse to their sides and come back, by button and by C", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const files = area.getByRole("region", { name: "Changed files" });
+        await files.getByRole("button", { name: "Collapse the pane" }).click();
+        await expect(files).toHaveAttribute("data-collapsed", "true");
+        await files.getByRole("button", { name: "Restore changed files" }).click();
+        await expect(files).not.toHaveAttribute("data-collapsed", "true");
+        const commit = area.getByRole("region", { name: "Commit", exact: true });
+        await area.getByRole("region", { name: "Unstaged files" }).getByText("old-theme.ts").click();
+        await page.keyboard.press("c");
+        await expect(files).toHaveAttribute("data-collapsed", "true");
+        await page.keyboard.press("c");
+        await expect(files).not.toHaveAttribute("data-collapsed", "true");
+        await commit.getByRole("button", { name: "Collapse the pane" }).click();
+        await expect(commit).toHaveAttribute("data-collapsed", "true");
+    });
+
+    test("every commit explorer pane collapses to the left and C restores the active one", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
+        for (const name of ["Commits", "Commit details", "File diff"]) {
+            await explorer.getByRole("region", { name, exact: true }).getByRole("button", { name: "Collapse the pane" }).click();
+            await expect(explorer.getByRole("region", { name, exact: true })).toHaveAttribute("data-collapsed", "true");
+        }
+        await explorer.getByRole("region", { name: "File diff" }).click();
+        await page.keyboard.press("c");
+        await expect(explorer.getByRole("region", { name: "File diff" })).not.toHaveAttribute("data-collapsed", "true");
+    });
+});
+
+test.describe("Staged and Unstaged panels", () => {
+    test("each panel collapses to its heading, maximises over the other and comes back", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const staged = area.getByRole("region", { name: "Staged files", exact: true });
+        const unstaged = area.getByRole("region", { name: "Unstaged files" });
+        await staged.getByRole("button", { name: "Collapse the staged files" }).click();
+        await expect(staged).toHaveAttribute("data-collapsed", "true");
+        await expect(staged.getByRole("list")).toHaveCount(0);
+        await staged.getByRole("button", { name: "Restore the staged files" }).click();
+        await expect(staged.getByRole("list")).toHaveCount(1);
+        await unstaged.getByRole("button", { name: "Maximise the unstaged files" }).click();
+        await expect(staged).toHaveCount(0);
+        await unstaged.getByRole("button", { name: "Put the unstaged files back" }).click();
+        await expect(staged).toHaveCount(1);
+    });
+
+    test("Right from the diff moves into the commit message, and Escape and Left come back", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        await area.focus();
+        await page.keyboard.press("ArrowRight");
+        await page.keyboard.press("ArrowRight");
+        await expect(area.getByRole("textbox", { name: "Summary" })).toBeFocused();
+        await expect(area.getByRole("region", { name: "Commit", exact: true })).toHaveAttribute("data-active", "true");
+        await page.keyboard.press("Escape");
+        await expect(area).toBeFocused();
+        await page.keyboard.press("ArrowLeft");
+        await expect(area.getByRole("region", { name: "File diff" })).toHaveAttribute("data-active", "true");
+    });
+});
+
+test.describe("Path menu, hover and configuration", () => {
+    test("the path menu closes on a click anywhere outside it and the click still lands", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        await area.getByRole("region", { name: "File diff" }).getByRole("button", { name: /^Path actions for/ }).click();
+        await expect(page.getByRole("menu")).toBeVisible();
+        await area.getByRole("textbox", { name: "Summary" }).click();
+        await expect(page.getByRole("menu")).toHaveCount(0);
+        await expect(area.getByRole("textbox", { name: "Summary" })).toBeFocused();
+        await area.getByRole("region", { name: "File diff" }).getByRole("button", { name: /^Path actions for/ }).click();
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("menu")).toHaveCount(0);
+    });
+
+    test("a hunk that a click picks shows the hover wash under the pointer", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const hunk = page.getByRole("application", { name: "Changes" }).first().getByRole("region", { name: "File diff" }).locator('[data-hunk-index="1"]');
+        await expect(hunk).toHaveClass(/graft-hoverable/);
+        await hunk.hover();
+        const wash = await hunk.evaluate(element => getComputedStyle(element, "::after").content);
+        expect(wash).toBe('""');
+    });
+
+    test("the light and dark settings live in the Configuration dropdown, not the sidebar", async ({ page }) => {
+        await page.goto("/page/button?components=light");
+        await expect(page.getByRole("navigation").getByRole("group", { name: "Explorer" })).toHaveCount(0);
+        await page.getByRole("button", { name: "Configuration" }).click();
+        const dialog = page.getByRole("dialog", { name: "Configuration" });
+        await expect(dialog.getByRole("group", { name: "Components" })).toBeVisible();
+        await expect(dialog.getByRole("group", { name: "Explorer" })).toBeVisible();
     });
 });

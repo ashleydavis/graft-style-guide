@@ -3,12 +3,15 @@
 // path and to open the file outside Graft.
 //
 
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import ClickAwayListener from "@mui/material/ClickAwayListener";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
+import MenuList from "@mui/material/MenuList";
+import Paper from "@mui/material/Paper";
+import Popper from "@mui/material/Popper";
 import Divider from "@mui/material/Divider";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -47,7 +50,9 @@ export function fileManagerLabel(): string {
 // full path, the path from the repository root or the file name, then the button shows a tick for
 // a moment. The open items show the file in the file manager or open it in the editor, which the
 // backend does in Graft; here they close the menu. A click on the button stays with it and never
-// reaches a row the button sits in.
+// reaches a row the button sits in. The menu floats over the page without blocking it: a click
+// anywhere outside it closes it and still reaches what was clicked, and Escape or Tab closes it.
+// The button stays in view while its menu is open, even in a row that shows it only on hover.
 //
 export function FilePathMenu({ path, repoRoot = exampleRepoRoot }: { path: string; repoRoot?: string }): ReactNode {
     const [anchor, setAnchor] = useState<HTMLElement | undefined>(undefined);
@@ -64,7 +69,20 @@ export function FilePathMenu({ path, repoRoot = exampleRepoRoot }: { path: strin
 
     function open(event: MouseEvent<HTMLElement>): void {
         event.stopPropagation();
-        setAnchor(event.currentTarget);
+        setAnchor(anchor === undefined ? event.currentTarget : undefined);
+    }
+
+    function close(): void {
+        setAnchor(undefined);
+    }
+
+    function onMenuKey(event: KeyboardEvent): void {
+        if (event.key === "Escape" || event.key === "Tab") {
+            event.preventDefault();
+            event.stopPropagation();
+            anchor?.focus();
+            close();
+        }
     }
 
     function copy(text: string): void {
@@ -79,7 +97,7 @@ export function FilePathMenu({ path, repoRoot = exampleRepoRoot }: { path: strin
 
     const label = isCopied ? "Copied" : `Path actions for ${name}`;
     return (
-        <span className="file-path-menu inline-flex flex-none" onClick={event => event.stopPropagation()}>
+        <span className="file-path-menu inline-flex flex-none" style={anchor !== undefined ? { opacity: 1 } : undefined} onClick={event => event.stopPropagation()}>
             <Tooltip title={isCopied ? "Copied" : "Copy or open"}>
                 <IconButton
                     size="small"
@@ -93,7 +111,17 @@ export function FilePathMenu({ path, repoRoot = exampleRepoRoot }: { path: strin
                     <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: "calc(var(--icon-sm) * 0.75)" }} />
                 </IconButton>
             </Tooltip>
-            <Menu anchorEl={anchor} open={anchor !== undefined} onClose={() => setAnchor(undefined)}>
+            <Popper open={anchor !== undefined} anchorEl={anchor} placement="bottom-start" popperOptions={{ strategy: "fixed" }} style={{ zIndex: 1300 }}>
+                <ClickAwayListener
+                    mouseEvent="onMouseDown"
+                    onClickAway={event => {
+                        if (!(event.target instanceof Node && anchor?.contains(event.target))) {
+                            close();
+                        }
+                    }}
+                >
+                    <Paper variant="overlay" sx={{ marginTop: "var(--space-1)" }}>
+                    <MenuList autoFocusItem onKeyDown={onMenuKey} sx={{ padding: "var(--space-2) var(--space-1)" }}>
                 <MenuItem onClick={() => copy(`${repoRoot}/${path}`)}>
                     <ListItemIcon>
                         <FontAwesomeIcon icon={faCopy} />
@@ -113,19 +141,22 @@ export function FilePathMenu({ path, repoRoot = exampleRepoRoot }: { path: strin
                     <ListItemText>Copy file name</ListItemText>
                 </MenuItem>
                 <Divider />
-                <MenuItem onClick={() => setAnchor(undefined)}>
+                <MenuItem onClick={close}>
                     <ListItemIcon>
                         <FontAwesomeIcon icon={faFolderOpen} />
                     </ListItemIcon>
                     <ListItemText>{fileManagerLabel()}</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => setAnchor(undefined)}>
+                <MenuItem onClick={close}>
                     <ListItemIcon>
                         <FontAwesomeIcon icon={faPenToSquare} />
                     </ListItemIcon>
                     <ListItemText>Open in editor</ListItemText>
                 </MenuItem>
-            </Menu>
+                    </MenuList>
+                    </Paper>
+                </ClickAwayListener>
+            </Popper>
         </span>
     );
 }

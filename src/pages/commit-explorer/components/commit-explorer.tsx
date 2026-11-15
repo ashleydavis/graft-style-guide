@@ -20,6 +20,7 @@ import { CommitDetailsPane, CommitInfoPane } from "./commit-details-pane";
 import { CommitPane } from "./commit-pane";
 import { FilePane } from "./file-pane";
 import { ResizeHandle } from "./resize-handle";
+import { COLLAPSE_KEY } from "../../../components/collapse";
 import { withViewTransition } from "../../../lib/view-transition";
 
 //
@@ -39,6 +40,7 @@ const keyHints = [
     { keys: ["Enter"], action: "Open" },
     { keys: ["Esc"], action: "Close" },
     { keys: ["M"], action: "Maximise or restore the pane" },
+    { keys: [COLLAPSE_KEY], action: "Collapse or restore the pane" },
 ];
 
 //
@@ -106,6 +108,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     const matchingHashes = new Set(commits.map(commit => commit.hash));
     const isSearching = search.trim() !== "";
     const columnsRef = useRef<HTMLDivElement>(null);
+    const explorerRef = useRef<HTMLDivElement>(null);
     const openCommit = state.openHash !== undefined ? commitByHash(history, state.openHash) : undefined;
     const isCommitOpen = state.openPath === COMMIT_SUMMARY_PATH;
     const openFile = state.openHash !== undefined && state.openPath !== undefined && !isCommitOpen ? changedFile(history, state.openHash, state.openPath) : undefined;
@@ -127,6 +130,34 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     // Returns true when the pane at `index` shows: every pane while none is maximised, and only
     // the maximised one while one is.
     //
+    const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(new Set());
+
+    //
+    // Collapses the pane at `index` into a strip at its left, or restores it. A pane stays as it is
+    // while one pane is maximised.
+    //
+    function toggleCollapse(index: number): void {
+        if (maximisedPane !== undefined) {
+            return;
+        }
+        //
+        // The pane's rows go as it collapses, so the keys move to the explorer to keep working.
+        //
+        explorerRef.current?.focus();
+        withViewTransition(() =>
+            setCollapsed(current => {
+                const next = new Set(current);
+                if (next.has(index)) {
+                    next.delete(index);
+                }
+                else {
+                    next.add(index);
+                }
+                return next;
+            }),
+        );
+    }
+
     function shows(index: number): boolean {
         return maximisedPane === undefined || maximisedPane === index;
     }
@@ -184,6 +215,12 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             toggleMaximise(state.activePaneIndex);
             return;
         }
+        if (event.key.toUpperCase() === COLLAPSE_KEY && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleCollapse(state.activePaneIndex);
+            return;
+        }
         if (state.activePaneIndex === 2 && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key) && fileCardRef.current?.handleOptionKey(event.key)) {
             event.preventDefault();
             event.stopPropagation();
@@ -220,6 +257,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
 
     return (
         <div
+            ref={explorerRef}
             role="application"
             aria-label="Commit explorer"
             tabIndex={0}
@@ -271,6 +309,8 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                     <CommitPane
                         isMaximised={maximisedPane === 0}
                         onToggleMaximise={() => toggleMaximise(0)}
+                        isCollapsed={collapsed.has(0)}
+                        onToggleCollapse={() => toggleCollapse(0)}
                         commits={history.commits}
                         laneCount={history.laneCount}
                         width={commitPaneWidth}
@@ -295,13 +335,17 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                         onSelectCommit={hash => setState(selectCommit(hash))}
                     />
                 ) : undefined}
-                {maximisedPane === undefined ? (
+                {maximisedPane === undefined && !collapsed.has(0) ? (
                     <ResizeHandle label="commit list" getWidth={() => paneWidth("Commits")} min={320} max={1000} onReset={() => setCommitPaneWidth(undefined)} onWidth={setCommitPaneWidth} />
+                ) : maximisedPane === undefined ? (
+                    <span aria-hidden="true" className="flex-none" style={{ width: "var(--space-2)" }} />
                 ) : undefined}
                 {openCommit && shows(1) ? (
                     <CommitDetailsPane
                         isMaximised={maximisedPane === 1}
                         onToggleMaximise={() => toggleMaximise(1)}
+                        isCollapsed={collapsed.has(1)}
+                        onToggleCollapse={() => toggleCollapse(1)}
                         key={openCommit.hash}
                         commit={openCommit}
                         selectedPath={state.selectedPath}
@@ -314,14 +358,18 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                         onClose={() => setState(closeCommitDetailsPane)}
                     />
                 ) : undefined}
-                {openCommit && maximisedPane === undefined ? (
+                {openCommit && maximisedPane === undefined && !collapsed.has(1) ? (
                     <ResizeHandle label="commit details" getWidth={() => paneWidth("Commit details")} min={280} max={800} onReset={() => setDetailsPaneWidth(DETAILS_PANE_WIDTH)} onWidth={setDetailsPaneWidth} />
+                ) : openCommit && maximisedPane === undefined ? (
+                    <span aria-hidden="true" className="flex-none" style={{ width: "var(--space-2)" }} />
                 ) : undefined}
                 {openFile && shows(2) ? (
                     <FilePane
                         key={openFile.path}
                         isMaximised={maximisedPane === 2}
                         onToggleMaximise={() => toggleMaximise(2)}
+                        isCollapsed={collapsed.has(2)}
+                        onToggleCollapse={() => toggleCollapse(2)}
                         file={openFile}
                         isActive={state.activePaneIndex === 2}
                         currentHunk={currentHunk}
@@ -344,6 +392,8 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                         isActive={state.activePaneIndex === 2}
                         isMaximised={maximisedPane === 2}
                         onToggleMaximise={() => toggleMaximise(2)}
+                        isCollapsed={collapsed.has(2)}
+                        onToggleCollapse={() => toggleCollapse(2)}
                         onClose={() => setState(closeFilePane)}
                     />
                 ) : undefined}

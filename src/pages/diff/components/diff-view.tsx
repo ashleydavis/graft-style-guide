@@ -486,7 +486,7 @@ export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: 
             onClick={pick?.onClick}
             onMouseDown={pick?.onMouseDown}
             data-discarded={isDiscarded || undefined}
-            className={isDiscarded ? "graft-discarded flex" : "flex"}
+            className={["flex", isDiscarded ? "graft-discarded" : "", pick ? "graft-hoverable" : ""].join(" ").trim()}
             style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, ...pick?.padding }}
         >
             {pick?.border}
@@ -511,7 +511,7 @@ export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | und
     }
     return (
         <div
-            className={isDiscardedLine(line) ? "graft-discarded flex min-w-0 flex-1" : "flex min-w-0 flex-1"}
+            className={["flex min-w-0 flex-1", isDiscardedLine(line) ? "graft-discarded" : "", pick ? "graft-hoverable" : ""].join(" ").trim()}
             data-discarded={isDiscardedLine(line) || undefined}
             data-side={side}
             data-line={line.kind}
@@ -628,7 +628,7 @@ export function GapRows({
             <div
                 role="row"
                 data-line="gap"
-                className="flex items-center"
+                className={lines && onSelect ? "graft-hoverable flex items-center" : "flex items-center"}
                 style={{
                     gap: "var(--space-3)",
                     //
@@ -848,7 +848,7 @@ export function DiffView({
                             data-hunk-index={index}
                             data-current={currentHunk === index}
                             data-discarded={discardedHunks?.has(index) || undefined}
-                            className={discardedHunks?.has(index) ? "graft-discarded" : undefined}
+                            className={[discardedHunks?.has(index) ? "graft-discarded" : "", onSelectHunk && !lineSelection ? "graft-hoverable" : ""].join(" ").trim() || undefined}
                             onClick={onSelectHunk ? () => onSelectHunk(index) : undefined}
                             style={{
                                 position: "relative",
