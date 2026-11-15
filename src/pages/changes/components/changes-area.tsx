@@ -112,13 +112,13 @@ interface ISplitSection {
 }
 
 //
-// Returns the split view's two sections for `file`: the staged hunks, then the unstaged ones.
+// Returns the split view's two sections for `file`: the unstaged hunks, then the staged ones.
 //
 export function splitSections(file: IFileDiff, staging: IStaging): ISplitSection[] {
     const all = Array.from({ length: parseHunks(file.diff ?? "").length }, (_unused, index) => index);
     return [
-        { title: "Staged", card: "Staged diff", hunks: all.filter(index => hunkStagedState(staging, index) !== "none"), action: "unstage", empty: "Nothing in this file is staged." },
         { title: "Unstaged", card: "Unstaged diff", hunks: all.filter(index => hunkStagedState(staging, index) !== "all"), action: "stage", empty: "Everything in this file is staged." },
+        { title: "Staged", card: "Staged diff", hunks: all.filter(index => hunkStagedState(staging, index) !== "none"), action: "unstage", empty: "Nothing in this file is staged." },
     ];
 }
 
@@ -312,8 +312,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     // both.
     //
     const entries: IListEntry[] = [
-        ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
         ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "all").map(file => ({ file, section: "unstaged" as const })),
+        ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
     ];
     const selectedEntry = entries.find(entry => entry.file.path === selectedPath && entry.section === selectedSection) ?? entries.find(entry => entry.file.path === selectedPath);
 
@@ -353,7 +353,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     //
     // Returns the selected file's stops in the order Up and Down step through them, its hunks and
     // the runs of unchanged lines between them: as the one diff draws them, and in the split the
-    // staged section's stops before the unstaged section's.
+    // unstaged section's stops before the staged section's.
     //
     function stopOrder(): DiffStop[] {
         if (!selectedFile?.diff) {
@@ -702,7 +702,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                         <FontAwesomeIcon icon={faFileLines} />
                                     </ToggleButton>
                                 </Tooltip>
-                                <Tooltip title={<Tip title="Staged and unstaged" detail="The staged changes and the unstaged changes in separate sections, staged above." />}>
+                                <Tooltip title={<Tip title="Staged and unstaged" detail="The unstaged changes and the staged changes in separate sections, unstaged above." />}>
                                     <ToggleButton value="split" aria-label="Staged and unstaged">
                                         <FontAwesomeIcon icon={faLayerGroup} />
                                     </ToggleButton>
@@ -728,7 +728,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     {shownFiles.length === 0 ? (
                                         <p style={{ padding: "var(--space-4) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", textAlign: "center" }}>No changed file matches the search.</p>
                                     ) : (
-                                        (["staged", "unstaged"] as const).map(section => {
+                                        (["unstaged", "staged"] as const).map(section => {
                                             const sectionEntries = entries.filter(entry => entry.section === section);
                                             const title = section === "staged" ? "Staged" : "Unstaged";
                                             const isPanelCollapsed = panelCollapsed.has(section) && panelMaximised !== section;
