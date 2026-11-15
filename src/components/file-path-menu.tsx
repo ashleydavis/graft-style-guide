@@ -105,7 +105,11 @@ export function FilePathMenu({ path, repoRoot = exampleRepoRoot }: { path: strin
                     aria-haspopup="menu"
                     aria-expanded={anchor !== undefined}
                     onClick={open}
-                    sx={{ gap: "2px", color: isCopied ? "var(--color-success)" : undefined }}
+                    //
+                    // A drop-down button with two icons, so it takes their width with room either
+                    // side instead of a single icon's square.
+                    //
+                    sx={{ width: "auto", paddingInline: "var(--space-1)", gap: "2px", color: isCopied ? "var(--color-success)" : undefined }}
                 >
                     <FontAwesomeIcon icon={isCopied ? faCheck : faCopy} />
                     <FontAwesomeIcon icon={faChevronDown} style={{ fontSize: "calc(var(--icon-sm) * 0.75)" }} />

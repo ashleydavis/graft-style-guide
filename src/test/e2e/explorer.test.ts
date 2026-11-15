@@ -644,6 +644,8 @@ test.describe("Commit explorer", () => {
         await page.keyboard.press("ArrowDown");
         await expect(explorer.getByRole("region", { name: "Full commit details" })).toContainText("Sam Lee");
         await page.keyboard.press("ArrowDown");
+        await expect(details.getByRole("button", { name: "Folder frontend/src/lib", exact: true })).toHaveClass(/Mui-selected/);
+        await page.keyboard.press("ArrowDown");
         const file = explorer.getByRole("region", { name: "File diff" });
         await expect(file).toContainText("frontend/src/lib/commit-explorer.ts");
         await expect(details).toHaveAttribute("data-active", "true");
@@ -802,10 +804,13 @@ test.describe("Commit explorer search and file views", () => {
         await details.getByRole("button", { name: "Tree" }).click();
         await expect(details.getByText("backend/src/tasks")).toBeVisible();
         await page.keyboard.press("ArrowRight");
-        await page.keyboard.press("ArrowDown");
-        await page.keyboard.press("ArrowDown");
+        for (let step = 0; step < 3; step++) {
+            await page.keyboard.press("ArrowDown");
+        }
         await expect(explorer.getByRole("region", { name: "File diff" })).toContainText("backend/src/tasks/file-diff-task.zig");
-        await page.keyboard.press("ArrowDown");
+        for (let step = 0; step < 3; step++) {
+            await page.keyboard.press("ArrowDown");
+        }
         await expect(explorer.getByRole("region", { name: "File diff" })).toContainText("file-pane.tsx");
     });
 });
@@ -893,7 +898,7 @@ test.describe("File paths, staging and tooltips", () => {
         await page.keyboard.press("ArrowDown");
         await expect(file.locator('[data-current="true"][data-hunk-index="0"]')).toHaveCount(1);
         await page.keyboard.press("Shift+ArrowDown");
-        await expect(file).toContainText("frontend/src/components/app-layout.tsx");
+        await expect(file).toContainText("frontend/src/lib/git-commands.ts");
         await expect(file).toHaveAttribute("data-active", "true");
     });
 
@@ -966,9 +971,10 @@ test.describe("Changes and commit", () => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.focus();
-        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("ArrowUp");
+        await page.keyboard.press("ArrowUp");
         await expect(area.getByRole("region", { name: "File diff" })).toContainText("theme-names.ts");
-        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("ArrowUp");
         await page.keyboard.press("Space");
         await expect(area.getByRole("button", { name: "frontend/src/lib/old-theme.ts", exact: true }).getByRole("button", { name: "Unstage this file" })).toBeVisible();
         await expect(area.getByRole("button", { name: "Commit 4 files" })).toBeDisabled();
@@ -1004,7 +1010,7 @@ test.describe("Changes and commit", () => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("textbox", { name: "Search changed files" }).fill("theme");
-        await expect(area.getByRole("region", { name: "Changed files" }).locator("li")).toHaveCount(3);
+        await expect(area.getByRole("region", { name: "Changed files" }).locator("li[aria-label]:not([aria-label^=\"Folder \"])")).toHaveCount(3);
         await expect(area).toContainText("3 of 9");
     });
 
@@ -1505,7 +1511,7 @@ test.describe("Discard only on the selection", () => {
         await expect(visibleDiscards).toHaveCount(1);
         await list.getByRole("button", { name: "docs/README.md", exact: true }).hover();
         await expect(visibleDiscards).toHaveCount(2);
-        await list.getByRole("button", { name: "Discard this file" }).filter({ visible: true }).first().click();
+        await list.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true }).getByRole("button", { name: "Discard this file" }).click();
         await list.getByRole("button", { name: "docs/README.md", exact: true }).getByText("README.md").click();
         await expect(list.getByRole("button", { name: "Undo the discard of this file" })).toHaveCount(1);
         await expect(list.getByRole("button", { name: "Discard this file" }).filter({ visible: true })).toHaveCount(1);
@@ -1549,5 +1555,87 @@ test.describe("Changes options", () => {
         await expect(list.getByRole("region", { name: "Staged files", exact: true })).toBeVisible();
         await page.keyboard.press("s");
         await expect(list.getByRole("region", { name: "Staged files", exact: true })).toHaveCount(0);
+    });
+});
+
+test.describe("Folders in the tree", () => {
+    test("a folder is selected with the keys, stages its files with Space and shows only itself with Enter", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const list = area.getByRole("region", { name: "Changed files" });
+        const folder = list.getByRole("button", { name: "Folder frontend/src/lib", exact: true });
+        await folder.click();
+        await expect(folder).toHaveClass(/Mui-selected/);
+        await expect(area).toContainText("4 changed files");
+        await expect(folder.getByRole("button", { name: /^(Stage|Unstage) this folder$/ })).toBeVisible();
+        await expect(folder.getByRole("button", { name: /^Path actions for/ })).toBeVisible();
+        await page.keyboard.press("Space");
+        await expect(folder.getByRole("button", { name: "Unstage this folder" })).toBeVisible();
+        await page.keyboard.press("Enter");
+        await expect(list.getByRole("button", { name: "docs/README.md", exact: true })).toHaveCount(0);
+        await expect(list.getByRole("button", { name: "Back to the folder above" })).toBeVisible();
+        await page.keyboard.press("ArrowDown");
+        await expect(area.getByRole("region", { name: "File diff" })).toContainText("theme-names.ts");
+        await page.keyboard.press("Escape");
+        await expect(list.getByRole("button", { name: "docs/README.md", exact: true })).toHaveCount(1);
+        await expect(list.getByRole("button", { name: "Folder frontend/src/lib", exact: true })).toHaveClass(/Mui-selected/);
+    });
+});
+
+test.describe("Folders in the commit's file list", () => {
+    test("a folder is selected with the keys, has a copy menu and shows only itself with Enter", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
+        await explorer.getByText("Show a changed file").click();
+        const details = explorer.getByRole("region", { name: "Commit details" });
+        await page.keyboard.press("ArrowRight");
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("ArrowDown");
+        const folder = details.getByRole("button", { name: /^Folder / }).first();
+        await expect(folder).toHaveClass(/Mui-selected/);
+        await expect(folder.getByRole("button", { name: /^Path actions for/ })).toBeVisible();
+        await page.keyboard.press("Enter");
+        await expect(details.getByRole("button", { name: "Back to the folder above" })).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(details.getByRole("button", { name: "Back to the folder above" })).toHaveCount(0);
+        await expect(details.getByRole("region", { name: "Commit details" })).toHaveCount(0);
+        await expect(explorer.getByRole("region", { name: "Commit details" })).toBeVisible();
+    });
+});
+
+test.describe("Tree lines and collapsing folders", () => {
+    test("folders collapse and expand by their button and by Left and Right", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const list = area.getByRole("region", { name: "Changed files" });
+        await list.getByRole("button", { name: "Collapse frontend/src/lib" }).click();
+        await expect(list.getByRole("button", { name: "frontend/src/lib/themes.ts", exact: true })).toHaveCount(0);
+        await list.getByRole("button", { name: "Expand frontend/src/lib" }).click();
+        await expect(list.getByRole("button", { name: "frontend/src/lib/themes.ts", exact: true })).toHaveCount(1);
+        await list.getByRole("button", { name: "Folder frontend/src/lib", exact: true }).click();
+        await page.keyboard.press("ArrowLeft");
+        await expect(list.getByRole("button", { name: "frontend/src/lib/themes.ts", exact: true })).toHaveCount(0);
+        await page.keyboard.press("ArrowRight");
+        await expect(list.getByRole("button", { name: "frontend/src/lib/themes.ts", exact: true })).toHaveCount(1);
+    });
+
+    test("the tree draws lines joining folders to what is inside them", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const row = page.getByRole("application", { name: "Changes" }).first().getByRole("button", { name: "docs/README.md", exact: true });
+        await expect(row.locator('[aria-hidden="true"] > span > span')).not.toHaveCount(0);
+    });
+
+    test("the commit's folders collapse and every folder shows its open button", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
+        await explorer.getByText("Show a changed file").click();
+        const details = explorer.getByRole("region", { name: "Commit details" });
+        const folders = details.getByRole("button", { name: /^Folder / });
+        const openButtons = details.getByRole("button", { name: /^Show only / }).filter({ visible: true });
+        await expect(openButtons).toHaveCount(await folders.count());
+        const first = await folders.first().getAttribute("aria-label");
+        const path = first!.slice("Folder ".length);
+        await details.getByRole("button", { name: `Collapse ${path}` }).click();
+        await expect(details.getByRole("button", { name: `Expand ${path}` })).toBeVisible();
     });
 });

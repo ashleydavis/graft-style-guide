@@ -13,15 +13,18 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolderOpen, faFolderTree, faList, faMessage, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faArrowRightToBracket, faFolderOpen, faFolderTree, faList, faMessage, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import IconButton from "@mui/material/IconButton";
+import { Tip } from "../../../components/tip";
 import { RefBadge } from "../../badges";
-import { COMMIT_SUMMARY_PATH } from "../explorer-state";
+import { COMMIT_SUMMARY_PATH, FOLDER_PREFIX } from "../explorer-state";
 import { refBadge } from "./commit-pane";
 import { CopyButton } from "../../../components/copy-button";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { StatusLetter } from "../../tree";
 import type { IChangedFile, ICommit } from "../data";
-import { treeRows, type FileListView } from "../file-views";
+import { treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../file-views";
+import { FolderToggle, TreeGuides } from "../../../components/tree-guides";
 import { FilePath } from "./file-path";
 import { LineCounts } from "./line-counts";
 import { Pane } from "./pane";
@@ -95,6 +98,11 @@ export interface IFileRowProps {
     depth: number;
 
     //
+    // The row's tree lines, in the tree view.
+    //
+    guides?: TreeGuide[];
+
+    //
     // What the row shows between the status letter and the line counts.
     //
     label: ReactNode;
@@ -124,7 +132,7 @@ export interface IFileRowProps {
 // Renders one changed file's row: its status letter, its label, indented by its depth, and its
 // line counts.
 //
-export function FileRow({ file, depth, label, isSelected, isOpen, selectedRef, onSelectFile }: IFileRowProps): ReactNode {
+export function FileRow({ file, depth, guides = [], label, isSelected, isOpen, selectedRef, onSelectFile }: IFileRowProps): ReactNode {
     return (
         <ListItemButton
             component="li"
@@ -152,6 +160,7 @@ export function FileRow({ file, depth, label, isSelected, isOpen, selectedRef, o
                 },
             }}
         >
+            <TreeGuides guides={guides} />
             <span className="min-w-0 flex-1">{label}</span>
             <FilePathMenu path={file.path} />
             <StatusLetter status={file.status} />
@@ -206,6 +215,31 @@ export interface ICommitDetailsPaneProps {
     onSelectFile: (path: string) => void;
 
     //
+    // The folder the tree shows its files from, or empty for the whole commit.
+    //
+    treeRoot: string;
+
+    //
+    // Called with a folder's path to show only the files inside it.
+    //
+    onDrillIn: (path: string) => void;
+
+    //
+    // Called by the back row to go back to the view the folder was opened from.
+    //
+    onDrillOut: () => void;
+
+    //
+    // The paths of the collapsed folders, whose rows inside the tree hides.
+    //
+    collapsedFolders: ReadonlySet<string>;
+
+    //
+    // Called with a folder's path by its collapse button.
+    //
+    onToggleFolder: (path: string) => void;
+
+    //
     // True while the pane fills the explorer.
     //
     isMaximised: boolean;
@@ -237,7 +271,7 @@ export interface ICommitDetailsPaneProps {
 // name and folder in two columns, or as a tree of folders, as the switch above them picks. The
 // selected file scrolls into view when the keys move the selection.
 //
-export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, fileView, onChangeFileView, onSelectFile, onClose }: ICommitDetailsPaneProps): ReactNode {
+export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, fileView, onChangeFileView, onSelectFile, treeRoot, onDrillIn, onDrillOut, collapsedFolders, onToggleFolder, onClose }: ICommitDetailsPaneProps): ReactNode {
     const selectedRef = useRef<HTMLLIElement>(null);
     const totalAdded = commit.files.reduce((total, file) => total + file.linesAdded, 0);
     const totalDeleted = commit.files.reduce((total, file) => total + file.linesDeleted, 0);
@@ -338,25 +372,68 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                         No files changed. A merge commit's changes are in its parents.
                     </li>
                 ) : fileView === "tree" ? (
-                    treeRows(commit.files).map(row =>
-                        row.kind === "folder" ? (
+                    [
+                        treeRoot !== "" ? (
                             <li
-                                key={`folder-${row.depth}-${row.name}`}
+                                key="back"
                                 className="flex items-center"
-                                style={{
+                                style={{ gap: "var(--space-2)", padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border)" }}
+                            >
+                                <Tooltip title={<Tip title="Back to the folder above" detail="Key: Escape" />}>
+                                    <IconButton size="small" aria-label="Back to the folder above" onClick={onDrillOut}>
+                                        <FontAwesomeIcon icon={faArrowLeft} />
+                                    </IconButton>
+                                </Tooltip>
+                                <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: "var(--icon-sm)" }} />
+                                <span className="min-w-0 truncate" style={{ color: "var(--color-text)" }}>
+                                    {treeRoot}
+                                </span>
+                            </li>
+                        ) : undefined,
+                        ...withoutCollapsed(treeRows(commit.files, treeRoot), collapsedFolders).map((row, index, rows) => {
+                        const guides = treeGuides(rows)[index];
+                        return row.kind === "folder" ? (
+                            <ListItemButton
+                                key={`folder-${row.path}`}
+                                component="li"
+                                aria-label={`Folder ${row.path}`}
+                                ref={selectedPath === `${FOLDER_PREFIX}${row.path}` ? selectedRef : undefined}
+                                selected={selectedPath === `${FOLDER_PREFIX}${row.path}`}
+                                onClick={() => onSelectFile(`${FOLDER_PREFIX}${row.path}`)}
+                                onDoubleClick={() => onDrillIn(row.path)}
+                                sx={{
                                     gap: "var(--space-2)",
-                                    padding: `var(--space-1) var(--space-3) var(--space-1) calc(var(--space-3) + var(--space-4) * ${row.depth})`,
                                     fontSize: "var(--text-sm)",
                                     color: "var(--color-text-muted)",
+                                    "& .file-path-menu": { opacity: 0 },
+                                    "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
                                 }}
                             >
-                                <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: "var(--icon-sm)" }} />
-                                <span className="min-w-0 truncate">{row.name}</span>
-                            </li>
+                                <TreeGuides guides={guides} />
+                                <FolderToggle path={row.path} isCollapsed={collapsedFolders.has(row.path)} onToggle={() => onToggleFolder(row.path)} />
+                                <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: "var(--icon-sm)", flex: "none" }} />
+                                <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                                <span className="folder-open">
+                                    <Tooltip title={<Tip title="Show only this folder" detail="Key: Enter, or a double click. Escape goes back." />}>
+                                        <IconButton
+                                            size="small"
+                                            aria-label={`Show only ${row.path}`}
+                                            onClick={event => {
+                                                event.stopPropagation();
+                                                onDrillIn(row.path);
+                                            }}
+                                        >
+                                            <FontAwesomeIcon icon={faArrowRightToBracket} />
+                                        </IconButton>
+                                    </Tooltip>
+                                </span>
+                                <FilePathMenu path={row.path} />
+                            </ListItemButton>
                         ) : (
-                            <FileRow key={row.file.path} {...rowState(row.file)} file={row.file} depth={row.depth} label={<span className="truncate">{row.name}</span>} />
-                        ),
-                    )
+                            <FileRow key={row.file.path} {...rowState(row.file)} file={row.file} depth={0} guides={guides} label={<span className="truncate">{row.name}</span>} />
+                        );
+                    }),
+                    ]
                 ) : (
                     commit.files.map(file =>
                         fileView === "columns" ? (

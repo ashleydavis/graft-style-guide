@@ -59,6 +59,12 @@ export interface IExplorerItems {
 export const COMMIT_SUMMARY_PATH = ":commit";
 
 //
+// What a folder's row in the tree stands for among the commit details pane's paths: this prefix
+// and the folder's path. Selecting it opens no pane to the right.
+//
+export const FOLDER_PREFIX = ":folder:";
+
+//
 // The explorer as it first shows: the commit pane alone, active, with nothing selected.
 //
 export const initialExplorerState: IExplorerState = {
@@ -81,7 +87,7 @@ export function openPaneCount(state: IExplorerState): number {
     if (state.openHash === undefined) {
         return 1;
     }
-    if (state.openPath === undefined) {
+    if (state.openPath === undefined || state.openPath.startsWith(FOLDER_PREFIX)) {
         return 2;
     }
     return 3;

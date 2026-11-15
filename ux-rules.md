@@ -18,6 +18,7 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 ## Buttons
 
 - Buttons should look like buttons, meaning they should all have visible borders and hover effects.
+- Icon buttons should be perfectly square and have adequate padding/margin between the icon and the border.
 - The rows of a list, a tree, a sidebar or a menu are rows to pick, not buttons: they show the hover and selected colours instead of a border.
 
 ## Text
@@ -32,6 +33,7 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 
 - Stage/unstage and non-destructive tools stick to the left. Destructive tools stick to the right.
 - In a row, a header or over a hunk or picked lines, the stage button sits at the left end and Discard, or Undo once discarded, at the right end, so the width of the row lies between them.
+- Destructive buttons should be separate to non-destructive buttons and be harder to hit by accident (e.g. by making them slightly smaller).
 - Discard shows only on the selected file, the current hunk or the picked lines, and on a file row under the pointer. Undo shows on every discarded part.
 
 ## Spacing around controls

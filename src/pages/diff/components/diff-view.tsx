@@ -285,10 +285,11 @@ function FloatingPanel({ side, top, transform, children }: { side: "left" | "rig
                 position: "absolute",
                 top,
                 //
-                // The left buttons sit past the first line number column, clear of the show and
-                // hide button of a bar of unchanged lines above.
+                // The left button is centred in the gap between the numbers of the two line number
+                // columns: the first column's numbers end `--space-2` before its edge, and the
+                // second column's two-digit numbers start as far past it.
                 //
-                [side]: side === "left" ? `calc(${GUTTER_WIDTH} + var(--space-2))` : "var(--space-4)",
+                [side]: side === "left" ? `calc(${GUTTER_WIDTH} + var(--space-1) * 1.5 - (var(--icon-md) * 0.85 + var(--space-2)) / 2)` : "var(--space-4)",
                 transform,
                 gap: "var(--space-2)",
                 fontFamily: "var(--font-sans)",
@@ -317,7 +318,7 @@ const STAGED_BAR_COLOUR = "color-mix(in srgb, var(--color-success) 55%, transpar
 const STAGED_BAR = `inset var(--space-1) 0 0 ${STAGED_BAR_COLOUR}`;
 
 //
-// True for the lines of the current hunk, whose colours stop at the hunk's border.
+// True for the lines of a hunk, whose colours stop at the hunk's border.
 //
 export const InsideBorderContext = createContext(false);
 
@@ -381,7 +382,7 @@ function useLinePick(line: IDiffLine | undefined): { id: string; isPicked: boole
         //
         padding: isPicked
             ? {
-                  paddingTop: before ? undefined : id === selection.actionsLine && (selection.actions.left || selection.actions.right) ? "var(--space-3)" : "var(--space-2)",
+                  paddingTop: before ? undefined : id === selection.actionsLine && (selection.actions.left || selection.actions.right) ? "var(--space-4)" : "var(--space-2)",
                   paddingBottom: after ? undefined : "var(--space-2)",
               }
             : {},
@@ -627,7 +628,8 @@ function GapButton({ label, detail, icon, onClick }: { label: string; detail: st
                         onClick();
                     }}
                     sx={{
-                        padding: "var(--space-1)",
+                        width: "calc(var(--icon-sm) + var(--space-2))",
+                        height: "calc(var(--icon-sm) + var(--space-2))",
                         color: "var(--color-accent)",
                         fontSize: "var(--icon-sm)",
                         borderRadius: "var(--radius-sm)",
@@ -659,7 +661,7 @@ export function gapLines(gap: IGap, oldFileLines: string[]): IDiffLine[] {
 // Renders the border that marks the current hunk or run of unchanged lines, set a little inside it
 // so it stays clear of the pane's own border.
 //
-function CurrentBorder(): ReactNode {
+function CurrentBorder({ isCurrent = true }: { isCurrent?: boolean }): ReactNode {
     return (
         <span
             aria-hidden="true"
@@ -669,7 +671,7 @@ function CurrentBorder(): ReactNode {
                 // The left edge sits just past the staged bar, so the border meets it.
                 //
                 inset: "calc(var(--space-1) / 2) var(--space-1) calc(var(--space-1) / 2) var(--space-1)",
-                border: "2px solid var(--color-select-item)",
+                border: `2px solid ${isCurrent ? "var(--color-select-item)" : "transparent"}`,
                 borderRadius: "var(--radius-sm)",
                 pointerEvents: "none",
                 zIndex: 1,
@@ -953,12 +955,13 @@ export function DiffView({
                                 position: "relative",
                                 cursor: onSelectHunk ? "pointer" : undefined,
                                 //
-                                // A hunk with floating buttons keeps room above its first line for
-                                // their lower half, so they hide no line number or text, and the
-                                // current hunk has room inside its border above and below.
+                                // Every hunk keeps the same room inside its border, transparent
+                                // until the hunk is current, so choosing a hunk moves nothing; a
+                                // hunk with floating buttons keeps a little more above its first
+                                // line for their lower half.
                                 //
-                                paddingTop: !hideHunkActions && hunkAction ? "var(--space-3)" : currentHunk === index ? "var(--space-2)" : undefined,
-                                paddingBottom: currentHunk === index ? "var(--space-2)" : undefined,
+                                paddingTop: !hideHunkActions && hunkAction ? "var(--space-4)" : "var(--space-2)",
+                                paddingBottom: "var(--space-2)",
                             }}
                         >
                             {isWholeHunkStaged(hunk) ? (
@@ -968,9 +971,9 @@ export function DiffView({
                                 //
                                 <span aria-hidden="true" style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "var(--space-1)", background: STAGED_BAR_COLOUR, pointerEvents: "none" }} />
                             ) : undefined}
-                            {currentHunk === index ? <CurrentBorder /> : undefined}
+                            <CurrentBorder isCurrent={currentHunk === index} />
                             {!hideHunkActions && hunkAction ? <HunkActions isAtTop={position === 0 && gaps[0].count === 0} actions={hunkAction(index)} /> : undefined}
-                            <InsideBorderContext.Provider value={currentHunk === index}>
+                            <InsideBorderContext.Provider value={true}>
                             {layout === "unified"
                                 ? hunk.lines.map((line, lineIndex) => <UnifiedRow key={lineIndex} line={line} partner={partners.get(line)} wrap={wrap} />)
                                 : splitRows(hunk.lines).map((row, rowIndex) => (

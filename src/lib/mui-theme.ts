@@ -251,7 +251,15 @@ export const graftTheme: Theme = createTheme({
         },
         MuiIconButton: {
             styleOverrides: {
+                //
+                // An icon button is square, its icon centred with room on every side between it and
+                // the border.
+                //
                 root: {
+                    width: "calc(var(--icon-lg) + var(--space-3))",
+                    height: "calc(var(--icon-lg) + var(--space-3))",
+                    padding: 0,
+                    flex: "none",
                     fontSize: "var(--icon-lg)",
                     color: "var(--color-text-muted)",
                     borderRadius: "var(--radius-md)",
@@ -269,6 +277,8 @@ export const graftTheme: Theme = createTheme({
                     },
                 },
                 sizeSmall: {
+                    width: "calc(var(--icon-md) + var(--space-3))",
+                    height: "calc(var(--icon-md) + var(--space-3))",
                     fontSize: "var(--icon-md)",
                 },
             },

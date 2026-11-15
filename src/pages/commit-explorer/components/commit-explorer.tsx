@@ -12,8 +12,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCodeBranch } from "@fortawesome/free-solid-svg-icons";
 import { KeyCaps } from "../../../components/shortcut";
 import { changedFile, commitByHash, graftHistory, type ICommit, type IHistory } from "../data";
-import { closeCommitDetailsPane, closeFilePane, COMMIT_SUMMARY_PATH, explorerKeys, initialExplorerState, selectCommit, selectFile, stateAfterKey, type IExplorerState } from "../explorer-state";
-import { filePathsInViewOrder, type FileListView } from "../file-views";
+import { closeCommitDetailsPane, closeFilePane, COMMIT_SUMMARY_PATH, explorerKeys, FOLDER_PREFIX, initialExplorerState, selectCommit, selectFile, stateAfterKey, type IExplorerState } from "../explorer-state";
+import { filePathsInViewOrder, parentFolder, rowPathsInViewOrder, type FileListView } from "../file-views";
 import { scrollLastChildIntoView, scrollSelectionIntoView } from "../scroll";
 import { parseHunks } from "../../diff/model";
 import { CommitDetailsPane, CommitInfoPane } from "./commit-details-pane";
@@ -93,7 +93,53 @@ export function matchingCommits(commits: ICommit[], search: string): ICommit[] {
 export function CommitExplorer({ history = graftHistory, initialState }: { history?: IHistory; initialState?: IExplorerState }): ReactNode {
     const [state, setState] = useState<IExplorerState>(initialState ?? { ...initialExplorerState, selectedHash: history.commits[0].hash });
     const [search, setSearch] = useState("");
-    const [fileView, setFileView] = useState<FileListView>("paths");
+    const [fileView, setFileView] = useState<FileListView>("tree");
+    const [treeRoot, setTreeRoot] = useState("");
+    const [rootHistory, setRootHistory] = useState<string[]>([]);
+    const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set());
+
+    //
+    // Collapses the folder `path` in the commit's file list, hiding the rows inside it, or expands
+    // it again.
+    //
+    function toggleCollapsedFolder(path: string, isCollapsed = !collapsedFolders.has(path)): void {
+        setCollapsedFolders(current => {
+            const next = new Set(current);
+            if (isCollapsed) {
+                next.add(path);
+            }
+            else {
+                next.delete(path);
+            }
+            return next;
+        });
+    }
+    const shownRoot = fileView === "tree" ? treeRoot : "";
+
+    //
+    // Shows only the open commit's files inside the folder `path`, with its first row selected.
+    //
+    function drillInto(path: string): void {
+        explorerRef.current?.focus();
+        setRootHistory(current => [...current, treeRoot]);
+        setTreeRoot(path);
+        setState(current => ({ ...current, activePaneIndex: 1, selectedPath: undefined, openPath: undefined }));
+    }
+
+    //
+    // Goes back from a folder the file list shows to the view it was opened from, with the folder
+    // selected.
+    //
+    function drillOut(): void {
+        if (treeRoot === "") {
+            return;
+        }
+        explorerRef.current?.focus();
+        const folder = `${FOLDER_PREFIX}${treeRoot}`;
+        setTreeRoot(rootHistory[rootHistory.length - 1] ?? parentFolder(treeRoot));
+        setRootHistory(current => current.slice(0, -1));
+        setState(current => ({ ...current, activePaneIndex: 1, selectedPath: folder, openPath: folder }));
+    }
     const [commitPaneWidth, setCommitPaneWidth] = useState<number | undefined>(undefined);
     const [detailsPaneWidth, setDetailsPaneWidth] = useState(DETAILS_PANE_WIDTH);
     const [maximised, setMaximised] = useState<number | undefined>(undefined);
@@ -111,7 +157,8 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     const explorerRef = useRef<HTMLDivElement>(null);
     const openCommit = state.openHash !== undefined ? commitByHash(history, state.openHash) : undefined;
     const isCommitOpen = state.openPath === COMMIT_SUMMARY_PATH;
-    const openFile = state.openHash !== undefined && state.openPath !== undefined && !isCommitOpen ? changedFile(history, state.openHash, state.openPath) : undefined;
+    const isFolderOpen = state.openPath?.startsWith(FOLDER_PREFIX) === true;
+    const openFile = state.openHash !== undefined && state.openPath !== undefined && !isCommitOpen && !isFolderOpen ? changedFile(history, state.openHash, state.openPath) : undefined;
     const [currentStop, setCurrentStop] = useState<DiffStop | undefined>(undefined);
     const currentHunk = currentStop?.kind === "hunk" ? currentStop.hunk : undefined;
     const currentGap = currentStop?.kind === "gap" ? currentStop.gap : undefined;
@@ -163,6 +210,11 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     }
 
     useEffect(() => {
+        setTreeRoot("");
+        setRootHistory([]);
+    }, [state.openHash]);
+
+    useEffect(() => {
         setCurrentStop(undefined);
     }, [state.openHash, state.openPath]);
 
@@ -200,7 +252,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         if (!openCommit) {
             return;
         }
-        const paths = [COMMIT_SUMMARY_PATH, ...filePathsInViewOrder(openCommit.files, fileView)];
+        const paths = [COMMIT_SUMMARY_PATH, ...filePathsInViewOrder(openCommit.files, fileView, shownRoot, collapsedFolders)];
         const index = state.openPath === undefined ? -1 : paths.indexOf(state.openPath);
         const next = paths[Math.min(Math.max(index + step, 0), paths.length - 1)];
         if (next !== undefined) {
@@ -232,6 +284,33 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             fileCardRef.current?.toggleGap(currentStop.gap);
             return;
         }
+        if (state.activePaneIndex === 1 && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
+            if (event.key === "Enter" && state.selectedPath?.startsWith(FOLDER_PREFIX)) {
+                event.preventDefault();
+                event.stopPropagation();
+                drillInto(state.selectedPath.slice(FOLDER_PREFIX.length));
+                return;
+            }
+            const folder = state.selectedPath?.startsWith(FOLDER_PREFIX) ? state.selectedPath.slice(FOLDER_PREFIX.length) : undefined;
+            if (folder !== undefined && event.key === "ArrowLeft" && !collapsedFolders.has(folder)) {
+                event.preventDefault();
+                event.stopPropagation();
+                toggleCollapsedFolder(folder, true);
+                return;
+            }
+            if (folder !== undefined && event.key === "ArrowRight" && collapsedFolders.has(folder)) {
+                event.preventDefault();
+                event.stopPropagation();
+                toggleCollapsedFolder(folder, false);
+                return;
+            }
+            if (event.key === "Escape" && shownRoot !== "") {
+                event.preventDefault();
+                event.stopPropagation();
+                drillOut();
+                return;
+            }
+        }
         if (!explorerKeys.includes(event.key) || event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target, event.key)) {
             return;
         }
@@ -250,7 +329,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         setState(current =>
             stateAfterKey(current, event.key, {
                 commitHashes: commits.map(commit => commit.hash),
-                filePaths: current.openHash !== undefined ? [COMMIT_SUMMARY_PATH, ...filePathsInViewOrder(commitByHash(history, current.openHash).files, fileView)] : [],
+                filePaths: current.openHash !== undefined ? [COMMIT_SUMMARY_PATH, ...rowPathsInViewOrder(commitByHash(history, current.openHash).files, fileView, shownRoot, FOLDER_PREFIX, collapsedFolders)] : [],
             }),
         );
     }
@@ -354,6 +433,11 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                         width={detailsPaneWidth}
                         fileView={fileView}
                         onChangeFileView={setFileView}
+                        treeRoot={shownRoot}
+                        onDrillIn={drillInto}
+                        onDrillOut={drillOut}
+                        collapsedFolders={collapsedFolders}
+                        onToggleFolder={path => toggleCollapsedFolder(path)}
                         onSelectFile={path => setState(current => selectFile(current, path))}
                         onClose={() => setState(closeCommitDetailsPane)}
                     />

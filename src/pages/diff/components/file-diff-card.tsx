@@ -411,15 +411,23 @@ export function DiffOptions({ layout, onLayout, wrap, onWrap, showAllLines, onSh
 // such as the diff's header, they take the size of the toolbar's other icon buttons.
 //
 //
-// The side of the square stage button: in a toolbar, the height of a small icon button; on a
-// hunk, picked lines or a file row, the height of the smaller action buttons.
+// The side of the square stage button: in a toolbar, a small icon button's; on a hunk, picked
+// lines or a file row, the smaller action buttons'.
 //
-const STAGE_SIZE = "calc(var(--icon-md) + var(--space-2) + var(--space-1) / 2)";
-const COMPACT_STAGE_SIZE = "calc(var(--icon-md) * 0.65 + var(--space-1) * 1.6)";
+const STAGE_SIZE = "calc(var(--icon-md) + var(--space-3))";
+const COMPACT_STAGE_SIZE = "calc(var(--icon-md) * 0.65 + var(--space-2))";
+
+//
+// The stage button on a hunk, picked lines or a file or folder row: larger than the Discard button
+// on the same row, so it is the easier of the two to hit.
+//
+const DIFF_STAGE_SIZE = "calc(var(--icon-md) * 0.85 + var(--space-2))";
 
 const ACTION_BUTTON_SIZE = {
     fontSize: "calc(var(--icon-md) * 0.65)",
-    padding: "calc(var(--space-1) * 0.8)",
+    width: COMPACT_STAGE_SIZE,
+    height: COMPACT_STAGE_SIZE,
+    padding: 0,
 };
 
 //
@@ -427,7 +435,19 @@ const ACTION_BUTTON_SIZE = {
 // button, in the stage button colours while it is unstaged and a minus on a slight green tinge
 // once it is staged, its tooltip naming what it does.
 //
-export function StageButton({ isStaged, what, onClick, isCompact = true }: { isStaged: boolean; what: string; onClick: () => void; isCompact?: boolean }): ReactNode {
+export function StageButton({
+    isStaged,
+    what,
+    onClick,
+    isCompact = true,
+    isProminent = false,
+}: {
+    isStaged: boolean;
+    what: string;
+    onClick: () => void;
+    isCompact?: boolean;
+    isProminent?: boolean;
+}): ReactNode {
     const label = isStaged ? `Unstage this ${what}` : `Stage this ${what}`;
     return (
         <Tooltip
@@ -447,8 +467,9 @@ export function StageButton({ isStaged, what, onClick, isCompact = true }: { isS
                 //
                 sx={{
                     ...(isCompact ? ACTION_BUTTON_SIZE : {}),
-                    width: isCompact ? COMPACT_STAGE_SIZE : STAGE_SIZE,
-                    height: isCompact ? COMPACT_STAGE_SIZE : STAGE_SIZE,
+                    ...(isProminent ? { fontSize: "calc(var(--icon-md) * 0.85)" } : {}),
+                    width: isProminent ? DIFF_STAGE_SIZE : isCompact ? COMPACT_STAGE_SIZE : STAGE_SIZE,
+                    height: isProminent ? DIFF_STAGE_SIZE : isCompact ? COMPACT_STAGE_SIZE : STAGE_SIZE,
                     padding: 0,
                     ...(isStaged
                         ? {
@@ -1109,7 +1130,7 @@ export function FileDiffCard({
     const lineActions: ISidedActions =
         selectedChangedCount > 0
             ? {
-                  left: stageable && !arePickedDiscarded ? <StageButton isStaged={selectedUnstagedCount === 0} what={pickedName} onClick={() => stageSelectedLines(selectedUnstagedCount > 0)} /> : undefined,
+                  left: stageable && !arePickedDiscarded ? <StageButton isStaged={selectedUnstagedCount === 0} what={pickedName} onClick={() => stageSelectedLines(selectedUnstagedCount > 0)} isProminent /> : undefined,
                   right: canDiscard ? arePickedDiscarded ? <UndoButton what={pickedName} onClick={discardPicked} /> : <DiscardButton what={pickedName} onClick={discardPicked} /> : undefined,
               }
             : {};
@@ -1353,7 +1374,7 @@ export function FileDiffCard({
                                     ? (index: number): ISidedActions => {
                                           const isDiscarded = discards !== undefined && isHunkDiscarded(discards, index);
                                           return {
-                                              left: stageable && !isDiscarded ? <StageButton isStaged={isHunkButtonStaged(index)} what="hunk" onClick={() => toggleHunk(index)} /> : undefined,
+                                              left: stageable && !isDiscarded ? <StageButton isStaged={isHunkButtonStaged(index)} what="hunk" onClick={() => toggleHunk(index)} isProminent /> : undefined,
                                               right: canDiscard ? (
                                                   isDiscarded ? (
                                                       <UndoButton what={discards.isFile ? "file" : "hunk"} onClick={() => onDiscardsChange(discards.isFile ? withFileDiscarded(discards, false) : withHunkMarked(discards, index, false))} />
