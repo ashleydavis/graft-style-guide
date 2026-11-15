@@ -51,6 +51,7 @@
     --green-600: #16a34a;
     --green-650: #169344;
     --green-700: #15803d;
+    --green-750: #157439;
     --green-900: #14532d;
     --green-950: #0f2e1a;
 
@@ -58,14 +59,18 @@
     --red-200: #fecaca;
     --red-400: #f87171;
     --red-600: #dc2626;
+    --red-650: #c51f1f;
     --red-900: #7f1d1d;
     --red-950: #3b1215;
     --red-975: #1a0505;
 
+    --amber-100: #fef3c7;
     --amber-400: #fbbf24;
     --amber-600: #d97706;
     --amber-650: #c76607;
     --amber-700: #b45309;
+    --amber-750: #a54a0b;
+    --amber-950: #3a2a0c;
 
     --blue-100: #dbeafe;
     --blue-300: #93c5fd;
@@ -79,10 +84,13 @@
     --blue-700: #1d4ed8;
     --blue-900: #1e3a8a;
 
+    --cyan-100: #cffafe;
     --cyan-400: #22d3ee;
     --cyan-600: #0891b2;
     --cyan-650: #098bac;
     --cyan-700: #0e7490;
+    --cyan-750: #0d6a84;
+    --cyan-950: #083344;
 
     --pink-400: #f472b6;
     --pink-600: #db2777;
@@ -157,10 +165,14 @@
     --color-focus: var(--blue-900);
     --color-select-pane: var(--blue-500);
     --color-select-item: var(--blue-700);
-    --color-success: var(--green-700);
-    --color-warning: var(--amber-700);
-    --color-danger: var(--red-600);
-    --color-info: var(--cyan-700);
+    --color-success: var(--green-750);
+    --color-warning: var(--amber-750);
+    --color-danger: var(--red-650);
+    --color-info: var(--cyan-750);
+    --color-success-subtle: var(--green-100);
+    --color-warning-subtle: var(--amber-100);
+    --color-danger-subtle: var(--red-100);
+    --color-info-subtle: var(--cyan-100);
     --color-on-danger: var(--gray-0);
     --color-scrim: var(--black-40);
     --color-diff-added: var(--green-100);
@@ -208,6 +220,10 @@
     --color-warning: var(--amber-400);
     --color-danger: var(--red-400);
     --color-info: var(--cyan-400);
+    --color-success-subtle: var(--green-950);
+    --color-warning-subtle: var(--amber-950);
+    --color-danger-subtle: var(--red-950);
+    --color-info-subtle: var(--cyan-950);
     --color-on-danger: var(--red-975);
     --color-scrim: var(--black-60);
     --color-diff-added: var(--green-950);

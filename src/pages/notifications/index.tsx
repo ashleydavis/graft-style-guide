@@ -222,7 +222,7 @@ export function NotificationsPage(): ReactNode {
         <div>
             <Section
                 title="Banners"
-                description="A message at the top of a view. Each status has its colour on the icon and on a bar down the left edge, and a plain message has neither. The words stay in the main text colour."
+                description="A message at the top of a view. Each status has its colour on the icon and a background tinted with it, and a plain message sits on the panel with a border. The words stay in the main text colour."
             >
                 <div className="flex flex-col" style={{ gap: "var(--space-2)", maxWidth: "560px" }}>
                     {exampleMessages.map(message => (

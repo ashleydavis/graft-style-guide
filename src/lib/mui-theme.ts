@@ -631,15 +631,27 @@ export const graftTheme: Theme = createTheme({
                 },
             },
         },
+        //
+        // A compact switch: a rounded track 36px wide with the knob inside it.
+        //
         MuiSwitch: {
             styleOverrides: {
                 root: {
+                    width: "36px",
+                    height: "20px",
+                    padding: 0,
+                    //
+                    // Room above and below keeps a column of switches apart, as the larger
+                    // switch's own padding did.
+                    //
+                    margin: "var(--space-1) var(--space-2) var(--space-1) var(--space-1)",
                     "& .MuiSwitch-switchBase.Mui-focusVisible .MuiSwitch-thumb": {
                         outline: "var(--focus-ring-width) solid var(--color-focus)",
                         outlineOffset: "var(--focus-ring-offset)",
                     },
                 },
                 track: {
+                    borderRadius: "var(--radius-full)",
                     backgroundColor: "var(--color-border-control)",
                     opacity: 1,
                     ".Mui-checked.Mui-checked + &": {
@@ -652,10 +664,17 @@ export const graftTheme: Theme = createTheme({
                     },
                 },
                 thumb: {
+                    width: "16px",
+                    height: "16px",
+                    borderRadius: "var(--radius-full)",
                     backgroundColor: "var(--color-panel)",
-                    boxShadow: "var(--shadow-raised)",
+                    boxShadow: "none",
                 },
                 switchBase: {
+                    padding: "2px",
+                    "&.Mui-checked": {
+                        transform: "translateX(16px)",
+                    },
                     "&.Mui-checked .MuiSwitch-thumb": {
                         backgroundColor: "var(--color-on-accent)",
                     },
@@ -935,8 +954,9 @@ export const graftTheme: Theme = createTheme({
                 },
             },
             //
-            // Each severity marks the message with its status colour on the icon and a bar down
-            // the left edge, and keeps the text in the main text colour.
+            // Each severity marks the message with a background tinted with its status colour and
+            // the status colour on the icon, with no border, and keeps the text in the main text
+            // colour.
             //
             variants: [
                 ...(["success", "info", "warning", "error"] as const).map(severity => ({
@@ -944,22 +964,24 @@ export const graftTheme: Theme = createTheme({
                         severity,
                     },
                     style: {
-                        borderLeft: `3px solid var(--color-${severity === "error" ? "danger" : severity})`,
+                        backgroundColor: `var(--color-${severity === "error" ? "danger" : severity}-subtle)`,
+                        border: "none",
                         "& .MuiAlert-icon": {
                             color: `var(--color-${severity === "error" ? "danger" : severity})`,
                         },
                     },
                 })),
                 //
-                // A plain message comes after the severities, so its plain edge replaces the
-                // status bar of the severity MUI gives every Alert by default.
+                // A plain message comes after the severities, so its panel background and border
+                // replace the tint of the severity MUI gives every Alert by default.
                 //
                 {
                     props: {
                         variant: "plain",
                     },
                     style: {
-                        borderLeft: "1px solid var(--color-border)",
+                        backgroundColor: "var(--color-panel)",
+                        border: "1px solid var(--color-border)",
                     },
                 },
             ],
