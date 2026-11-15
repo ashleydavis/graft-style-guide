@@ -6,11 +6,6 @@
 
 import { useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { diffStops, stopAfterMove, type DiffStop } from "../../diff/stops";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
@@ -30,12 +25,11 @@ import { FilePathMenu } from "../../../components/file-path-menu";
 import { KeyCaps } from "../../../components/shortcut";
 import { Tip } from "../../../components/tip";
 import { FilePath } from "../../commit-explorer/components/file-path";
-import { LineCounts } from "../../commit-explorer/components/line-counts";
 import { Pane } from "../../commit-explorer/components/pane";
-import { countLines, FileDiffCard, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
-import { parseHunks, sectionDiff, withHunkDiscarded as withHunkRemoved, withLinesDiscarded, type ISectionDiff } from "../../diff/model";
-import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withLinesRenumbered, withFileToggled, withHunkDiscarded as withStagedHunkDiscarded, withHunkToggled, type IStaging } from "../../diff/staging";
-import { StatusLetter } from "../../tree";
+import { DISCARD_KEYS, DiscardButton, FileDiffCard, StageButton, UndoButton, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
+import { noDiscards, withFileDiscarded, withHunkMarked, type IDiscards } from "../../diff/discards";
+import { parseHunks, sectionDiff, type ISectionDiff } from "../../diff/model";
+import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
 import { withViewTransition } from "../../../lib/view-transition";
 
 //
@@ -140,9 +134,8 @@ export function SplitDiff({
     onSelectHunk,
     onSelectGap,
     cardRef,
-    onDiscardFile,
-    onDiscardHunk,
-    onDiscardLines,
+    discards,
+    onDiscardsChange,
     isMaximised,
     onToggleMaximise,
 }: {
@@ -154,9 +147,8 @@ export function SplitDiff({
     onSelectHunk: (hunkIndex: number) => void;
     onSelectGap: (card: string, gapIndex: number) => void;
     cardRef: (card: string) => Ref<IFileDiffCardHandle>;
-    onDiscardFile: () => void;
-    onDiscardHunk: (hunkIndex: number) => void;
-    onDiscardLines: (lines: ReadonlyMap<number, ReadonlySet<number>>) => void;
+    discards: IDiscards;
+    onDiscardsChange: (discards: IDiscards) => void;
     isMaximised: boolean;
     onToggleMaximise: () => void;
 }): ReactNode {
@@ -181,7 +173,6 @@ export function SplitDiff({
                                 file={file}
                                 label={section.card}
                                 section={section.action === "unstage" ? "staged" : "unstaged"}
-                                onDiscardLines={onDiscardLines}
                                 isCurrent={isCurrent && ((currentHunk !== undefined && section.hunks.includes(currentHunk)) || (currentStop?.kind === "gap" && currentStop.card === section.card))}
                                 currentHunk={currentHunk}
                                 currentGap={currentStop?.kind === "gap" && currentStop.card === section.card ? currentStop.gap : undefined}
@@ -190,8 +181,8 @@ export function SplitDiff({
                                 onStagingChange={onStagingChange}
                                 answersKeys={false}
                                 onSelectHunk={onSelectHunk}
-                                onDiscardFile={onDiscardFile}
-                                onDiscardHunk={onDiscardHunk}
+                                discards={discards}
+                                onDiscardsChange={onDiscardsChange}
                                 isMaximised={isMaximised}
                                 onToggleMaximise={onToggleMaximise}
                                 initialWrap
@@ -265,7 +256,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [diffMode, setDiffMode] = useState<"one" | "split">("one");
     const [maximised, setMaximised] = useState<0 | 1 | 2 | undefined>(undefined);
     const [fileSearch, setFileSearch] = useState("");
-    const [pendingDiscard, setPendingDiscard] = useState<{ path: string; hunk?: number; lines?: ReadonlyMap<number, ReadonlySet<number>> } | undefined>(undefined);
+    const [discardsByPath, setDiscardsByPath] = useState<ReadonlyMap<string, IDiscards>>(new Map());
+    const discardsOf = (path: string): IDiscards => discardsByPath.get(path) ?? noDiscards();
+
+    function setDiscards(path: string, discards: IDiscards): void {
+        setDiscardsByPath(current => new Map(current).set(path, discards));
+    }
     const areaRef = useRef<HTMLDivElement>(null);
     const shownFiles = files.filter(file => `${file.oldPath ?? ""} ${file.path}`.toLowerCase().includes(fileSearch.trim().toLowerCase()));
     const selectedFile = files.find(file => file.path === selectedPath);
@@ -311,17 +307,6 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         if (next) {
             selectFile(next.file.path, next.section, pane);
         }
-    }
-
-    //
-    // Returns the diff a row counts its lines from: the staged part for a row under Staged, the
-    // unstaged part for a row under Unstaged, and the whole change in one diff.
-    //
-    function rowDiffOf(file: IFileDiff, section: ListSection): string | undefined {
-        if (section === "all" || file.diff === undefined) {
-            return file.diff;
-        }
-        return fileSectionDiff(file, stagingOf(file), section).diff;
     }
 
     //
@@ -403,84 +388,25 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Throws away the change waiting in `pendingDiscard`: a whole file leaves the list, and a hunk
-    // leaves its file's diff, taking the file with it when it was the file's last change.
+    // Discards the part the keys are on, or brings it back when it is discarded: the selected file
+    // in the file list, and in the diff the picked lines, else the current hunk, else the file.
     //
-    function discard(): void {
-        if (!pendingDiscard) {
+    function discardCurrent(): void {
+        if (!selectedFile) {
             return;
         }
-        const { path, hunk, lines } = pendingDiscard;
-        setPendingDiscard(undefined);
-        const file = files.find(candidate => candidate.path === path);
-        if (!file) {
-            return;
-        }
-        if (lines) {
-            discardLines(file, lines);
-            return;
-        }
-        const isLastChange = hunk === undefined || hunkCountOf(file) <= 1;
-        if (isLastChange) {
-            const index = files.indexOf(file);
-            const left = files.filter(candidate => candidate !== file);
-            setFiles(left);
-            setStagings(current => {
-                const next = new Map(current);
-                next.delete(path);
-                return next;
-            });
-            if (selectedPath === path) {
-                setSelectedPath(left[Math.min(index, left.length - 1)]?.path);
-                setCurrentHunk(undefined);
+        const discards = discardsOf(selectedFile.path);
+        if (activePane === 1) {
+            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
+            if (cards.some(card => cardRefs.current.get(card)?.discardPicked() === true)) {
+                return;
             }
-            return;
-        }
-        setFiles(files.map(candidate => (candidate === file ? { ...file, diff: withHunkRemoved(file.diff ?? "", hunk), stagedHunks: undefined } : candidate)));
-        setStaging(path, withStagedHunkDiscarded(stagingOf(file), hunk));
-        if (selectedPath === path && currentHunk !== undefined) {
-            setCurrentHunk(currentHunk > hunk ? currentHunk - 1 : currentHunk === hunk ? undefined : currentHunk);
-        }
-    }
-
-    //
-    // Throws away the picked lines of `file`, `lines` giving each hunk's line positions, last hunk
-    // first so the earlier hunks keep their positions. A hunk with no changes left drops out, and a
-    // file with no hunks left leaves the list. The staging of the lines that stay follows them.
-    //
-    function discardLines(file: IFileDiff, lines: ReadonlyMap<number, ReadonlySet<number>>): void {
-        let diff = file.diff ?? "";
-        let staging = stagingOf(file);
-        for (const hunk of [...lines.keys()].sort((a, b) => b - a)) {
-            const before = parseHunks(diff);
-            const result = withLinesDiscarded(diff, hunk, lines.get(hunk) ?? new Set());
-            diff = result.diff;
-            staging = result.lineMap === undefined ? withStagedHunkDiscarded(staging, hunk) : withLinesRenumbered(staging, before[hunk], hunk, result.lineMap, parseHunks(diff)[hunk]);
-        }
-        if (parseHunks(diff).length === 0) {
-            const index = files.indexOf(file);
-            const left = files.filter(candidate => candidate !== file);
-            setFiles(left);
-            if (selectedPath === file.path) {
-                setSelectedPath(left[Math.min(index, left.length - 1)]?.path);
+            if (currentHunk !== undefined && !discards.isFile) {
+                setDiscards(selectedFile.path, withHunkMarked(discards, currentHunk, !discards.hunks.has(currentHunk)));
+                return;
             }
         }
-        else {
-            setFiles(files.map(candidate => (candidate === file ? { ...file, diff, stagedHunks: undefined } : candidate)));
-            setStaging(file.path, staging);
-        }
-        setCurrentHunk(undefined);
-    }
-
-    //
-    // Returns the discard dialog's title for what waits to be discarded: a file, a change or lines.
-    //
-    function discardTitle(): string {
-        if (pendingDiscard?.lines) {
-            const count = [...pendingDiscard.lines.values()].reduce((total, lines) => total + lines.size, 0);
-            return `Discard ${count} ${count === 1 ? "line" : "lines"}?`;
-        }
-        return pendingDiscard?.hunk === undefined ? "Discard the file's changes?" : "Discard this change?";
+        setDiscards(selectedFile.path, withFileDiscarded(discards, !discards.isFile));
     }
 
     function onKeyDown(event: KeyboardEvent): void {
@@ -491,6 +417,11 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         if (key === "m" || key === "M") {
             event.preventDefault();
             toggleMaximise(activePane);
+            return;
+        }
+        if (DISCARD_KEYS.includes(key) && activePane !== 2) {
+            event.preventDefault();
+            discardCurrent();
             return;
         }
         if (activePane === 1) {
@@ -561,7 +492,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             }}
         >
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row" style={{ gap: "var(--space-3)", padding: "var(--space-3)" }}>
-                <div className={maximised === 1 || maximised === 2 ? "hidden" : maximised === 0 ? "flex min-h-0 flex-1 flex-col" : "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[360px] lg:flex-none"} style={{ gap: "var(--space-3)" }}>
+                <div className={maximised === 1 || maximised === 2 ? "hidden" : maximised === 0 ? "flex min-h-0 flex-1 flex-col" : "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[280px] lg:flex-none 2xl:w-[360px]"} style={{ gap: "var(--space-3)" }}>
                     <div className="flex min-h-0 flex-1 flex-col" style={{ maxHeight: "100%" }} onPointerDown={() => setActivePane(0)}>
                         <Pane
                             label="Changed files"
@@ -632,7 +563,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 <span className="flex items-baseline" style={{ gap: "var(--space-2)" }}>
                                     Changes
                                     <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-normal)", color: "var(--color-text-muted)" }}>
-                                        {files.length} {files.length === 1 ? "file" : "files"}, {stagedFiles.length} staged
+                                        {files.length === 0 ? "none" : `${files.length} ${files.length === 1 ? "file" : "files"}, ${stagedFiles.length} staged`}
                                     </span>
                                 </span>
                             }
@@ -652,10 +583,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     {entries.map((entry, index) => {
                                         const { file, section } = entry;
                                         const state = stagedState(stagingOf(file), hunkCountOf(file));
-                                        const counts = countLines(rowDiffOf(file, section));
                                         const heading = section !== "all" && entries[index - 1]?.section !== section;
                                         const isChecked = section === "staged" ? true : section === "unstaged" ? false : state === "all";
-                                        const isPartial = section === "all" && state === "some";
                                         return [
                                             heading ? (
                                                 <ListSubheader key={`${section}-heading`} component="li">
@@ -664,6 +593,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                             ) : undefined,
                                             <ListItemButton
                                                 key={`${section}:${file.path}`}
+                                                className={discardsOf(file.path).isFile ? "graft-discarded" : undefined}
+                                                data-discarded={discardsOf(file.path).isFile || undefined}
                                                 component="li"
                                                 aria-label={section === "all" ? file.path : `${section === "staged" ? "Staged" : "Unstaged"} ${file.path}`}
                                                 selected={entry === selectedEntry}
@@ -671,27 +602,23 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                                 sx={{
                                                     gap: "var(--space-2)",
                                                     fontSize: "var(--text-sm)",
-                                                    paddingLeft: "var(--space-1)",
+                                                    paddingRight: "var(--space-2)",
                                                     "& .file-path-menu": { opacity: 0 },
                                                     "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
                                                 }}
                                             >
-                                                <Tooltip title={<Tip title={isChecked ? "Unstage the file" : "Stage the file"} detail={state === "some" ? "Some of its changes are staged and some are not." : undefined} />}>
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={isChecked}
-                                                        indeterminate={isPartial}
-                                                        onClick={event => event.stopPropagation()}
-                                                        onChange={() => toggleEntry(entry)}
-                                                        slotProps={{ input: { "aria-label": `Stage ${file.path}` } }}
-                                                    />
-                                                </Tooltip>
                                                 <span className="min-w-0 flex-1">
                                                     <FilePath path={file.path} />
                                                 </span>
                                                 <FilePathMenu path={file.path} />
-                                                <StatusLetter status={file.status} />
-                                                {file.diff !== undefined ? <LineCounts added={counts.added} deleted={counts.deleted} /> : undefined}
+                                                <span data-floating-actions className="flex flex-none items-center" style={{ gap: "var(--space-2)" }}>
+                                                    {discardsOf(file.path).isFile ? (
+                                                        <UndoButton what="file" onClick={() => setDiscards(file.path, noDiscards())} />
+                                                    ) : (
+                                                        <DiscardButton what="file" onClick={() => setDiscards(file.path, withFileDiscarded(discardsOf(file.path), true))} />
+                                                    )}
+                                                    {discardsOf(file.path).isFile ? undefined : <StageButton isStaged={isChecked} what="file" onClick={() => toggleEntry(entry)} />}
+                                                </span>
                                             </ListItemButton>,
                                         ];
                                     })}
@@ -715,9 +642,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     setCurrentStop({ kind: "gap", gap, card });
                                     setActivePane(1);
                                 }}
-                                onDiscardFile={() => setPendingDiscard({ path: selectedFile.path })}
-                                onDiscardHunk={hunk => setPendingDiscard({ path: selectedFile.path, hunk })}
-                                onDiscardLines={lines => setPendingDiscard({ path: selectedFile.path, lines })}
+                                discards={discardsOf(selectedFile.path)}
+                                onDiscardsChange={discards => setDiscards(selectedFile.path, discards)}
                                 isMaximised={maximised === 1}
                                 onToggleMaximise={() => toggleMaximise(1)}
                                 onSelectHunk={hunk => {
@@ -742,9 +668,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     staging={stagingOf(selectedFile)}
                                     onStagingChange={staging => setStaging(selectedFile.path, staging)}
                                     answersKeys={false}
-                                    onDiscardFile={() => setPendingDiscard({ path: selectedFile.path })}
-                                    onDiscardHunk={hunk => setPendingDiscard({ path: selectedFile.path, hunk })}
-                                    onDiscardLines={lines => setPendingDiscard({ path: selectedFile.path, lines })}
+                                    discards={discardsOf(selectedFile.path)}
+                                    onDiscardsChange={discards => setDiscards(selectedFile.path, discards)}
                                     isMaximised={maximised === 1}
                                     onToggleMaximise={() => toggleMaximise(1)}
                                     onSelectHunk={hunk => {
@@ -758,13 +683,13 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         )
                     ) : (
                         <div className="flex flex-1 items-center justify-center" style={{ color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
-                            Select a file to see its diff.
+                            {files.length === 0 ? "Nothing to commit." : "Select a file to see its diff."}
                         </div>
                     )}
                 </div>
 
                 <div
-                    className={maximised === 2 ? "flex min-h-0 flex-1 flex-col" : maximised === undefined ? "flex min-h-0 flex-none flex-col lg:w-[300px]" : "hidden"}
+                    className={maximised === 2 ? "flex min-h-0 flex-1 flex-col" : maximised === undefined ? "flex min-h-0 flex-none flex-col lg:w-[240px] 2xl:w-[300px]" : "hidden"}
                     onPointerDown={() => setActivePane(2)}
                 >
                 <Pane label="Commit" title="Commit" width="100%" fillsHeight isActive={activePane === 2} isMaximised={maximised === 2} onToggleMaximise={() => toggleMaximise(2)}>
@@ -820,7 +745,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     >
                         <span>
                             <Button variant="contained" fullWidth disabled={!canCommit} onClick={commit}>
-                                {amend ? "Amend commit" : `Commit ${stagedFiles.length} ${stagedFiles.length === 1 ? "file" : "files"}`}
+                                {amend ? "Amend commit" : stagedFiles.length === 0 ? "Nothing to commit" : `Commit ${stagedFiles.length} ${stagedFiles.length === 1 ? "file" : "files"}`}
                             </Button>
                         </span>
                     </Tooltip>
@@ -852,27 +777,6 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     </span>
                 ))}
             </div>
-            <Dialog open={pendingDiscard !== undefined} onClose={() => setPendingDiscard(undefined)} container={() => areaRef.current} maxWidth="xs" fullWidth={true}>
-                <DialogTitle>{discardTitle()}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {pendingDiscard?.lines
-                            ? `Puts these lines of ${pendingDiscard.path} back as they were in the last commit.`
-                            : pendingDiscard?.hunk === undefined
-                              ? `Puts ${pendingDiscard?.path ?? ""} back as it was in the last commit.`
-                              : `Puts this part of ${pendingDiscard.path} back as it was in the last commit.`}{" "}
-                        Discarded changes are gone for good.
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button variant="text" onClick={() => setPendingDiscard(undefined)}>
-                        Keep changes
-                    </Button>
-                    <Button variant="outlined" color="error" onClick={discard}>
-                        Discard
-                    </Button>
-                </DialogActions>
-            </Dialog>
         </div>
     );
 }

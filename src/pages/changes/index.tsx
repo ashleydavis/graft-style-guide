@@ -16,9 +16,12 @@ export function ChangesPage(): ReactNode {
         <div>
             <Section
                 title="Staging and committing"
-                description="The changed files on the left, each with a checkbox that stages the whole file: ticked when it is all staged and half-ticked when some of its changes are. Selecting a file shows its diff beside the list, with Stage, Unstage and Discard for the file and for each change. To the right of the diff, write a summary and a description, tick Amend or No verify if you need them, and commit. Click the area, then Up and Down move through the files, Right moves into the diff to step through its changes, and Space stages or unstages."
+                description="The changed files on the left, each with Discard and a plus that stages it or a minus that unstages it. Selecting a file shows its diff beside the list, with the same buttons for the file and for each change. Discard fades the file, change or lines in place and turns its button into Undo; the Delete key does the same for what the keys are on. To the right of the diff, write a summary and a description, tick Amend or No verify if you need them, and commit. Click the area, then Up and Down move through the files, Right moves into the diff to step through its changes, and Space stages or unstages."
             >
                 <ChangesArea startFiles={[zoomChange, ...commitFiles]} />
+            </Section>
+            <Section title="Nothing to commit" description="The working tree matches the last commit: the file list says so, the diff has nothing to show and the Commit button waits for a change to stage, or for Amend.">
+                <ChangesArea startFiles={[]} />
             </Section>
         </div>
     );

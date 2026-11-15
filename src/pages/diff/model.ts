@@ -249,54 +249,6 @@ export function wordPieces(text: string, partner: string): IWordPiece[] {
     return pieces;
 }
 
-//
-// Returns the diff without the hunks at the positions in `drop`, from 0, as it reads once those
-// hunks are committed and only the rest of the change is left.
-//
-export function withoutHunks(diff: string, drop: ReadonlySet<number>): string {
-    const kept: string[] = [];
-    let hunk = -1;
-    for (const line of diff.split("\n")) {
-        if (line.startsWith("@@")) {
-            hunk += 1;
-        }
-        if (!drop.has(hunk)) {
-            kept.push(line);
-        }
-    }
-    return kept.join("\n");
-}
-
-//
-// Returns the diff without hunk `index`, from 0, as it reads once that change is discarded and the
-// file goes back to how it was there. The hunks after it start that many lines earlier in the new
-// file, so their headers' new line numbers move up by the lines the discarded hunk added less the
-// lines it deleted.
-//
-export function withHunkDiscarded(diff: string, index: number): string {
-    const hunk = parseHunks(diff)[index];
-    if (!hunk) {
-        return diff;
-    }
-    const added = hunk.lines.filter(line => line.kind === "added").length;
-    const deleted = hunk.lines.filter(line => line.kind === "deleted").length;
-    const shift = added - deleted;
-    let position = -1;
-    return withoutHunks(diff, new Set([index]))
-        .split("\n")
-        .map(line => {
-            if (!line.startsWith("@@")) {
-                return line;
-            }
-            position += 1;
-            if (position < index) {
-                return line;
-            }
-            return line.replace(/^(@@ -\S+ \+)(\d+)/, (_match, start: string, newStart: string) => `${start}${Number(newStart) - shift}`);
-        })
-        .join("\n");
-}
-
 
 //
 // The unchanged lines between two hunks, before the first or after the last: where they start in
@@ -411,56 +363,4 @@ export function sectionDiff(diff: string, stagedLines: (hunk: IHunk, index: numb
         shift += stagedShift;
     });
     return { diff: texts.join("\n"), hunkIndexes, lineIndexes };
-}
-
-//
-// What is left of a diff once some lines of one hunk are discarded: the diff, and for that hunk
-// each old line position's new one, or -1 for a line that went. `lineMap` is undefined when the
-// hunk had no changes left and dropped out.
-//
-export interface ILinesDiscarded {
-    diff: string;
-    lineMap: number[] | undefined;
-}
-
-//
-// Returns `diff` with the lines at `lineIndexes` of hunk `index` discarded, put back as they were
-// in the last commit: a discarded added line goes and a discarded deleted line stays as a kept
-// line. The hunks after it start as many lines earlier or later in the new file as the change
-// added or took away there.
-//
-export function withLinesDiscarded(diff: string, index: number, lineIndexes: ReadonlySet<number>): ILinesDiscarded {
-    const hunks = parseHunks(diff);
-    const hunk = hunks[index];
-    if (!hunk) {
-        return { diff, lineMap: undefined };
-    }
-    const lines: IDiffLine[] = [];
-    const lineMap: number[] = [];
-    hunk.lines.forEach((line, position) => {
-        if (!lineIndexes.has(position) || line.kind === "context") {
-            lineMap.push(lines.length);
-            lines.push(line);
-        }
-        else if (line.kind === "deleted") {
-            lineMap.push(lines.length);
-            lines.push({ ...line, kind: "context" });
-        }
-        else {
-            lineMap.push(-1);
-        }
-    });
-    if (!lines.some(line => line.kind !== "context")) {
-        return { diff: withHunkDiscarded(diff, index), lineMap: undefined };
-    }
-    const newLinesBefore = hunk.lines.filter(line => line.kind !== "deleted").length;
-    const newLinesAfter = lines.filter(line => line.kind !== "deleted").length;
-    const shift = newLinesAfter - newLinesBefore;
-    const texts = hunks.flatMap((each, position) => {
-        if (position === index) {
-            return hunkText(each, each.oldStart, each.newStart, lines);
-        }
-        return hunkText(each, each.oldStart, position > index ? each.newStart + shift : each.newStart, each.lines);
-    });
-    return { diff: texts.join("\n"), lineMap };
 }

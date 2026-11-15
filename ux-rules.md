@@ -11,8 +11,9 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 - A dangerous action's button is outlined, never filled: its text, its icon and its border are `--color-danger` on a see-through background. On hover the border thickens to 2px and the background stays see-through.
 - An icon-only dangerous button, such as the trash can that discards a file, a hunk or lines, follows the same rule: icon and border in `--color-danger`.
 - A disabled dangerous button takes the disabled colours, `--color-text-disabled` and `--color-border`, like any disabled button.
-- A dangerous button's tooltip says what it does and what is lost, and that Graft asks first.
-- A dangerous action always asks first in a dialog. The title is a question that names what goes, such as "Discard 3 lines?". The body says what happens and that the change is gone for good. The safe way out comes first as a text button that names what stays, such as "Keep changes", and the dangerous button comes after it, outlined in `--color-danger`, naming the action, such as "Discard". Escape and a click outside the dialog keep the work.
+- A dangerous button's tooltip says what it does, how to undo it and its key.
+- Discarding takes effect straight away and asks nothing. The discarded file, hunk or lines play a short animation, stay in view faded and struck through, and their Discard button turns into an Undo button that brings them back.
+- Discard has a key, Delete, that acts on what is selected: the file in the file list, and in the diff the selected lines, else the current hunk, else the file. Pressing it on a discarded part brings it back.
 - A dangerous button sits before the safe action beside it, such as Discard before Stage, so the safe action keeps the end of the row.
 
 ## Spacing around controls

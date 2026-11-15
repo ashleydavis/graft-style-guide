@@ -157,24 +157,3 @@ export function withFileToggled(staging: IStaging, hunkCount: number): IStaging 
         isWholeFile: !isStaged,
     };
 }
-
-//
-// Returns the staging once hunk `index` is discarded: that hunk drops out and the staged hunks
-// after it move up one place.
-//
-export function withHunkDiscarded(staging: IStaging, index: number): IStaging {
-    const shift = (hunk: number): number => (hunk > index ? hunk - 1 : hunk);
-    const hunks = new Set([...staging.hunks].filter(hunk => hunk !== index).map(shift));
-    const lines = new Map([...staging.lines].filter(([hunk]) => hunk !== index).map(([hunk, staged]) => [shift(hunk), staged] as const));
-    return { hunks, lines, isWholeFile: staging.isWholeFile && (hunks.size > 0 || lines.size > 0) };
-}
-
-//
-// Returns the staging once some lines of hunk `index` are discarded and the hunk's lines renumber:
-// `lineMap` gives each old line position its new one, or -1 for a line that went. The hunk's
-// remaining staged lines keep their staging under their new positions.
-//
-export function withLinesRenumbered(staging: IStaging, hunk: IHunk, index: number, lineMap: number[], newHunk: IHunk): IStaging {
-    const staged = [...stagedLinesOf(staging, hunk, index)].map(line => lineMap[line]).filter(line => line >= 0 && newHunk.lines[line]?.kind !== "context");
-    return withLinesStaged(withHunkStaged(staging, index, false), newHunk, index, staged, true);
-}

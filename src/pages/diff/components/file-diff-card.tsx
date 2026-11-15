@@ -17,17 +17,18 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faChevronDown, faChevronRight, faFileImage, faFileShield, faTableColumns, faSliders, faBars, faCircleInfo, faObjectGroup, faListCheck, faTriangleExclamation, faPlus, faMinus, faXmark, faExpand, faCompress, faMagnifyingGlass, faChevronUp, faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faChevronDown, faChevronRight, faFileImage, faFileShield, faTableColumns, faSliders, faBars, faCircleInfo, faObjectGroup, faListCheck, faTriangleExclamation, faPlus, faMinus, faXmark, faExpand, faCompress, faMagnifyingGlass, faChevronUp, faTrashCan, faRotateLeft } from "@fortawesome/free-solid-svg-icons";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { MaximiseButton } from "../../../components/maximise-button";
 import { Tip } from "../../../components/tip";
 import { KeyCaps } from "../../../components/shortcut";
 import { FilePath } from "../../commit-explorer/components/file-path";
 import { statusColour } from "../../tree";
-import { parseHunks, sectionDiff } from "../model";
+import { gapBefore, parseHunks, sectionDiff } from "../model";
 import { emptyStaging, hunkStagedState, initialStaging, isFileStaged, stagedLinesOf, withFileToggled, withHunkStaged, withLinesStaged, type IStaging } from "../staging";
 import { scrollSelectionIntoView } from "../../commit-explorer/scroll";
 import { DiffView, type DiffLayout, type LinePick } from "./diff-view";
+import { isHunkDiscarded, isLineDiscarded, withFileDiscarded, withHunkMarked, withLinesMarked, type IDiscards } from "../discards";
 import { ImageDiff, type IImageVersion } from "./image-diff";
 
 //
@@ -431,14 +432,21 @@ export function StageButton({ isStaged, what, onClick }: { isStaged: boolean; wh
         </Tooltip>
     );
 }
+//
+// The key that discards the file, hunk or picked lines the keys are on, or brings back a
+// discarded one, as KeyboardEvent.key names it. Backspace does the same, as the Delete key on a
+// Mac sends it.
+//
+export const DISCARD_KEYS = ["Delete", "Backspace"];
 
 //
-// Renders the Discard button for a file or a hunk: a small danger button, outlined in the error
-// colour, that throws away the changes of `what` in the working tree.
+// Renders the Discard button for a file, a hunk or picked lines: a small danger icon button, a
+// trash can in the danger colour. The part stays in view, faded and struck through, until Undo
+// brings it back.
 //
 export function DiscardButton({ what, onClick }: { what: string; onClick: () => void }): ReactNode {
     return (
-        <Tooltip title={<Tip title={`Discard this ${what}`} detail={`Puts the ${what} back as it was in the last commit. Asks first, because Git cannot bring the changes back.`} />}>
+        <Tooltip title={<Tip title={`Discard this ${what}`} detail={`Puts the ${what} back as it was in the last commit. Undo brings it back. Key: Delete`} />}>
             <IconButton
                 size="small"
                 color="error"
@@ -449,6 +457,27 @@ export function DiscardButton({ what, onClick }: { what: string; onClick: () => 
                 }}
             >
                 <FontAwesomeIcon icon={faTrashCan} />
+            </IconButton>
+        </Tooltip>
+    );
+}
+
+//
+// Renders the Undo button that takes the place of a discarded part's Discard button and brings the
+// part back.
+//
+export function UndoButton({ what, onClick }: { what: string; onClick: () => void }): ReactNode {
+    return (
+        <Tooltip title={<Tip title={`Undo the discard of this ${what}`} detail="Brings the changes back. Key: Delete" />}>
+            <IconButton
+                size="small"
+                aria-label={`Undo the discard of this ${what}`}
+                onClick={event => {
+                    event.stopPropagation();
+                    onClick();
+                }}
+            >
+                <FontAwesomeIcon icon={faRotateLeft} />
             </IconButton>
         </Tooltip>
     );
@@ -475,6 +504,12 @@ export interface IFileDiffCardHandle {
     // other key.
     //
     handleLineKey: (key: string, isShift: boolean) => boolean;
+
+    //
+    // Discards the picked changed lines in the lines mode, or brings them back when they are all
+    // discarded, and returns true. Returns false when no changed line is picked.
+    //
+    discardPicked: () => boolean;
 }
 
 //
@@ -581,20 +616,15 @@ export interface IFileDiffCardProps {
     section?: "staged" | "unstaged";
 
     //
-    // Called by the file's Discard button, absent for a card with no Discard buttons.
+    // What is discarded of the file, for a card with Discard buttons. Absent for a card with none.
     //
-    onDiscardFile?: () => void;
+    discards?: IDiscards;
 
     //
-    // Called with a hunk's position, from 0, by that hunk's Discard button.
+    // Called with the new discards when a Discard or Undo button is clicked.
     //
-    onDiscardHunk?: (hunkIndex: number) => void;
+    onDiscardsChange?: (discards: IDiscards) => void;
 
-    //
-    // Called with the lines picked in the line selection mode, by hunk position, by the Discard
-    // lines button. Absent for a card with no Discard buttons.
-    //
-    onDiscardLines?: (lines: ReadonlyMap<number, ReadonlySet<number>>) => void;
 
     //
     // True for a card that answers its own keys: Up and Down step through its hunks and Space
@@ -643,9 +673,8 @@ export function FileDiffCard({
     isMaximised = false,
     onToggleMaximise,
     section,
-    onDiscardFile,
-    onDiscardHunk,
-    onDiscardLines,
+    discards,
+    onDiscardsChange,
     onSelectHunk,
     staging: givenStaging,
     onStagingChange,
@@ -688,13 +717,16 @@ export function FileDiffCard({
     const [selectedLines, setSelectedLines] = useState<ReadonlySet<string>>(new Set());
     const [rangeStart, setRangeStart] = useState<string | undefined>(undefined);
     const [focusLine, setFocusLine] = useState<string | undefined>(undefined);
-    const canSelectLines = stageable || onDiscardLines !== undefined;
+    const [lineGap, setLineGap] = useState<number | undefined>(undefined);
+    const canDiscard = discards !== undefined && onDiscardsChange !== undefined;
+    const canSelectLines = stageable || canDiscard;
 
     function changeSelectingLines(isOn: boolean): void {
         setIsSelectingLines(isOn);
         setSelectedLines(new Set());
         setRangeStart(undefined);
         setFocusLine(undefined);
+        setLineGap(undefined);
     }
 
     function handleOptionKey(key: string): boolean {
@@ -717,7 +749,7 @@ export function FileDiffCard({
         return true;
     }
 
-    useImperativeHandle(ref, () => ({ toggleGap, handleOptionKey, handleLineKey }));
+    useImperativeHandle(ref, () => ({ toggleGap, handleOptionKey, handleLineKey, discardPicked }));
     const id = useId();
     const [search, setSearch] = useState("");
     const [currentMatch, setCurrentMatch] = useState(0);
@@ -816,17 +848,32 @@ export function FileDiffCard({
     // The ids of the lines the line selection mode can pick, "hunk:line" in the whole file's
     // numbering, in the order the diff draws them, and the ids of the staged ones.
     //
-    const selectableIds = useMemo(() => {
+    const { selectableIds, changedIds, shownGapIds } = useMemo(() => {
         const ids: string[] = [];
-        parseHunks(shownDiff ?? "").forEach((hunk, position) => {
+        const changed = new Set<string>();
+        const gapIds = new Map<number, string[]>();
+        const shownHunks = parseHunks(shownDiff ?? "");
+        function addGap(position: number): void {
+            const gap = gapBefore(shownHunks, position, file.oldFileLines?.length);
+            if (file.oldFileLines && gap.count > 0 && (gapStates.get(position) ?? showAllLines)) {
+                const lines = Array.from({ length: gap.count }, (_unused, index) => `u${position}:${index}`);
+                gapIds.set(position, lines);
+                ids.push(...lines);
+            }
+        }
+        shownHunks.forEach((hunk, position) => {
+            addGap(position);
             hunk.lines.forEach((line, index) => {
+                const id = `${shownHunkIndexes?.[position] ?? position}:${shown?.lineIndexes[position]?.[index] ?? index}`;
+                ids.push(id);
                 if (line.kind !== "context") {
-                    ids.push(`${shownHunkIndexes?.[position] ?? position}:${shown?.lineIndexes[position]?.[index] ?? index}`);
+                    changed.add(id);
                 }
             });
         });
-        return ids;
-    }, [shownDiff, shownHunkIndexes, shown]);
+        addGap(shownHunks.length);
+        return { selectableIds: ids, changedIds: changed, shownGapIds: gapIds };
+    }, [shownDiff, shownHunkIndexes, shown, file.oldFileLines, gapStates, showAllLines]);
     const stagedIds = useMemo(() => {
         const ids = new Set<string>();
         hunks.forEach((hunk, index) => {
@@ -836,6 +883,29 @@ export function FileDiffCard({
         });
         return ids;
     }, [hunks, staging]);
+
+    //
+    // The stops Up and Down move through in the lines mode, in the order the diff draws them: each
+    // changed line by its id and each run of unchanged lines as "gap:" and its position.
+    //
+    const lineStops = useMemo(() => {
+        if (shownDiff === undefined) {
+            return [];
+        }
+        return diffStops(shownDiff, file.oldFileLines, shownHunkIndexes).flatMap(stop =>
+            stop.kind === "gap" ? [`gap:${stop.gap}`, ...(shownGapIds.get(stop.gap) ?? [])] : selectableIds.filter(id => id.startsWith(`${stop.hunk}:`)),
+        );
+    }, [shownDiff, file.oldFileLines, shownHunkIndexes, selectableIds, shownGapIds]);
+
+    //
+    // Makes the run of unchanged lines at `gapIndex` the current stop in the lines mode, in place
+    // of any picked lines, as a click on its bar does.
+    //
+    function pickGap(gapIndex: number): void {
+        setSelectedLines(new Set());
+        setFocusLine(undefined);
+        setLineGap(gapIndex);
+    }
 
     //
     // Returns the ids from `from` to `to` in the order the diff draws them, both included.
@@ -854,6 +924,7 @@ export function FileDiffCard({
     // line picked first to this one. The line becomes the one the keys move from.
     //
     function pickLine(id: string, pick: LinePick): void {
+        setLineGap(undefined);
         if (pick === "range") {
             setSelectedLines(new Set(idsBetween(rangeStart ?? id, id)));
         }
@@ -885,16 +956,35 @@ export function FileDiffCard({
             return false;
         }
         if (key === "ArrowUp" || key === "ArrowDown") {
-            if (selectableIds.length === 0) {
+            const step = key === "ArrowDown" ? 1 : -1;
+            if (isShift) {
+                if (selectableIds.length > 0) {
+                    const index = focusLine === undefined ? -1 : selectableIds.indexOf(focusLine);
+                    const nextIndex = index < 0 ? (step > 0 ? 0 : selectableIds.length - 1) : Math.min(Math.max(index + step, 0), selectableIds.length - 1);
+                    pickLine(selectableIds[nextIndex], "range");
+                }
                 return true;
             }
-            const index = focusLine === undefined ? -1 : selectableIds.indexOf(focusLine);
-            const nextIndex = index < 0 ? (key === "ArrowDown" ? 0 : selectableIds.length - 1) : Math.min(Math.max(index + (key === "ArrowDown" ? 1 : -1), 0), selectableIds.length - 1);
-            pickLine(selectableIds[nextIndex], isShift ? "range" : "only");
+            if (lineStops.length === 0) {
+                return true;
+            }
+            const current = lineGap !== undefined ? `gap:${lineGap}` : focusLine;
+            const index = current === undefined ? -1 : lineStops.indexOf(current);
+            const next = lineStops[index < 0 ? (step > 0 ? 0 : lineStops.length - 1) : Math.min(Math.max(index + step, 0), lineStops.length - 1)];
+            if (next.startsWith("gap:")) {
+                pickGap(Number(next.slice(4)));
+            }
+            else {
+                pickLine(next, "only");
+            }
+            return true;
+        }
+        if (key === " " && lineGap !== undefined) {
+            toggleGap(lineGap);
             return true;
         }
         if (key === " " && stageable) {
-            if (selectedLines.size > 0) {
+            if (selectedChangedCount > 0) {
                 stageSelectedLines(selectedUnstagedCount > 0);
             }
             return true;
@@ -903,7 +993,8 @@ export function FileDiffCard({
     }
 
     useEffect(() => {
-        const element = focusLine ? bodyRef.current?.querySelector(`[data-line-id="${focusLine}"]`) : undefined;
+        const selector = lineGap !== undefined ? `[data-gap-index="${lineGap}"]` : focusLine ? `[data-line-id="${focusLine}"]` : undefined;
+        const element = selector ? bodyRef.current?.querySelector(selector) : undefined;
         if (element instanceof HTMLElement) {
             if (element.closest("[data-pane-scroll]")) {
                 scrollSelectionIntoView(element);
@@ -912,14 +1003,18 @@ export function FileDiffCard({
                 element.scrollIntoView({ block: "nearest" });
             }
         }
-    }, [focusLine]);
+    }, [focusLine, lineGap]);
 
     //
-    // Returns the selected lines grouped by hunk position, each with its line positions.
+    // Returns the picked changed lines grouped by hunk position, each with its line positions. Kept
+    // lines in the pick have nothing to stage or discard and are left out.
     //
     function selectedByHunk(): Map<number, Set<number>> {
         const byHunk = new Map<number, Set<number>>();
         for (const id of selectedLines) {
+            if (!changedIds.has(id)) {
+                continue;
+            }
             const [hunk, line] = id.split(":").map(Number);
             byHunk.set(hunk, (byHunk.get(hunk) ?? new Set()).add(line));
         }
@@ -935,26 +1030,34 @@ export function FileDiffCard({
         setSelectedLines(new Set());
     }
 
+    const selectedChangedCount = [...selectedLines].filter(id => changedIds.has(id)).length;
     const selectedStagedCount = [...selectedLines].filter(id => stagedIds.has(id)).length;
-    const selectedUnstagedCount = selectedLines.size - selectedStagedCount;
+    const selectedUnstagedCount = selectedChangedCount - selectedStagedCount;
     const pickedName = selectedLines.size === 1 ? "line" : "selection";
 
     //
     // The picked lines' buttons: Discard, then Stage, or Unstage when every picked line is staged.
     //
+    const pickedChangedIds = [...selectedLines].filter(id => changedIds.has(id));
+    const arePickedDiscarded = discards !== undefined && pickedChangedIds.length > 0 && pickedChangedIds.every(id => isLineDiscarded(discards, id));
+
+    //
+    // Discards the picked changed lines, or brings them back when they are all discarded, and
+    // returns true. Returns false when no changed line is picked.
+    //
+    function discardPicked(): boolean {
+        if (!canDiscard || pickedChangedIds.length === 0) {
+            return false;
+        }
+        onDiscardsChange(withLinesMarked(discards, pickedChangedIds, !arePickedDiscarded));
+        return true;
+    }
+
     const lineActions =
-        selectedLines.size > 0 ? (
+        selectedChangedCount > 0 ? (
             <>
-                {onDiscardLines ? (
-                    <DiscardButton
-                        what={pickedName}
-                        onClick={() => {
-                            onDiscardLines(selectedByHunk());
-                            setSelectedLines(new Set());
-                        }}
-                    />
-                ) : undefined}
-                {stageable ? <StageButton isStaged={selectedUnstagedCount === 0} what={pickedName} onClick={() => stageSelectedLines(selectedUnstagedCount > 0)} /> : undefined}
+                {canDiscard ? arePickedDiscarded ? <UndoButton what={pickedName} onClick={discardPicked} /> : <DiscardButton what={pickedName} onClick={discardPicked} /> : undefined}
+                {stageable && !arePickedDiscarded ? <StageButton isStaged={selectedUnstagedCount === 0} what={pickedName} onClick={() => stageSelectedLines(selectedUnstagedCount > 0)} /> : undefined}
             </>
         ) : undefined;
 
@@ -1062,8 +1165,14 @@ export function FileDiffCard({
                         onSelectingLines={canSelectLines ? changeSelectingLines : undefined}
                     />
                 ) : undefined}
-                {onDiscardFile ? <DiscardButton what="file" onClick={onDiscardFile} /> : undefined}
-                {stageable ? <StageButton isStaged={section === undefined ? fileStaged : section === "staged"} what="file" onClick={toggleFile} /> : undefined}
+                {canDiscard ? (
+                    discards.isFile ? (
+                        <UndoButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, false))} />
+                    ) : (
+                        <DiscardButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, true))} />
+                    )
+                ) : undefined}
+                {stageable && discards?.isFile !== true ? <StageButton isStaged={section === undefined ? fileStaged : section === "staged"} what="file" onClick={toggleFile} /> : undefined}
                 {onToggleMaximise ? <MaximiseButton isMaximised={isMaximised} onClick={onToggleMaximise} /> : undefined}
                 {onClose ? (
                     <Tooltip title="Close">
@@ -1176,12 +1285,14 @@ export function FileDiffCard({
                             lineIndexes={shown?.lineIndexes}
                             lineSelection={isSelectingLines ? { selected: selectedLines, onPick: pickLine, actionsLine: selectableIds.find(id => selectedLines.has(id)), actions: lineActions } : undefined}
                             hideHunkActions={isSelectingLines}
+                            discardedHunks={discards ? (discards.isFile ? new Set(hunks.map((_hunk, index) => index)) : discards.hunks) : undefined}
+                            discardedLines={discards?.lines}
                             search={search}
                             currentMatch={isSearching ? currentMatch : undefined}
                             onMatchCount={setMatchCount}
                             onSelectHunk={answersKeys ? hunk => setOwnStop({ kind: "hunk", hunk }) : onSelectHunk}
-                            onSelectGap={answersKeys ? gap => setOwnStop({ kind: "gap", gap }) : onSelectGap}
-                            currentGap={isSelectingLines ? undefined : shownGap}
+                            onSelectGap={isSelectingLines ? pickGap : answersKeys ? gap => setOwnStop({ kind: "gap", gap }) : onSelectGap}
+                            currentGap={isSelectingLines ? lineGap : shownGap}
                             gapStates={gapStates}
                             onGapStateChange={setGapState}
                             layout={layout}
@@ -1190,13 +1301,22 @@ export function FileDiffCard({
                             currentHunk={isSelectingLines ? undefined : shownHunk}
                             showAllLines={showAllLines}
                             hunkAction={
-                                stageable || onDiscardHunk
-                                    ? index => (
-                                          <>
-                                              {onDiscardHunk ? <DiscardButton what="hunk" onClick={() => onDiscardHunk(index)} /> : undefined}
-                                              {stageable ? <StageButton isStaged={isHunkButtonStaged(index)} what="hunk" onClick={() => toggleHunk(index)} /> : undefined}
-                                          </>
-                                      )
+                                stageable || canDiscard
+                                    ? index => {
+                                          const isDiscarded = discards !== undefined && isHunkDiscarded(discards, index);
+                                          return (
+                                              <>
+                                                  {canDiscard ? (
+                                                      isDiscarded ? (
+                                                          <UndoButton what={discards.isFile ? "file" : "hunk"} onClick={() => onDiscardsChange(discards.isFile ? withFileDiscarded(discards, false) : withHunkMarked(discards, index, false))} />
+                                                      ) : (
+                                                          <DiscardButton what="hunk" onClick={() => onDiscardsChange(withHunkMarked(discards, index, true))} />
+                                                      )
+                                                  ) : undefined}
+                                                  {stageable && !isDiscarded ? <StageButton isStaged={isHunkButtonStaged(index)} what="hunk" onClick={() => toggleHunk(index)} /> : undefined}
+                                              </>
+                                          );
+                                      }
                                     : undefined
                             }
                         />

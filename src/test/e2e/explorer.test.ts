@@ -943,13 +943,13 @@ test.describe("File paths, staging and tooltips", () => {
 test.describe("Changes and commit", () => {
     test("Up and Down move through the files, Space stages one and committing takes the staged files away", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         await area.focus();
         await page.keyboard.press("ArrowDown");
         await expect(area.getByRole("region", { name: "File diff" })).toContainText("theme-names.ts");
         await page.keyboard.press("ArrowDown");
         await page.keyboard.press("Space");
-        await expect(area.getByRole("checkbox", { name: "Stage frontend/src/lib/old-theme.ts" })).toBeChecked();
+        await expect(area.getByRole("button", { name: "frontend/src/lib/old-theme.ts", exact: true }).getByRole("button", { name: "Unstage this file" })).toBeVisible();
         await expect(area.getByRole("button", { name: "Commit 4 files" })).toBeDisabled();
         await area.getByRole("textbox", { name: "Summary" }).fill("Tidy the themes");
         await area.getByRole("button", { name: "Commit 4 files" }).click();
@@ -960,7 +960,7 @@ test.describe("Changes and commit", () => {
 
     test("ticking Amend brings in the last commit's message", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("checkbox", { name: "Amend" }).check();
         await expect(area.getByRole("textbox", { name: "Summary" })).toHaveValue("Show the Git commands each page runs");
         await expect(area.getByRole("button", { name: "Amend commit" })).toBeEnabled();
@@ -969,7 +969,7 @@ test.describe("Changes and commit", () => {
 
     test("the split view lists staged and unstaged files apart and shows the diff in two sections", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("button", { name: "Staged and unstaged" }).click();
         await expect(area.getByText("Staged (3)")).toBeVisible();
         await expect(area.getByText("Unstaged (7)")).toBeVisible();
@@ -981,7 +981,7 @@ test.describe("Changes and commit", () => {
 
     test("the search box narrows the changed files", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("textbox", { name: "Search changed files" }).fill("theme");
         await expect(area.getByRole("list", { name: "Changed files" }).locator(":scope > li")).toHaveCount(3);
         await expect(area).toContainText("3 of 9");
@@ -989,7 +989,7 @@ test.describe("Changes and commit", () => {
 
     test("an image file shows its old and new versions side by side", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("button", { name: "assets/graft-512.png" }).click();
         await expect(area.getByRole("img", { name: /^Before/ })).toBeVisible();
         await expect(area.getByRole("img", { name: /^After/ })).toBeVisible();
@@ -997,7 +997,7 @@ test.describe("Changes and commit", () => {
 
     test("M and the maximise button make a pane fill the area and put it back", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         await area.focus();
         await page.keyboard.press("m");
         await expect(area.getByRole("region", { name: "File diff" })).toBeHidden();
@@ -1086,29 +1086,48 @@ test.describe("Whole file, search in shown lines and clicking panes", () => {
 });
 
 test.describe("Discarding changes", () => {
-    test("discarding a hunk asks first, then takes it out of the diff", async ({ page }) => {
+    test("discarding a hunk fades it in place and Undo brings it back", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
-        await expect(card.locator("[data-hunk-index]")).toHaveCount(2);
         await card.getByRole("button", { name: "Discard this hunk" }).last().click();
-        const dialog = area.getByRole("dialog", { name: "Discard this change?" });
-        await dialog.getByRole("button", { name: "Keep changes" }).click();
+        await expect(card.locator('[data-hunk-index="1"]')).toHaveAttribute("data-discarded", "true");
         await expect(card.locator("[data-hunk-index]")).toHaveCount(2);
-        await card.getByRole("button", { name: "Discard this hunk" }).last().click();
-        await dialog.getByRole("button", { name: "Discard" }).click();
-        await expect(card.locator("[data-hunk-index]")).toHaveCount(1);
-        await expect(card.locator('[data-line="added"]')).toHaveCount(3);
-        await expect(card.locator('[data-line="deleted"]')).toHaveCount(2);
+        await card.getByRole("button", { name: "Undo the discard of this hunk" }).click();
+        await expect(card.locator('[data-hunk-index="1"]')).not.toHaveAttribute("data-discarded", "true");
+        await expect(card.getByRole("button", { name: "Discard this hunk" })).toHaveCount(2);
     });
 
-    test("discarding a file takes it out of the list", async ({ page }) => {
+    test("discarding a file fades its row and its diff, and Undo brings it back", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
-        await area.getByRole("region", { name: "File diff" }).getByRole("button", { name: "Discard this file" }).click();
-        await area.getByRole("dialog").getByRole("button", { name: "Discard" }).click();
-        await expect(area.getByRole("button", { name: "frontend/src/lib/zoom.ts" })).toHaveCount(0);
-        await expect(area.getByText("8 files")).toBeVisible();
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const card = area.getByRole("region", { name: "File diff" });
+        await card.getByRole("button", { name: "Discard this file" }).click();
+        const row = area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
+        await expect(row).toHaveAttribute("data-discarded", "true");
+        await expect(card.locator('[data-discarded="true"][data-hunk-index]')).toHaveCount(2);
+        await row.getByRole("button", { name: "Undo the discard of this file" }).click();
+        await expect(row).not.toHaveAttribute("data-discarded", "true");
+        await expect(card.locator('[data-discarded="true"]')).toHaveCount(0);
+    });
+
+    test("the Delete key discards what the keys are on and brings it back", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const card = area.getByRole("region", { name: "File diff" });
+        const row = area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
+        await area.focus();
+        await page.keyboard.press("Delete");
+        await expect(row).toHaveAttribute("data-discarded", "true");
+        await page.keyboard.press("Delete");
+        await expect(row).not.toHaveAttribute("data-discarded", "true");
+        await page.keyboard.press("ArrowRight");
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("ArrowDown");
+        await expect(card.locator('[data-current="true"][data-hunk-index="0"]')).toHaveCount(1);
+        await page.keyboard.press("Delete");
+        await expect(card.locator('[data-hunk-index="0"]')).toHaveAttribute("data-discarded", "true");
+        await expect(row).not.toHaveAttribute("data-discarded", "true");
     });
 });
 
@@ -1132,7 +1151,7 @@ test.describe("Runs of unchanged lines and the full commit details", () => {
 
     test("clicking a run of unchanged lines makes it the current stop", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByText("24 unchanged lines").click();
         await expect(diff.locator('[data-current="true"][data-gap-index="1"]')).toHaveCount(1);
@@ -1171,8 +1190,8 @@ test.describe("Diff options and picking lines", () => {
 
     test("picked lines stage on their own and show apart in the split view", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
-        await area.getByRole("button", { name: ".gitignore", exact: true }).click();
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        await area.getByRole("button", { name: ".gitignore", exact: true }).getByText(".gitignore").click();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByRole("button", { name: "Diff options" }).click();
         await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
@@ -1189,18 +1208,19 @@ test.describe("Diff options and picking lines", () => {
         await expect(unstaged.locator('[data-line="deleted"]')).toHaveCount(1);
     });
 
-    test("discarding picked lines asks first, then puts them back", async ({ page }) => {
+    test("discarding picked lines fades them and Undo brings them back", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByRole("button", { name: "Diff options" }).click();
         await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
         await page.keyboard.press("Escape");
-        await diff.locator('[data-line-id]').filter({ hasText: "DEFAULT_LEVEL = 1" }).click();
+        const line = diff.locator("[data-line-id]").filter({ hasText: "DEFAULT_LEVEL = 1" });
+        await line.click();
         await diff.getByRole("button", { name: "Discard this line" }).click();
-        await area.getByRole("dialog", { name: "Discard 1 line?" }).getByRole("button", { name: "Discard" }).click();
-        await expect(diff).not.toContainText("DEFAULT_LEVEL = 1");
-        await expect(diff.locator('[data-line="added"]')).toHaveCount(4);
+        await expect(line).toHaveAttribute("data-discarded", "true");
+        await diff.getByRole("button", { name: "Undo the discard of this line" }).click();
+        await expect(line).not.toHaveAttribute("data-discarded", "true");
     });
 });
 
@@ -1217,7 +1237,7 @@ test.describe("Popups and the page scrollbar", () => {
 test.describe("Danger icon buttons", () => {
     test("the Discard icon buttons draw their icon and border in the danger colour", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const button = page.getByRole("application", { name: "Changes" }).getByRole("button", { name: "Discard this file" });
+        const button = page.getByRole("application", { name: "Changes" }).first().getByRole("button", { name: "Discard this file" }).first();
         const colours = await button.evaluate(element => {
             const style = getComputedStyle(element);
             const probe = document.createElement("span");
@@ -1235,7 +1255,7 @@ test.describe("Danger icon buttons", () => {
 test.describe("Picking lines like hunks", () => {
     test("a click picks a line, Shift picks a run, Ctrl adds a line and the keys move the pick", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByRole("button", { name: "Diff options" }).click();
         await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
@@ -1261,7 +1281,7 @@ test.describe("Picking lines like hunks", () => {
 test.describe("One selection at a time", () => {
     test("the lines mode shows only the picked lines' border, not the current hunk's", async ({ page }) => {
         await page.goto("/page/changes?components=light");
-        const area = page.getByRole("application", { name: "Changes" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.locator('[data-hunk-index="1"]').click();
         await expect(diff.locator('[data-current="true"][data-hunk-index="1"]')).toHaveCount(1);
@@ -1269,5 +1289,60 @@ test.describe("One selection at a time", () => {
         await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
         await page.keyboard.press("Escape");
         await expect(diff.locator('[data-current="true"][data-hunk-index]')).toHaveCount(0);
+    });
+});
+
+test.describe("Runs of unchanged lines in the lines mode", () => {
+    test("Up and Down stop on runs between lines, a click picks a run and Space opens it", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const diff = area.getByRole("region", { name: "File diff" });
+        await diff.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
+        await page.keyboard.press("Escape");
+        await diff.getByText("24 unchanged lines").click();
+        await expect(diff.locator('[data-current="true"][data-gap-index="1"]')).toHaveCount(1);
+        await expect(diff.locator('[data-picked="true"]')).toHaveCount(0);
+        await page.keyboard.press("Space");
+        await expect(diff.getByRole("button", { name: "Hide 24 unchanged lines" })).toBeVisible();
+        await page.keyboard.press("ArrowDown");
+        await expect(diff.locator('[data-picked="true"]')).toHaveCount(1);
+        await expect(diff.locator('[data-current="true"][data-gap-index]')).toHaveCount(0);
+        await page.keyboard.press("ArrowUp");
+        await expect(diff.locator('[data-current="true"][data-gap-index="1"]')).toHaveCount(1);
+    });
+});
+
+test.describe("Any shown line can be picked", () => {
+    test("kept lines and shown unchanged lines can be picked, and the buttons float over the pick", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const diff = area.getByRole("region", { name: "File diff" });
+        await diff.getByRole("button", { name: "Diff options" }).click();
+        await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Pick lines" }).click();
+        await page.keyboard.press("Escape");
+        const kept = diff.locator('[data-line="context"]').filter({ hasText: "function setLevel" });
+        await kept.click();
+        await expect(kept).toHaveAttribute("data-picked", "true");
+        await expect(diff.getByRole("button", { name: "Discard this line" })).toHaveCount(0);
+        const added = diff.locator('[data-line="added"]').filter({ hasText: "saveState" });
+        const heightBefore = (await added.boundingBox())!.height;
+        await added.click();
+        await expect(diff.getByRole("button", { name: "Discard this line" })).toBeVisible();
+        expect((await added.boundingBox())!.height).toBeLessThan(heightBefore + 20);
+        await diff.getByText("24 unchanged lines").click();
+        await page.keyboard.press("Space");
+        await page.keyboard.press("ArrowDown");
+        await expect(diff.locator('[data-picked="true"][data-line="context"]')).toHaveCount(1);
+    });
+});
+
+test.describe("Nothing to commit", () => {
+    test("an empty working tree says there is nothing to commit", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).nth(1);
+        await expect(area).toContainText("No changes. The working tree matches the last commit.");
+        await expect(area).toContainText("Nothing to commit.");
+        await expect(area.getByRole("button", { name: "Nothing to commit" })).toBeDisabled();
     });
 });

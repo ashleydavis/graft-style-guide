@@ -40,3 +40,35 @@ html {
 * {
     scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
 }
+
+/*
+ * A discarded file, hunk or line stays in view, its parts faded and struck through. As it is
+ * discarded they nudge sideways and fade, over the slow duration with the standard easing. Its
+ * floating buttons, such as Undo, stay clear.
+ */
+.graft-discarded > :not([data-floating-actions]) {
+    opacity: var(--opacity-faded);
+    text-decoration: line-through;
+    animation: graft-discard var(--duration-slow) var(--ease-standard);
+}
+
+@keyframes graft-discard {
+    0% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    40% {
+        opacity: 1;
+        transform: translateX(var(--space-2));
+    }
+    100% {
+        opacity: var(--opacity-faded);
+        transform: translateX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .graft-discarded > :not([data-floating-actions]) {
+        animation: none;
+    }
+}
