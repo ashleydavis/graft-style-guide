@@ -32,6 +32,16 @@ async function openConfiguration(page: Page): Promise<Locator> {
     return dialog;
 }
 
+//
+// Switches a Changes area to the view with the unstaged and the staged changes apart, through its
+// options dialog.
+//
+async function showStagedAndUnstaged(page: Page, area: Locator): Promise<void> {
+    await area.getByRole("button", { name: "Changes options" }).click();
+    await page.getByRole("dialog", { name: "Changes options" }).getByRole("button", { name: "Staged and unstaged" }).click();
+    await page.keyboard.press("Escape");
+}
+
 test.describe("Opening pages", () => {
     test("the bare URL opens the overview", async ({ page }) => {
         await page.goto("/");
@@ -957,9 +967,10 @@ test.describe("Changes and commit", () => {
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.focus();
         await page.keyboard.press("ArrowDown");
-        await expect(area.getByRole("region", { name: "File diff" })).toContainText("old-theme.ts");
+        await expect(area.getByRole("region", { name: "File diff" })).toContainText("theme-names.ts");
+        await page.keyboard.press("ArrowDown");
         await page.keyboard.press("Space");
-        await expect(area.getByRole("region", { name: "Staged files" }).getByRole("button", { name: "frontend/src/lib/old-theme.ts", exact: true }).getByRole("button", { name: "Unstage this file" })).toBeVisible();
+        await expect(area.getByRole("button", { name: "frontend/src/lib/old-theme.ts", exact: true }).getByRole("button", { name: "Unstage this file" })).toBeVisible();
         await expect(area.getByRole("button", { name: "Commit 4 files" })).toBeDisabled();
         await area.getByRole("textbox", { name: "Summary" }).fill("Tidy the themes");
         await area.getByRole("button", { name: "Commit 4 files" }).click();
@@ -980,7 +991,7 @@ test.describe("Changes and commit", () => {
     test("the split view lists staged and unstaged files apart and shows the diff in two sections", async ({ page }) => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
-        await area.getByRole("button", { name: "Staged and unstaged" }).click();
+        await showStagedAndUnstaged(page, area);
         await expect(area.getByText("Staged (3)")).toBeVisible();
         await expect(area.getByText("Unstaged (7)")).toBeVisible();
         await expect(area.getByRole("region", { name: "Staged changes", exact: true })).toBeVisible();
@@ -1115,7 +1126,7 @@ test.describe("Discarding changes", () => {
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
         await area.getByRole("region", { name: "Changed files" }).getByRole("button", { name: "Discard this file" }).click();
-        const row = area.getByRole("region", { name: "Unstaged files" }).getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
+        const row = area.getByRole("region", { name: "Changed files" }).getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
         await expect(row).toHaveAttribute("data-discarded", "true");
         await expect(card.locator('[data-discarded="true"][data-hunk-index]')).toHaveCount(2);
         await row.getByRole("button", { name: "Undo the discard of this file" }).click();
@@ -1127,7 +1138,7 @@ test.describe("Discarding changes", () => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
-        const row = area.getByRole("region", { name: "Unstaged files" }).getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
+        const row = area.getByRole("region", { name: "Changed files" }).getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
         await area.focus();
         await page.keyboard.press("Delete");
         await expect(row).toHaveAttribute("data-discarded", "true");
@@ -1211,7 +1222,7 @@ test.describe("Diff options and picking lines", () => {
         await diff.locator('[data-line-id][data-line="added"]').filter({ hasText: "tmp/" }).click();
         await expect(diff.locator('[data-picked="true"]')).toHaveCount(1);
         await diff.getByRole("button", { name: "Stage this line", exact: true }).click();
-        await area.getByRole("button", { name: "Staged and unstaged" }).click();
+        await showStagedAndUnstaged(page, area);
         const staged = area.getByRole("region", { name: "Staged diff", exact: true });
         await expect(staged.locator('[data-line="added"]')).toHaveCount(1);
         await expect(staged).toContainText("tmp/");
@@ -1372,7 +1383,7 @@ test.describe("Collapsing panes", () => {
         await files.getByRole("button", { name: "Restore changed files" }).click();
         await expect(files).not.toHaveAttribute("data-collapsed", "true");
         const commit = area.getByRole("region", { name: "Commit", exact: true });
-        await area.getByRole("region", { name: "Unstaged files" }).getByText("old-theme.ts").click();
+        await area.getByRole("region", { name: "Changed files" }).getByText("old-theme.ts").click();
         await page.keyboard.press("c");
         await expect(files).toHaveAttribute("data-collapsed", "true");
         await page.keyboard.press("c");
@@ -1398,6 +1409,7 @@ test.describe("Staged and Unstaged panels", () => {
     test("each panel collapses to its heading, maximises over the other and comes back", async ({ page }) => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
+        await showStagedAndUnstaged(page, area);
         const staged = area.getByRole("region", { name: "Staged files", exact: true });
         const unstaged = area.getByRole("region", { name: "Unstaged files" });
         await staged.getByRole("button", { name: "Collapse the staged files" }).click();
@@ -1495,7 +1507,7 @@ test.describe("Discard only on the selection", () => {
         await expect(visibleDiscards).toHaveCount(2);
         await list.getByRole("button", { name: "Discard this file" }).filter({ visible: true }).first().click();
         await list.getByRole("button", { name: "docs/README.md", exact: true }).getByText("README.md").click();
-        await expect(list.getByRole("button", { name: "Undo the discard of this file" })).toHaveCount(2);
+        await expect(list.getByRole("button", { name: "Undo the discard of this file" })).toHaveCount(1);
         await expect(list.getByRole("button", { name: "Discard this file" }).filter({ visible: true })).toHaveCount(1);
     });
 });
@@ -1505,6 +1517,7 @@ test.describe("Counts leave out discarded files", () => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         const list = area.getByRole("region", { name: "Changed files" });
+        await showStagedAndUnstaged(page, area);
         await expect(list).toContainText("Unstaged (7)");
         await expect(list).toContainText("9 files, 3 staged");
         const readme = list.getByRole("button", { name: "docs/README.md", exact: true });
@@ -1514,5 +1527,27 @@ test.describe("Counts leave out discarded files", () => {
         await expect(list).toContainText("8 files, 3 staged");
         await readme.getByRole("button", { name: "Undo the discard of this file" }).click();
         await expect(list).toContainText("Unstaged (7)");
+    });
+});
+
+test.describe("Changes options", () => {
+    test("one diff shows one list, and the options dialog and S switch to the panels and back", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const list = area.getByRole("region", { name: "Changed files" });
+        await expect(list.getByRole("region", { name: "Staged files", exact: true })).toHaveCount(0);
+        await expect(list.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true })).toHaveCount(1);
+        await area.getByRole("button", { name: "Changes options" }).click();
+        const dialog = page.getByRole("dialog", { name: "Changes options" });
+        await expect(dialog).toContainText("Diff view");
+        await expect(dialog).toContainText("Panels");
+        await page.keyboard.press("Escape");
+        await area.focus();
+        await page.keyboard.press("s");
+        await expect(list.getByRole("region", { name: "Staged files", exact: true })).toHaveCount(1);
+        await page.keyboard.press("h");
+        await expect(list.getByRole("region", { name: "Staged files", exact: true })).toBeVisible();
+        await page.keyboard.press("s");
+        await expect(list.getByRole("region", { name: "Staged files", exact: true })).toHaveCount(0);
     });
 });

@@ -287,7 +287,7 @@ function PickModeSwitch({ isSelectingLines, onSelectingLines }: { isSelectingLin
 //
 // Renders one row of the options dialog: what the option does, its control and its key.
 //
-function OptionRow({ label, detail, control, keyName }: { label: string; detail: string; control: ReactNode; keyName: string }): ReactNode {
+export function OptionRow({ label, detail, control, keyName }: { label: string; detail: string; control: ReactNode; keyName: string }): ReactNode {
     return (
         <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "var(--space-3)" }}>
             <div className="flex min-w-0 flex-col">

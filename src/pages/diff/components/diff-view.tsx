@@ -278,7 +278,11 @@ function FloatingPanel({ side, top, transform, children }: { side: "left" | "rig
             style={{
                 position: "absolute",
                 top,
-                [side]: "var(--space-4)",
+                //
+                // The left buttons sit past the first line number column, clear of the show and
+                // hide button of a bar of unchanged lines above.
+                //
+                [side]: side === "left" ? `calc(${GUTTER_WIDTH} + var(--space-2))` : "var(--space-4)",
                 transform,
                 gap: "var(--space-2)",
                 fontFamily: "var(--font-sans)",
@@ -668,6 +672,7 @@ export function GapRows({
                 style={{
                     minHeight: "calc(var(--space-6) + var(--space-1))",
                     paddingTop: "var(--space-1)",
+                    paddingBottom: "var(--space-1)",
                     background: "var(--color-raised)",
                     color: "var(--color-text-muted)",
                 }}

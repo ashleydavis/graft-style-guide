@@ -24,6 +24,10 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 
 - Don't use uppercase for titles. Use proper case, eg "STAGED" => "Staged". For multi word titles only capitalize the first character of the first word.
 
+## Toolbars
+
+- If a toolbar becomes cluttered with configuration buttons/toggles, move those to a configuration dropdown dialog accesses from a configuration button on the toolbar.
+
 ## Placing actions
 
 - Stage/unstage and non-destructive tools stick to the left. Destructive tools stick to the right.

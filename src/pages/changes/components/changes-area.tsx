@@ -19,13 +19,14 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faChevronDown, faChevronUp, faDownLeftAndUpRightToCenter, faFileLines, faLayerGroup, faMagnifyingGlass, faUpRightAndDownLeftFromCenter, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faChevronDown, faChevronUp, faDownLeftAndUpRightToCenter, faFileLines, faGripLines, faGripLinesVertical, faLayerGroup, faMagnifyingGlass, faSliders, faUpRightAndDownLeftFromCenter, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { KeyCaps } from "../../../components/shortcut";
 import { Tip } from "../../../components/tip";
 import { FilePath } from "../../commit-explorer/components/file-path";
 import { Pane } from "../../commit-explorer/components/pane";
-import { DISCARD_KEYS, DiscardButton, FileDiffCard, StageButton, UndoButton, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
+import { DISCARD_KEYS, DiscardButton, FileDiffCard, OptionRow, StageButton, UndoButton, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
+import Popover from "@mui/material/Popover";
 import { noDiscards, withFileDiscarded, withHunkMarked, type IDiscards } from "../../diff/discards";
 import { parseHunks, sectionDiff, type ISectionDiff } from "../../diff/model";
 import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
@@ -54,6 +55,7 @@ const keyHints = [
     { keys: ["Shift", "↑", "↓"], action: "File to file from the diff" },
     { keys: ["M"], action: "Maximise or restore" },
     { keys: [COLLAPSE_KEY], action: "Collapse or restore the files or the commit pane" },
+    { keys: ["S"], action: "One diff, or staged and unstaged apart" },
 ];
 
 //
@@ -215,6 +217,114 @@ function isOwnKeyTarget(target: EventTarget, key: string): boolean {
 }
 
 //
+// The keys of the Changes pane's options, as KeyboardEvent.key names them in lower case, and as the
+// options dialog shows them.
+//
+export const CHANGES_OPTION_KEYS = { split: "s", stack: "h" };
+
+//
+// Renders the Changes pane's options button, which opens a dialog under it with each way of
+// showing the changes, labelled with what it does and its key: one diff with one list of files, or
+// the unstaged and the staged changes apart, and, while they are apart, their panels stacked or
+// side by side.
+//
+export function ChangesOptions({
+    diffMode,
+    onDiffMode,
+    panelStack,
+    onPanelStack,
+}: {
+    diffMode: "one" | "split";
+    onDiffMode: (diffMode: "one" | "split") => void;
+    panelStack: "vertical" | "horizontal";
+    onPanelStack: (panelStack: "vertical" | "horizontal") => void;
+}): ReactNode {
+    const [anchor, setAnchor] = useState<HTMLElement | undefined>(undefined);
+    const groupStyle = { "& .MuiToggleButton-root": { padding: "var(--space-1) var(--space-2)", fontSize: "var(--icon-sm)" } };
+    return (
+        <>
+            <Tooltip title={<Tip title="Changes options" detail="How the changes show, with a key for each." />}>
+                <IconButton size="small" aria-label="Changes options" aria-haspopup="dialog" aria-expanded={anchor !== undefined} onClick={event => setAnchor(event.currentTarget)}>
+                    <FontAwesomeIcon icon={faSliders} />
+                </IconButton>
+            </Tooltip>
+            <Popover
+                open={anchor !== undefined}
+                anchorEl={anchor}
+                onClose={() => setAnchor(undefined)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                slotProps={{ paper: { role: "dialog", "aria-label": "Changes options" } }}
+            >
+                <div className="flex flex-col" style={{ gap: "var(--space-3)", padding: "var(--space-4)", width: "min(calc(var(--space-8) * 13), calc(100vw - var(--space-8)))" }}>
+                    <OptionRow
+                        label="Diff view"
+                        detail="One diff and one list of files, or the unstaged and the staged changes apart."
+                        keyName={CHANGES_OPTION_KEYS.split}
+                        control={
+                            <ToggleButtonGroup
+                                size="small"
+                                exclusive
+                                value={diffMode}
+                                onChange={(_event, value: "one" | "split" | null) => {
+                                    if (value) {
+                                        onDiffMode(value);
+                                    }
+                                }}
+                                aria-label="Diff shows"
+                                sx={groupStyle}
+                            >
+                                <Tooltip title="One diff">
+                                    <ToggleButton value="one" aria-label="One diff">
+                                        <FontAwesomeIcon icon={faFileLines} />
+                                    </ToggleButton>
+                                </Tooltip>
+                                <Tooltip title="Staged and unstaged">
+                                    <ToggleButton value="split" aria-label="Staged and unstaged">
+                                        <FontAwesomeIcon icon={faLayerGroup} />
+                                    </ToggleButton>
+                                </Tooltip>
+                            </ToggleButtonGroup>
+                        }
+                    />
+                    <OptionRow
+                        label="Panels"
+                        detail={diffMode === "split" ? "Unstaged above Staged, or side by side." : "Shows with the unstaged and the staged changes apart."}
+                        keyName={CHANGES_OPTION_KEYS.stack}
+                        control={
+                            <ToggleButtonGroup
+                                size="small"
+                                exclusive
+                                value={panelStack}
+                                disabled={diffMode !== "split"}
+                                onChange={(_event, value: "vertical" | "horizontal" | null) => {
+                                    if (value) {
+                                        onPanelStack(value);
+                                    }
+                                }}
+                                aria-label="Panels sit"
+                                sx={groupStyle}
+                            >
+                                <Tooltip title="Stacked">
+                                    <ToggleButton value="vertical" aria-label="Stack the panels">
+                                        <FontAwesomeIcon icon={faGripLines} />
+                                    </ToggleButton>
+                                </Tooltip>
+                                <Tooltip title="Side by side">
+                                    <ToggleButton value="horizontal" aria-label="Put the panels side by side">
+                                        <FontAwesomeIcon icon={faGripLinesVertical} />
+                                    </ToggleButton>
+                                </Tooltip>
+                            </ToggleButtonGroup>
+                        }
+                    />
+                </div>
+            </Popover>
+        </>
+    );
+}
+
+//
 // Renders the area in a window frame. The files pane lists every changed file with a checkbox
 // that stages or unstages the whole file, ticked when all of it is staged and half-ticked when
 // some hunks are, and a count of the files and how many are staged. The selected file's diff
@@ -263,6 +373,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [collapsed, setCollapsed] = useState<ReadonlySet<0 | 2>>(new Set());
     const [panelCollapsed, setPanelCollapsed] = useState<ReadonlySet<"staged" | "unstaged">>(new Set());
     const [panelMaximised, setPanelMaximised] = useState<"staged" | "unstaged" | undefined>(undefined);
+    const [panelStack, setPanelStack] = useState<"vertical" | "horizontal">("vertical");
 
     //
     // Folds the Staged or the Unstaged panel of the file list down to its heading, so the other
@@ -322,10 +433,13 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     // file under Staged and each unstaged file under Unstaged, so a file staged in part shows in
     // both.
     //
-    const entries: IListEntry[] = [
-        ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "all").map(file => ({ file, section: "unstaged" as const })),
-        ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
-    ];
+    const entries: IListEntry[] =
+        diffMode === "one"
+            ? shownFiles.map(file => ({ file, section: "all" as const }))
+            : [
+                  ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "all").map(file => ({ file, section: "unstaged" as const })),
+                  ...shownFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
+              ];
     const selectedEntry = entries.find(entry => entry.file.path === selectedPath && entry.section === selectedSection) ?? entries.find(entry => entry.file.path === selectedPath);
 
     function selectFile(path: string, section: ListSection, pane: 0 | 1): void {
@@ -481,6 +595,16 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             toggleMaximise(activePane);
             return;
         }
+        if (key.toLowerCase() === CHANGES_OPTION_KEYS.split && !event.shiftKey) {
+            event.preventDefault();
+            setDiffMode(diffMode === "one" ? "split" : "one");
+            return;
+        }
+        if (key.toLowerCase() === CHANGES_OPTION_KEYS.stack && !event.shiftKey && diffMode === "split") {
+            event.preventDefault();
+            withViewTransition(() => setPanelStack(panelStack === "vertical" ? "horizontal" : "vertical"));
+            return;
+        }
         if (key.toUpperCase() === COLLAPSE_KEY && activePane !== 1) {
             event.preventDefault();
             toggleCollapse(activePane);
@@ -578,13 +702,14 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Renders one file's row in the Staged or the Unstaged panel: the button that stages or unstages
-    // it at the left, its path and its path menu, and at the right Discard on the selected row and
-    // the row under the pointer, or Undo on a discarded one.
+    // Renders one file's row in the single list or in the Staged or the Unstaged panel: at the left
+    // the button that stages or unstages it, a minus for a file staged whole in the single list or
+    // any file on the staged side, then its path and its path menu, and at the right Discard on the
+    // selected row and the row under the pointer, or Undo on a discarded one.
     //
     function fileRow(entry: IListEntry): ReactNode {
         const { file, section } = entry;
-        const isChecked = section === "staged";
+        const isChecked = section === "all" ? stagedState(stagingOf(file), hunkCountOf(file)) === "all" : section === "staged";
         return (
             <ListItemButton
                 key={`${section}:${file.path}`}
@@ -653,7 +778,9 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                               ? "flex min-h-0 flex-1 flex-col"
                               : collapsed.has(0)
                                 ? "flex flex-none flex-col lg:min-h-0"
-                                : "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[280px] lg:flex-none 2xl:w-[360px]"
+                                : diffMode === "split" && panelStack === "horizontal"
+                                  ? "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[480px] lg:flex-none 2xl:w-[600px]"
+                                  : "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[280px] lg:flex-none 2xl:w-[360px]"
                     }
                     style={{ gap: "var(--space-3)" }}
                 >
@@ -704,29 +831,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 />
                             }
                             headerExtra={
-                            <ToggleButtonGroup
-                                size="small"
-                                exclusive
-                                value={diffMode}
-                                onChange={(_event, value: "one" | "split" | null) => {
-                                    if (value) {
-                                        setDiffMode(value);
-                                    }
-                                }}
-                                aria-label="Diff shows"
-                                sx={{ "& .MuiToggleButton-root": { padding: "var(--space-1) var(--space-2)", fontSize: "var(--icon-sm)" } }}
-                            >
-                                <Tooltip title={<Tip title="One diff" detail="The file's whole change, staged and unstaged together." />}>
-                                    <ToggleButton value="one" aria-label="One diff">
-                                        <FontAwesomeIcon icon={faFileLines} />
-                                    </ToggleButton>
-                                </Tooltip>
-                                <Tooltip title={<Tip title="Staged and unstaged" detail="The unstaged changes and the staged changes in separate sections, unstaged above." />}>
-                                    <ToggleButton value="split" aria-label="Staged and unstaged">
-                                        <FontAwesomeIcon icon={faLayerGroup} />
-                                    </ToggleButton>
-                                </Tooltip>
-                            </ToggleButtonGroup>
+                                <ChangesOptions
+                                    diffMode={diffMode}
+                                    onDiffMode={setDiffMode}
+                                    panelStack={panelStack}
+                                    onPanelStack={value => withViewTransition(() => setPanelStack(value))}
+                                />
                             }
                             title={
                                 <span className="flex items-baseline" style={{ gap: "var(--space-2)" }}>
@@ -743,9 +853,13 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     No changes. The working tree matches the last commit.
                                 </p>
                             ) : (
-                                <div className="flex h-full flex-col" style={{ gap: "var(--space-2)", padding: "var(--space-2)" }}>
+                                <div className={panelStack === "vertical" ? "flex h-full flex-col" : "flex h-full flex-row"} style={{ gap: "var(--space-2)", padding: "var(--space-2)" }}>
                                     {shownFiles.length === 0 ? (
                                         <p style={{ padding: "var(--space-4) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", textAlign: "center" }}>No changed file matches the search.</p>
+                                    ) : diffMode === "one" ? (
+                                        <List aria-label="Changed files" sx={{ padding: 0 }}>
+                                            {entries.map(entry => fileRow(entry))}
+                                        </List>
                                     ) : (
                                         (["unstaged", "staged"] as const).map(section => {
                                             const sectionEntries = entries.filter(entry => entry.section === section);
@@ -760,7 +874,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                                     aria-label={`${title} files`}
                                                     data-collapsed={isPanelCollapsed || undefined}
                                                     data-maximised={panelMaximised === section || undefined}
-                                                    className={isPanelCollapsed ? "flex flex-none flex-col" : "flex min-h-[120px] flex-1 flex-col"}
+                                                    className={isPanelCollapsed ? "flex flex-none flex-col" : panelStack === "vertical" ? "flex min-h-[120px] flex-1 flex-col" : "flex min-w-0 flex-1 flex-col"}
                                                     style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}
                                                 >
                                                     <div
