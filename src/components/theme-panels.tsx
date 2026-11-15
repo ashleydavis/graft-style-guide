@@ -30,30 +30,18 @@ export function ThemePanels({ children }: { children: ReactNode }): ReactNode {
 }
 
 //
-// Renders one themed panel with its theme name above the example.
+// Renders one themed panel on its theme's background, with no border or label.
 //
 export function ThemePanel({ theme, children }: { theme: string; children: ReactNode }): ReactNode {
     return (
         <div
             data-theme={theme}
-            className="p-4"
             style={{
                 background: "var(--color-bg)",
                 color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
                 borderRadius: "var(--radius-lg)",
             }}
         >
-            <div
-                className="mb-3"
-                style={{
-                    fontSize: "var(--text-sm)",
-                    fontWeight: "var(--weight-bold)",
-                    color: "var(--color-text-muted)",
-                }}
-            >
-                {theme.charAt(0).toUpperCase() + theme.slice(1)}
-            </div>
             <PanelThemeContext.Provider value={theme}>{children}</PanelThemeContext.Provider>
         </div>
     );

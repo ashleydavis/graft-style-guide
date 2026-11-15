@@ -13,7 +13,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faArrowRightToBracket, faFolderOpen, faFolderTree, faList, faMessage, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faArrowRightToBracket, faFolder, faFolderOpen, faFolderTree, faList, faMessage, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import IconButton from "@mui/material/IconButton";
 import { Tip } from "../../../components/tip";
 import { RefBadge } from "../../badges";
@@ -24,6 +24,7 @@ import { FilePathMenu } from "../../../components/file-path-menu";
 import { StatusLetter } from "../../tree";
 import type { IChangedFile, ICommit } from "../data";
 import { treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../file-views";
+import { FileIcon } from "../../../components/file-icon";
 import { DIRECTORY_KEYS, FolderToggle, TreeGuides } from "../../../components/tree-guides";
 import { FilePath } from "./file-path";
 import { LineCounts } from "./line-counts";
@@ -161,6 +162,7 @@ export function FileRow({ file, depth, guides = [], label, isSelected, isOpen, s
             }}
         >
             <TreeGuides guides={guides} />
+            <FileIcon path={file.path} />
             <span className="min-w-0 flex-1">{label}</span>
             <FilePathMenu path={file.path} />
             <StatusLetter status={file.status} />
@@ -413,7 +415,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                             >
                                 <TreeGuides guides={guides} />
                                 <FolderToggle path={row.path} isCollapsed={collapsedFolders.has(row.path)} onToggle={() => onToggleFolder(row.path)} />
-                                <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: "var(--icon-sm)", flex: "none" }} />
+                                <FontAwesomeIcon icon={collapsedFolders.has(row.path) ? faFolder : faFolderOpen} style={{ fontSize: "var(--icon-sm)", flex: "none" }} />
                                 <span className="min-w-0 flex-1 truncate">{row.name}</span>
                                 <span className="folder-open">
                                     <Tooltip title={<Tip title="Focus on this directory" detail={`Key: ${DIRECTORY_KEYS.focus.toUpperCase()}, Enter or a double click. ${DIRECTORY_KEYS.up.toUpperCase()} goes back up.`} />}>

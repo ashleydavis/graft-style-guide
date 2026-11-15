@@ -7,10 +7,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { diffStops, stackStopAfterMove, stackStops, stopAfterMove, type DiffStop, type IStackStop } from "../../diff/stops";
 import { exampleOldFile } from "../../diff/example-old-file";
-import { FOLD_DIFF_KEY, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
+import { FOLD_DIFF_KEY, isFindKey, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCodeBranch } from "@fortawesome/free-solid-svg-icons";
-import { KeyCaps } from "../../../components/shortcut";
 import { changedFile, commitByHash, graftHistory, type ICommit, type IHistory } from "../data";
 import { closeCommitDetailsPane, closeFilePane, COMMIT_SUMMARY_PATH, explorerKeys, FOLDER_PREFIX, initialExplorerState, selectCommit, selectFile, stateAfterKey, type IExplorerState } from "../explorer-state";
 import { filePathsInViewOrder, isUnder, parentFolder, rowPathsInViewOrder, type FileListView } from "../file-views";
@@ -30,23 +29,6 @@ import { withViewTransition } from "../../../lib/view-transition";
 // back to sizing itself on a double-click.
 //
 const DETAILS_PANE_WIDTH = 380;
-
-//
-// The keys the explorer answers to, with what each does, for the hints along its foot.
-//
-const keyHints = [
-    { keys: ["↑", "↓"], action: "Move, or change to change in a diff" },
-    { keys: ["Shift", "↑", "↓"], action: "File to file in a diff" },
-    { keys: ["Ctrl", "↑", "↓"], action: "File to file in a directory's diffs" },
-    { keys: [FOLD_DIFF_KEY], action: "Fold away or show the diff, or expand or collapse the directory" },
-    { keys: ["←", "→"], action: "Switch pane" },
-    { keys: ["Enter"], action: "Open" },
-    { keys: ["Esc"], action: "Close" },
-    { keys: ["F"], action: "Focus on the directory" },
-    { keys: ["U"], action: "Up to the directory above" },
-    { keys: ["M"], action: "Maximise or restore the pane" },
-    { keys: [COLLAPSE_KEY], action: "Collapse or restore the pane" },
-];
 
 //
 // Returns true when `key` pressed with the focus on `target` belongs to the target itself: every
@@ -85,7 +67,7 @@ export function matchingCommits(commits: ICommit[], search: string): ICommit[] {
 
 //
 // Renders the explorer in a window frame: a title bar with the repository and branch, the panes,
-// with a search box at the top of the commit list, and the key hints. While a search is typed,
+// with a search box at the top of the commit list. Each button's tooltip names its key. While a search is typed,
 // every commit keeps its place and its lanes, the commits that do not match fade, and Up and Down
 // move through the matches only. The explorer answers its keys while the focus is anywhere inside it outside the
 // search box; click a commit or move to the explorer with Tab to use them. In the file pane, Up and
@@ -282,6 +264,20 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     }
 
     function onKeyDown(event: KeyboardEvent): void {
+        if (isFindKey(event) && (openFile || openFolder !== undefined)) {
+            //
+            // Ctrl+F starts find mode in the diff the keys are on: the current file of a
+            // directory's stacked diffs, or the open file's diff.
+            //
+            const card = openFolder !== undefined ? stackCardRefs.current.get(stackStop?.path ?? openFolderFiles[0]?.path ?? "") : fileCardRef.current;
+            if (card) {
+                event.preventDefault();
+                event.stopPropagation();
+                setState(current => ({ ...current, activePaneIndex: 2 }));
+                card.openFind();
+            }
+            return;
+        }
         if (state.activePaneIndex === 2 && openFolder !== undefined && !event.altKey && !event.metaKey && !event.shiftKey && !isOwnKeyTarget(event.target, event.key)) {
             //
             // In a directory's stacked diffs, Up and Down step through every file's hunks and runs
@@ -404,11 +400,10 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             aria-label="Commit explorer"
             tabIndex={0}
             onKeyDownCapture={onKeyDown}
-            className="relative flex flex-col shadow-(--shadow-raised) focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--color-focus),var(--shadow-raised)]"
+            className="relative flex flex-col focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--color-focus)]"
             style={{
                 height: "560px",
                 background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
                 borderRadius: "var(--radius-lg)",
                 overflow: "hidden",
                 outline: "none",
@@ -435,7 +430,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             <div
                 ref={columnsRef}
                 className="flex min-h-0 flex-1 items-stretch overflow-x-auto"
-                style={{ padding: "var(--space-3)" }}
+                style={{ paddingTop: "var(--space-3)" }}
                 //
                 // A press anywhere in a pane makes it the active pane, found by the pane's label.
                 //
@@ -567,29 +562,6 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                 ) : undefined}
             </div>
 
-            <div
-                aria-label="Keys"
-                className="flex flex-none flex-wrap items-center"
-                style={{
-                    gap: "var(--space-1) var(--space-4)",
-                    padding: "var(--space-2) var(--space-4)",
-                    background: "var(--color-panel)",
-                    borderTop: "1px solid var(--color-border)",
-                    fontSize: "var(--text-sm)",
-                    color: "var(--color-text-muted)",
-                }}
-            >
-                {keyHints.map(hint => (
-                    <span key={hint.action} className="inline-flex items-center" style={{ gap: "var(--space-2)" }}>
-                        <span className="inline-flex" style={{ gap: "var(--space-1)" }}>
-                            {hint.keys.map(key => (
-                                <KeyCaps key={key} keys={key} />
-                            ))}
-                        </span>
-                        {hint.action}
-                    </span>
-                ))}
-            </div>
         </div>
     );
 }

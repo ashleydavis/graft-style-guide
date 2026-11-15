@@ -90,6 +90,7 @@ export function FilePane({ file, isActive, currentHunk, currentGap, cardRef, isM
     return (
         <div style={{ flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
             <FileDiffCard
+                isFoldable={false}
                 file={{ path: file.path, status: file.status, diff: file.diff, oldFileLines: exampleOldFile(file.path, file.status, file.diff) }}
                 label="File diff"
                 initialWrap

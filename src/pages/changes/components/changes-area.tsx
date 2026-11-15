@@ -19,19 +19,19 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faChevronDown, faChevronUp, faDownLeftAndUpRightToCenter, faFileLines, faArrowLeft, faArrowRightToBracket, faFolderOpen, faFolderTree, faGripLines, faGripLinesVertical, faLayerGroup, faList, faMagnifyingGlass, faSliders, faTableColumns, type IconDefinition, faUpRightAndDownLeftFromCenter, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faChevronDown, faChevronUp, faDownLeftAndUpRightToCenter, faFileLines, faArrowLeft, faArrowRightToBracket, faFolder, faFolderOpen, faFolderTree, faGripLines, faGripLinesVertical, faLayerGroup, faList, faMagnifyingGlass, faSliders, faTableColumns, type IconDefinition, faUpRightAndDownLeftFromCenter, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FilePathMenu } from "../../../components/file-path-menu";
-import { KeyCaps } from "../../../components/shortcut";
 import { Tip } from "../../../components/tip";
 import { FilePath } from "../../commit-explorer/components/file-path";
 import { Pane } from "../../commit-explorer/components/pane";
-import { DISCARD_KEYS, DiscardButton, FileDiffCard, FOLD_DIFF_KEY, OptionRow, StageButton, UndoButton, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
+import { DISCARD_KEYS, DiscardButton, FileDiffCard, FOLD_DIFF_KEY, isFindKey, OptionRow, StageButton, UndoButton, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import Popover from "@mui/material/Popover";
 import { noDiscards, withFileDiscarded, withHunkMarked, type IDiscards } from "../../diff/discards";
 import { parseHunks, sectionDiff, type ISectionDiff } from "../../diff/model";
 import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
 import { withViewTransition } from "../../../lib/view-transition";
 import { filePathsInViewOrder, isUnder, parentFolder, treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../../commit-explorer/file-views";
+import { FileIcon } from "../../../components/file-icon";
 import { DIRECTORY_KEYS, directoryKeyAction, FolderToggle, TreeGuides } from "../../../components/tree-guides";
 import { LiveToast, ToastStack } from "../../notifications";
 import { COLLAPSE_KEY } from "../../../components/collapse";
@@ -44,26 +44,6 @@ const lastCommit = {
     summary: "Show the Git commands each page runs",
     description: "The help panel in the right sidebar lists the commands, each with a button that copies it.",
 };
-
-//
-// The keys the area answers to, with what each does, for the hints along its foot.
-//
-const keyHints = [
-    { keys: ["↑", "↓"], action: "File to file, or change to change in the diff" },
-    { keys: ["←", "→"], action: "Files, diff or commit" },
-    { keys: ["Enter"], action: "Write the commit message" },
-    { keys: ["Esc"], action: "Leave the message" },
-    { keys: ["Space"], action: "Stage or unstage" },
-    { keys: ["Shift", "↑", "↓"], action: "File to file from the diff" },
-    { keys: ["Ctrl", "↑", "↓"], action: "File to file in a directory's diffs" },
-    { keys: [FOLD_DIFF_KEY], action: "Fold away or show the diff, or expand or collapse the directory" },
-    { keys: ["M"], action: "Maximise or restore" },
-    { keys: [COLLAPSE_KEY], action: "Collapse or restore the files or the commit pane" },
-    { keys: ["S"], action: "One diff, or staged and unstaged apart" },
-    { keys: ["T"], action: "Full paths, file name and directory, or tree" },
-    { keys: ["F"], action: "Focus on the directory" },
-    { keys: ["U"], action: "Up to the directory above" },
-];
 
 //
 // Which list a row of the file list sits in: the one list of one diff, or the Staged or Unstaged
@@ -189,6 +169,7 @@ export function SplitDiff({
                     ) : (
                         <div className="min-h-0 flex-1">
                             <FileDiffCard
+                                isFoldable={false}
                                 key={file.path + section.title}
                                 ref={cardRef(section.card)}
                                 file={file}
@@ -846,6 +827,25 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     function onKeyDown(event: KeyboardEvent): void {
+        if (isFindKey(event) && activePane !== 2) {
+            //
+            // Ctrl+F starts find mode in the diff the keys are on: the current file of a
+            // directory's stacked diffs, or the selected file's diff, the unstaged side first in
+            // the split.
+            //
+            const names = selectedFolderItem
+                ? [stackCardName(stackStop?.path ?? selectedFolderItem.files[0]?.path ?? "")]
+                : diffMode === "one"
+                  ? [ONE_DIFF_CARD]
+                  : ["Unstaged diff", "Staged diff"];
+            const card = names.map(name => cardRefs.current.get(name)).find(handle => handle);
+            if (card) {
+                event.preventDefault();
+                setActivePane(1);
+                card.openFind();
+            }
+            return;
+        }
         if (
             event.ctrlKey &&
             !event.altKey &&
@@ -1110,7 +1110,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 <TreeGuides guides={item.guides} />
                 <FolderToggle path={item.path} isCollapsed={collapsedFolders.has(item.path)} onToggle={() => toggleCollapsedFolder(item.path)} />
                 <span className="flex min-w-0 flex-1 items-center" style={{ gap: "var(--space-2)", color: isStaged ? "color-mix(in srgb, var(--color-text-muted) 70%, var(--color-success))" : "var(--color-text-muted)" }}>
-                    <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: "var(--icon-sm)", flex: "none" }} />
+                    <FontAwesomeIcon icon={collapsedFolders.has(item.path) ? faFolder : faFolderOpen} style={{ fontSize: "var(--icon-sm)", flex: "none" }} />
                     <span className="min-w-0 truncate">{item.name}</span>
                 </span>
                 <span className="folder-open">
@@ -1198,6 +1198,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 </span>
                 {/* The tree's lines sit after the stage button, which keeps the left column. */}
                 <TreeGuides guides={guides} />
+                <FileIcon path={file.path} />
                 <span className="min-w-0 flex-1">
                     {/* A staged file's path takes a slight green tinge. */}
                     <FileLabel path={file.path} view={view} tint={isChecked ? "var(--color-success)" : undefined} />
@@ -1223,16 +1224,15 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             aria-label="Changes"
             tabIndex={0}
             onKeyDown={onKeyDown}
-            className={`flex flex-col ${diffMode === "split" ? "lg:h-[900px]" : "lg:h-[680px]"} shadow-(--shadow-raised) focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--color-focus),var(--shadow-raised)]`}
+            className={`flex flex-col ${diffMode === "split" ? "lg:h-[900px]" : "lg:h-[680px]"} focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--color-focus)]`}
             style={{
                 background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
                 borderRadius: "var(--radius-lg)",
                 overflow: "hidden",
                 outline: "none",
             }}
         >
-            <div className="flex min-h-0 flex-1 flex-col lg:flex-row" style={{ gap: "var(--space-3)", padding: "var(--space-3)" }}>
+            <div className="flex min-h-0 flex-1 flex-col lg:flex-row" style={{ gap: "var(--space-3)" }}>
                 <div
                     className={
                         maximised === 1 || maximised === 2
@@ -1470,6 +1470,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         ) : (
                             <div className="min-h-0 flex-1">
                                 <FileDiffCard
+                                    isFoldable={false}
                                     key={selectedFile.path + (selectedFile.diff ?? "")}
                                     file={selectedFile}
                                     label="File diff"
@@ -1590,29 +1591,6 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 </div>
             </div>
 
-            <div
-                aria-label="Keys"
-                className="flex flex-none flex-wrap items-center"
-                style={{
-                    gap: "var(--space-1) var(--space-4)",
-                    padding: "var(--space-2) var(--space-4)",
-                    background: "var(--color-panel)",
-                    borderTop: "1px solid var(--color-border)",
-                    fontSize: "var(--text-sm)",
-                    color: "var(--color-text-muted)",
-                }}
-            >
-                {keyHints.map(hint => (
-                    <span key={hint.action} className="inline-flex items-center" style={{ gap: "var(--space-2)" }}>
-                        <span className="inline-flex" style={{ gap: "var(--space-1)" }}>
-                            {hint.keys.map(key => (
-                                <KeyCaps key={key} keys={key} />
-                            ))}
-                        </span>
-                        {hint.action}
-                    </span>
-                ))}
-            </div>
             {committed ? (
                 //
                 // The commit's toast shows at the bottom centre of the screen.

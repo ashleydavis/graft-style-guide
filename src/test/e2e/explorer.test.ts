@@ -1041,13 +1041,22 @@ test.describe("Finding, clicking hunks, resizing and maximising", () => {
     test("the find box counts matches and steps through them", async ({ page }) => {
         await page.goto("/page/diff?components=light");
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
-        await card.getByRole("textbox", { name: "Find in this diff" }).fill("level");
+        await expect(card.getByRole("textbox", { name: "Find in this diff" })).toHaveCount(0);
+        await card.getByText("saveState({ zoom: value });").click();
+        await page.keyboard.press("Control+f");
+        await expect(card.getByRole("textbox", { name: "Find in this diff" })).toBeFocused();
+        await page.keyboard.type("level");
+        await expect(card.locator('[data-current-match="true"]')).toHaveCount(0);
+        await page.keyboard.press("Enter");
         await expect(card).toContainText("1 of 6");
         await expect(card.locator('[data-current-match="true"]')).toHaveCount(1);
         await card.getByRole("textbox", { name: "Find in this diff" }).press("Enter");
         await expect(card).toContainText("2 of 6");
         await card.getByRole("button", { name: "Previous match" }).click();
         await expect(card).toContainText("1 of 6");
+        await card.getByRole("textbox", { name: "Find in this diff" }).press("Escape");
+        await expect(card.getByRole("textbox", { name: "Find in this diff" })).toHaveCount(0);
+        await expect(card.locator("[data-search-match]")).toHaveCount(0);
     });
 
     test("clicking a hunk makes it the current one", async ({ page }) => {
@@ -1078,8 +1087,10 @@ test.describe("Whole file, search in shown lines and clicking panes", () => {
     test("search finds matches in unchanged lines once the whole file shows", async ({ page }) => {
         await page.goto("/page/diff?components=light");
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
+        await card.getByRole("button", { name: "Open the find box" }).click();
         const find = card.getByRole("textbox", { name: "Find in this diff" });
         await find.fill("zoomIn");
+        await find.press("Enter");
         await expect(card).toContainText("No matches");
         await card.getByRole("button", { name: "Diff options" }).click();
         await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Show the whole file" }).click();
@@ -1779,5 +1790,46 @@ test.describe("Left out of the commit message", () => {
         await area.getByRole("textbox", { name: "Description" }).click();
         await page.keyboard.press("ArrowLeft");
         await expect(diff).toHaveAttribute("data-active", "true");
+    });
+});
+
+test.describe("Find mode", () => {
+    test("Ctrl+F opens the find box in the Changes diff and Escape closes it, back to the diff", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const diff = area.getByRole("region", { name: "File diff" });
+        await area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true }).click();
+        await expect(diff.getByRole("textbox", { name: "Find in this diff" })).toHaveCount(0);
+        await page.keyboard.press("Control+f");
+        await expect(diff.getByRole("textbox", { name: "Find in this diff" })).toBeFocused();
+        await page.keyboard.type("level");
+        await page.keyboard.press("Enter");
+        await expect(diff.locator('[data-current-match="true"]')).toHaveCount(1);
+        await page.keyboard.press("Escape");
+        await expect(diff.getByRole("textbox", { name: "Find in this diff" })).toHaveCount(0);
+        await page.keyboard.press("ArrowDown");
+        await expect(diff.locator('[data-current="true"][data-gap-index]')).toHaveCount(1);
+    });
+
+    test("Ctrl+F opens the find box in the commit's open diff", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const section = page.locator("section", { has: page.getByRole("heading", { name: "A file with several changes" }) });
+        const pane = section.getByRole("application", { name: "Commit explorer" }).first().getByRole("region", { name: "File diff" });
+        await pane.click();
+        await page.keyboard.press("Control+f");
+        await expect(pane.getByRole("textbox", { name: "Find in this diff" })).toBeFocused();
+    });
+});
+
+test.describe("No folding for a single file", () => {
+    test("a single selected file's diff has no fold button and E leaves it open", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const diff = area.getByRole("region", { name: "File diff" });
+        await area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true }).click();
+        await expect(diff.getByRole("button", { name: "Fold the diff away" })).toHaveCount(0);
+        await page.keyboard.press("ArrowRight");
+        await page.keyboard.press("e");
+        await expect(diff.locator("[data-hunk-index]")).not.toHaveCount(0);
     });
 });

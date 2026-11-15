@@ -18,6 +18,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight, faChevronDown, faChevronRight, faFileImage, faFileShield, faTableColumns, faSliders, faBars, faCircleInfo, faObjectGroup, faListCheck, faTriangleExclamation, faPlus, faMinus, faXmark, faExpand, faCompress, faMagnifyingGlass, faChevronUp, faTrashCan, faRotateLeft } from "@fortawesome/free-solid-svg-icons";
+import { FileIcon } from "../../../components/file-icon";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { MaximiseButton } from "../../../components/maximise-button";
 import { Tip } from "../../../components/tip";
@@ -581,12 +582,24 @@ export interface IFileDiffCardHandle {
     // Folds the diff away under its header when it shows, and shows it when it is folded.
     //
     toggleOpen: () => void;
+
+    //
+    // Shows the find box and puts the keys in it, as Ctrl+F does.
+    //
+    openFind: () => void;
 }
 
 //
 // The key that folds away or shows the diff the keys are on.
 //
 export const FOLD_DIFF_KEY = "E";
+
+//
+// Returns true for Ctrl+F, or Cmd+F on a Mac, the keys that start find mode in a diff.
+//
+export function isFindKey(event: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }): boolean {
+    return (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f";
+}
 
 //
 // What a file diff card shows and how.
@@ -651,6 +664,13 @@ export interface IFileDiffCardProps {
     // as in the commit explorer.
     //
     fillHeight?: boolean;
+
+    //
+    // False for the diff of a single selected file, which has no button that folds it away and
+    // ignores the fold key; true, the default, for a diff among others, such as a directory's
+    // stacked diffs.
+    //
+    isFoldable?: boolean;
 
     //
     // Called by a close button at the header's far right, absent for a card that cannot close.
@@ -751,6 +771,7 @@ export function FileDiffCard({
     ref,
     label,
     fillHeight = false,
+    isFoldable = true,
     onClose,
     isMaximised = false,
     onToggleMaximise,
@@ -763,7 +784,7 @@ export function FileDiffCard({
     onStagingChange,
     answersKeys = true,
 }: IFileDiffCardProps): ReactNode {
-    const [isOpen, setIsOpen] = useState(file.startsCollapsed !== true);
+    const [isOpen, setIsOpen] = useState(!isFoldable || file.startsCollapsed !== true);
     const [layout, setLayout] = useState<DiffLayout>(initialLayout);
     const [wrap, setWrap] = useState(initialWrap);
     const [isLargeShown, setIsLargeShown] = useState(false);
@@ -832,8 +853,25 @@ export function FileDiffCard({
         return true;
     }
 
-    useImperativeHandle(ref, () => ({ toggleGap, handleOptionKey, handleLineKey, discardPicked, toggleOpen: () => setIsOpen(current => !current) }));
+    useImperativeHandle(ref, () => ({ toggleGap, handleOptionKey, handleLineKey, discardPicked, toggleOpen: () => {
+            if (isFoldable) {
+                setIsOpen(current => !current);
+            }
+        },
+        openFind,
+    }));
     const id = useId();
+
+    //
+    // The find box shows only in find mode, which Ctrl+F or the find button starts and Escape in
+    // the box ends. `draft` is what is typed in the box and `search` the text the diff is searched
+    // for, set from the draft by Enter.
+    //
+    const [isFinding, setIsFinding] = useState(false);
+    const [findRequest, setFindRequest] = useState(0);
+    const [draft, setDraft] = useState("");
+    const findInputRef = useRef<HTMLInputElement>(null);
+    const focusBeforeFind = useRef<HTMLElement | null>(null);
     const [search, setSearch] = useState("");
     const [currentMatch, setCurrentMatch] = useState(0);
     const [matchCount, setMatchCount] = useState(0);
@@ -862,15 +900,55 @@ export function FileDiffCard({
         }
     }
 
+    //
+    // Starts find mode, or puts the keys back in the find box when it already shows, remembering
+    // where the keys were so Escape can give them back.
+    //
+    function openFind(): void {
+        if (!findInputRef.current?.contains(document.activeElement) && document.activeElement instanceof HTMLElement) {
+            focusBeforeFind.current = document.activeElement;
+        }
+        setIsOpen(true);
+        setIsFinding(true);
+        setFindRequest(current => current + 1);
+    }
+
+    useEffect(() => {
+        if (findRequest > 0) {
+            findInputRef.current?.focus();
+            findInputRef.current?.select();
+        }
+    }, [findRequest]);
+
+    //
+    // Ends find mode: hides the box, clears the search and gives the keys back to where they were.
+    //
+    function closeFind(): void {
+        setIsFinding(false);
+        setDraft("");
+        setSearch("");
+        setCurrentMatch(0);
+        const before = focusBeforeFind.current;
+        if (before?.isConnected) {
+            before.focus();
+        }
+    }
+
     function onSearchKey(event: KeyboardEvent<HTMLInputElement>): void {
         if (event.key === "Enter") {
             event.preventDefault();
-            moveMatch(event.shiftKey ? -1 : 1);
+            if (draft !== search) {
+                setSearch(draft);
+                setCurrentMatch(0);
+            }
+            else {
+                moveMatch(event.shiftKey ? -1 : 1);
+            }
         }
-        else if (event.key === "Escape" && isSearching) {
+        else if (event.key === "Escape") {
             event.preventDefault();
             event.stopPropagation();
-            setSearch("");
+            closeFind();
         }
     }
     const [ownStop, setOwnStop] = useState<DiffStop | undefined>(undefined);
@@ -1146,6 +1224,11 @@ export function FileDiffCard({
             : {};
 
     function onKeyDown(event: KeyboardEvent): void {
+        if (answersKeys && isFindKey(event) && hasLines) {
+            event.preventDefault();
+            openFind();
+            return;
+        }
         if (!answersKeys || event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target)) {
             return;
         }
@@ -1209,11 +1292,13 @@ export function FileDiffCard({
                     borderBottom: isOpen ? "1px solid var(--color-border)" : "none",
                 }}
             >
-                <Tooltip title={<Tip title={isOpen ? "Fold the diff away" : "Show the diff"} detail={`Key: ${FOLD_DIFF_KEY}`} />}>
-                    <IconButton size="small" aria-label={isOpen ? "Fold the diff away" : "Show the diff"} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>
-                        <FontAwesomeIcon icon={isOpen ? faChevronDown : faChevronRight} />
-                    </IconButton>
-                </Tooltip>
+                {isFoldable ? (
+                    <Tooltip title={<Tip title={isOpen ? "Fold the diff away" : "Show the diff"} detail={`Key: ${FOLD_DIFF_KEY}`} />}>
+                        <IconButton size="small" aria-label={isOpen ? "Fold the diff away" : "Show the diff"} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>
+                            <FontAwesomeIcon icon={isOpen ? faChevronDown : faChevronRight} />
+                        </IconButton>
+                    </Tooltip>
+                ) : undefined}
                 {stageable && discards?.isFile !== true ? <StageButton isStaged={section === undefined ? fileStaged : section === "staged"} what="file" onClick={toggleFile} isCompact={false} /> : undefined}
                 <span
                     className="flex flex-1 items-center"
@@ -1223,6 +1308,7 @@ export function FileDiffCard({
                     //
                     style={{ minWidth: "min(calc(var(--space-8) * 6), 100%)", gap: "var(--space-2)", fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)" }}
                 >
+                    <FileIcon path={file.path} />
                     {file.oldPath ? (
                         <>
                             <span className="min-w-0" style={{ color: "var(--color-text-muted)" }}>
@@ -1236,6 +1322,13 @@ export function FileDiffCard({
                     </span>
                     <FilePathMenu path={file.path} />
                 </span>
+                {hasLines ? (
+                    <Tooltip title={<Tip title="Find in this diff" detail="Keys: Ctrl+F" />}>
+                        <IconButton size="small" aria-label="Open the find box" aria-pressed={isFinding} onClick={openFind}>
+                            <FontAwesomeIcon icon={faMagnifyingGlass} />
+                        </IconButton>
+                    </Tooltip>
+                ) : undefined}
                 <DiffInfo file={file} counts={shownCounts} hunkCount={parseHunks(shownDiff ?? "").length} staging={stageable && section === undefined ? staging : undefined} section={section} />
                 {file.diff !== undefined ? (
                     <DiffOptions
@@ -1260,18 +1353,16 @@ export function FileDiffCard({
                     </Tooltip>
                 ) : undefined}
             </div>
-            {isOpen && hasLines ? (
+            {isOpen && hasLines && isFinding ? (
                 <div className="flex flex-none items-center" style={{ gap: "var(--space-2)", padding: "var(--space-2)", background: "var(--color-panel)", borderBottom: "1px solid var(--color-border)" }}>
                     <TextField
                         size="small"
                         fullWidth
-                        placeholder="Find in this diff"
-                        value={search}
-                        onChange={event => {
-                            setSearch(event.target.value);
-                            setCurrentMatch(0);
-                        }}
+                        placeholder="Find in this diff, then Enter"
+                        value={draft}
+                        onChange={event => setDraft(event.target.value)}
                         onKeyDown={onSearchKey}
+                        inputRef={findInputRef}
                         slotProps={{
                             htmlInput: {
                                 "aria-label": "Find in this diff",
@@ -1305,6 +1396,11 @@ export function FileDiffCard({
                                 <FontAwesomeIcon icon={faChevronDown} />
                             </IconButton>
                         </span>
+                    </Tooltip>
+                    <Tooltip title={<Tip title="Close the find box" detail="Key: Escape" />}>
+                        <IconButton size="small" aria-label="Close the find box" onClick={closeFind}>
+                            <FontAwesomeIcon icon={faXmark} />
+                        </IconButton>
                     </Tooltip>
                 </div>
             ) : undefined}
