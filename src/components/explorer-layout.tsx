@@ -16,8 +16,8 @@ import Tooltip from "@mui/material/Tooltip";
 import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAnglesLeft, faAnglesRight, faBars, faCircleInfo, faGear, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
-import { explorerPages, type IExplorerPage } from "../explorer-pages";
+import { faAnglesLeft, faAnglesRight, faBars, faChevronDown, faChevronRight, faCircleInfo, faGear, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { explorerPages, PAGE_GROUPS, type IExplorerPage } from "../explorer-pages";
 import { readExplorerSearch } from "../lib/explorer-mode";
 
 //
@@ -25,6 +25,11 @@ import { readExplorerSearch } from "../lib/explorer-mode";
 // show the sidebar as a drawer over the page instead of a column beside it.
 //
 const NARROW_SCREEN = "(max-width: 1023.98px)";
+
+//
+// The browser storage key that holds the ids of the closed sidebar groups.
+//
+const CLOSED_GROUPS_KEY = "graft-style-guide-closed-groups";
 
 //
 // Renders the sidebar and the page the router has chosen. Pressing Enter in the search box
@@ -67,6 +72,41 @@ export function ExplorerLayout(): ReactNode {
     }, [explorerTheme]);
 
     const query = search.trim().toLowerCase();
+
+    //
+    // The sidebar groups that are closed, remembered in this browser between visits.
+    //
+    const [closedGroups, setClosedGroups] = useState<ReadonlySet<string>>(() => {
+        try {
+            return new Set(JSON.parse(localStorage.getItem(CLOSED_GROUPS_KEY) ?? "[]") as string[]);
+        }
+        catch {
+            return new Set();
+        }
+    });
+
+    //
+    // Opens the sidebar group `id` when it is closed and closes it when it is open.
+    //
+    function toggleGroup(id: string): void {
+        const next = new Set(closedGroups);
+        if (next.has(id)) {
+            next.delete(id);
+        }
+        else {
+            next.add(id);
+        }
+        setClosedGroups(next);
+        try {
+            localStorage.setItem(CLOSED_GROUPS_KEY, JSON.stringify([...next]));
+        }
+        catch {
+            //
+            // The browser keeps no storage here, such as in a private window, so the groups open
+            // again on the next visit.
+            //
+        }
+    }
     const matches = explorerPages.filter(page => {
         if (!query) {
             return true;
@@ -242,10 +282,37 @@ export function ExplorerLayout(): ReactNode {
                     },
                 }}
             />
+            {/* The style pages first, then each group under its heading. */}
             <ul aria-label="Pages" className="flex flex-col gap-1">
-                {matches.map(page => (
-                    <li key={page.id}>{pageLink(page)}</li>
-                ))}
+                {matches
+                    .filter(page => page.group === undefined)
+                    .map(page => (
+                        <li key={page.id}>{pageLink(page)}</li>
+                    ))}
+                {PAGE_GROUPS.map(group => {
+                    const pages = matches.filter(page => page.group === group.id);
+                    //
+                    // A search shows every group open, so no match hides in a closed one.
+                    //
+                    const isOpen = query !== "" || !closedGroups.has(group.id);
+                    return pages.length === 0
+                        ? undefined
+                        : [
+                              <li key={`heading-${group.id}`} role="presentation" style={{ paddingTop: "var(--space-2)" }}>
+                                  <button
+                                      type="button"
+                                      aria-expanded={isOpen}
+                                      onClick={() => toggleGroup(group.id)}
+                                      className="flex w-full items-center px-3 py-1"
+                                      style={{ gap: "var(--space-2)", fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)", color: "var(--color-text-muted)", borderRadius: "var(--radius-md)", cursor: "pointer" }}
+                                  >
+                                      <FontAwesomeIcon icon={isOpen ? faChevronDown : faChevronRight} style={{ fontSize: "var(--icon-sm)", width: "var(--icon-sm)" }} />
+                                      {group.heading}
+                                  </button>
+                              </li>,
+                              ...(isOpen ? pages.map(page => <li key={page.id}>{pageLink(page)}</li>) : []),
+                          ];
+                })}
             </ul>
             {matches.length === 0 ? (
                 <div

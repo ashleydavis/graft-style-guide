@@ -25,6 +25,7 @@ import { StatusLetter } from "../../tree";
 import type { IChangedFile, ICommit } from "../data";
 import { treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../file-views";
 import { FileIcon } from "../../../components/file-icon";
+import { matchesSearch, SearchModeBox, SearchModeButton, type ISearchMode } from "../../../components/search-box";
 import { DIRECTORY_KEYS, FolderToggle, TreeGuides } from "../../../components/tree-guides";
 import { FilePath } from "./file-path";
 import { LineCounts } from "./line-counts";
@@ -242,6 +243,11 @@ export interface ICommitDetailsPaneProps {
     onToggleFolder: (path: string) => void;
 
     //
+    // The file list's search mode, whose query keeps only the files whose path holds it.
+    //
+    fileSearch: ISearchMode;
+
+    //
     // True while the pane fills the explorer.
     //
     isMaximised: boolean;
@@ -273,7 +279,8 @@ export interface ICommitDetailsPaneProps {
 // name and folder in two columns, or as a tree of folders, as the switch above them picks. The
 // selected file scrolls into view when the keys move the selection.
 //
-export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, fileView, onChangeFileView, onSelectFile, treeRoot, onDrillIn, onDrillOut, collapsedFolders, onToggleFolder, onClose }: ICommitDetailsPaneProps): ReactNode {
+export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, fileView, onChangeFileView, onSelectFile, treeRoot, onDrillIn, onDrillOut, collapsedFolders, onToggleFolder, fileSearch, onClose }: ICommitDetailsPaneProps): ReactNode {
+    const files = commit.files.filter(file => matchesSearch(file.path, fileSearch.query));
     const selectedRef = useRef<HTMLLIElement>(null);
     const totalAdded = commit.files.reduce((total, file) => total + file.linesAdded, 0);
     const totalDeleted = commit.files.reduce((total, file) => total + file.linesDeleted, 0);
@@ -344,6 +351,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                     <ListSubheader component="div" className="flex items-center" sx={{ gap: "var(--space-2)", paddingTop: "var(--space-3)", paddingBottom: "var(--space-2)" }}>
                         <span className="flex-1">Files changed ({commit.files.length})</span>
                         {commit.files.length > 0 ? <LineCounts added={totalAdded} deleted={totalDeleted} /> : undefined}
+                        {commit.files.length > 0 ? <SearchModeButton mode={fileSearch} what="the files" /> : undefined}
                         {commit.files.length > 0 ? (
                             <ToggleButtonGroup
                                 size="small"
@@ -369,9 +377,18 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                     </ListSubheader>
                 }
             >
+                {fileSearch.isOpen ? (
+                    <li style={{ listStyle: "none", margin: "0 calc(var(--space-1) * -1)" }}>
+                        <SearchModeBox mode={fileSearch} label="Search the files" placeholder="Search the file paths, then Enter" result={`${files.length} of ${commit.files.length}`} />
+                    </li>
+                ) : undefined}
                 {commit.files.length === 0 ? (
                     <li style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
                         No files changed. A merge commit's changes are in its parents.
+                    </li>
+                ) : files.length === 0 ? (
+                    <li style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
+                        No files match the search.
                     </li>
                 ) : fileView === "tree" ? (
                     [
@@ -392,7 +409,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                                 </span>
                             </li>
                         ) : undefined,
-                        ...withoutCollapsed(treeRows(commit.files, treeRoot), collapsedFolders).map((row, index, rows) => {
+                        ...withoutCollapsed(treeRows(files, treeRoot), collapsedFolders).map((row, index, rows) => {
                         const guides = treeGuides(rows)[index];
                         return row.kind === "folder" ? (
                             <ListItemButton
@@ -431,7 +448,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                                         </IconButton>
                                     </Tooltip>
                                 </span>
-                                <FilePathMenu path={row.path} />
+                                <FilePathMenu path={row.path} kind="directory" />
                             </ListItemButton>
                         ) : (
                             <FileRow key={row.file.path} {...rowState(row.file)} file={row.file} depth={0} guides={guides} label={<span className="truncate">{row.name}</span>} />
@@ -439,7 +456,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                     }),
                     ]
                 ) : (
-                    commit.files.map(file =>
+                    files.map(file =>
                         fileView === "columns" ? (
                             <FileRow
                                 key={file.path}

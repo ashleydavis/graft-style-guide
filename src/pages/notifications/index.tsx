@@ -215,14 +215,14 @@ export function ToastOpener(): ReactNode {
 }
 
 //
-// Renders one section per kind of notification, each shown in the themes of the current mode.
+// Renders the banner examples, each shown in the themes of the current mode.
 //
-export function NotificationsPage(): ReactNode {
+export function BannersPage(): ReactNode {
     return (
         <div>
             <Section
                 title="Banners"
-                description="A message at the top of a view. Each status has its colour on the icon and a background tinted with it, and a plain message sits on the panel with a border. The words stay in the main text colour."
+                description="A message for each status, and a plain one."
             >
                 <div className="flex flex-col" style={{ gap: "var(--space-2)", maxWidth: "560px" }}>
                     {exampleMessages.map(message => (
@@ -233,7 +233,7 @@ export function NotificationsPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Banner with a title and a close button" description="A longer message leads with a bold title. A message the person can put away has a Dismiss button.">
+            <Section title="Banner with a title and a close button" description="A banner with a bold title, and one with a Dismiss button.">
                 <div className="flex flex-col" style={{ gap: "var(--space-2)", maxWidth: "560px" }}>
                     <Alert severity="error">
                         <AlertTitle>Push rejected</AlertTitle>
@@ -244,10 +244,19 @@ export function NotificationsPage(): ReactNode {
                     </Message>
                 </div>
             </Section>
+        </div>
+    );
+}
 
+//
+// Renders the toast notification examples, each shown in the themes of the current mode.
+//
+export function NotificationsPage(): ReactNode {
+    return (
+        <div>
             <Section
                 title="Stacked toasts"
-                description="Toasts float over the page with the overlay shadow and a Dismiss button. When several arrive together they stack, newest at the bottom. Drawn here as they look on screen."
+                description="Toasts stacked, newest at the bottom."
             >
                 <ToastStack>
                     {exampleMessages.map(message => (
@@ -260,7 +269,7 @@ export function NotificationsPage(): ReactNode {
 
             <Section
                 title="Toasts on screen"
-                description="Press a button to show a toast of that kind at the bottom left of the screen. Press several to stack them. Each closes after 4 seconds or on Dismiss."
+                description="Toasts shown at the bottom left of the screen."
             >
                 <ToastOpener />
             </Section>

@@ -12,15 +12,15 @@ import { choices } from "./pages/choices/options";
 import { FontsPage } from "./pages/fonts";
 import { CommitGraphPage } from "./pages/commit-graph";
 import { SelectPage } from "./pages/select";
-import { TogglesPage } from "./pages/toggles";
+import { CheckboxPage, RadioPage, SwitchPage } from "./pages/toggles";
 import { TabsPage } from "./pages/tabs";
 import { MenuPage } from "./pages/menu";
 import { TooltipPage } from "./pages/tooltip";
-import { TreePage } from "./pages/tree";
+import { ListPage, TreePage } from "./pages/tree";
 import { TablePage } from "./pages/table";
-import { BarsPage } from "./pages/bars";
+import { StatusBarPage, ToolbarPage } from "./pages/bars";
 import { SidebarPage } from "./pages/sidebar";
-import { NotificationsPage } from "./pages/notifications";
+import { BannersPage, NotificationsPage } from "./pages/notifications";
 import { ProgressPage } from "./pages/progress";
 import { BadgesPage } from "./pages/badges";
 import { CommandPalettePage } from "./pages/command-palette";
@@ -33,6 +33,19 @@ import { ChangesPage } from "./pages/changes";
 //
 // One page in the explorer.
 //
+//
+// The groups of the sidebar, in the order it lists them, with their headings.
+//
+export const PAGE_GROUPS = [
+    { id: "app", heading: "App features" },
+    { id: "components", heading: "Basic components" },
+] as const;
+
+//
+// A sidebar group's id.
+//
+export type PageGroup = (typeof PAGE_GROUPS)[number]["id"];
+
 export interface IExplorerPage {
     //
     // The page's part of the URL, as in /page/<id>.
@@ -53,6 +66,13 @@ export interface IExplorerPage {
     // The component that renders the page.
     //
     component: ComponentType;
+
+    //
+    // The sidebar group the page is listed under: a feature of the Graft app, or a basic component
+    // the features are built from. A page about the style itself, such as the overview, has none
+    // and is listed above the groups.
+    //
+    group?: PageGroup;
 }
 
 //
@@ -77,30 +97,35 @@ export const explorerPages: IExplorerPage[] = [
         title: "Commit explorer",
         keywords: ["commits", "history", "log", "diff", "panes", "columns", "keys"],
         component: CommitExplorerPage,
+        group: "app",
     },
     {
         id: "changes",
-        title: "Changes and commit",
+        title: "Commit",
         keywords: ["staging", "stage", "unstage", "commit", "working tree", "amend", "no-verify"],
         component: ChangesPage,
+        group: "app",
     },
     {
         id: "diff",
         title: "Diff",
         keywords: ["changes", "unified", "side by side", "split", "hunk", "patch", "word"],
         component: DiffPage,
+        group: "app",
     },
     {
         id: "git-commands-panel",
-        title: "Git commands panel",
+        title: "Git command",
         keywords: ["help", "right sidebar", "context help", "terminal", "commands"],
         component: GitCommandsPanelPage,
+        group: "app",
     },
     {
         id: "commit-graph",
         title: "Commit graph",
         keywords: ["lanes", "branch", "merge", "history", "commits"],
         component: CommitGraphPage,
+        group: "app",
     },
     ...(choices.length > 0
         ? [
@@ -117,101 +142,153 @@ export const explorerPages: IExplorerPage[] = [
         title: "Button",
         keywords: ["action", "click"],
         component: ButtonPage,
+        group: "components",
     },
     {
         id: "text-box",
         title: "Text box",
         keywords: ["input", "text field", "search"],
         component: TextBoxPage,
+        group: "components",
     },
     {
         id: "select",
         title: "Select",
         keywords: ["dropdown", "drop-down", "combo", "picker", "options"],
         component: SelectPage,
+        group: "components",
     },
     {
-        id: "toggles",
-        title: "Checkbox, radio and switch",
-        keywords: ["checkbox", "radio", "switch", "toggle", "option"],
-        component: TogglesPage,
+        id: "checkbox",
+        title: "Checkbox",
+        keywords: ["checkbox", "tick", "mixed", "option"],
+        component: CheckboxPage,
+        group: "components",
+    },
+    {
+        id: "radio",
+        title: "Radio buttons",
+        keywords: ["radio", "option", "choice"],
+        component: RadioPage,
+        group: "components",
+    },
+    {
+        id: "switch",
+        title: "Switch",
+        keywords: ["switch", "toggle", "setting"],
+        component: SwitchPage,
+        group: "components",
     },
     {
         id: "tabs",
         title: "Tabs",
         keywords: ["tab", "views", "switcher"],
         component: TabsPage,
+        group: "components",
     },
     {
         id: "menu",
         title: "Menu",
         keywords: ["context menu", "right-click", "actions", "dropdown"],
         component: MenuPage,
+        group: "components",
     },
     {
         id: "tooltip",
         title: "Tooltip",
         keywords: ["hint", "hover", "title"],
         component: TooltipPage,
+        group: "components",
     },
     {
         id: "dialog",
         title: "Dialog",
         keywords: ["modal", "popup", "confirm", "form"],
         component: DialogPage,
+        group: "components",
     },
     {
-        id: "list-and-tree",
-        title: "List and tree",
-        keywords: ["file tree", "directories", "rows", "branches"],
+        id: "list",
+        title: "List",
+        keywords: ["rows", "branches", "filter"],
+        component: ListPage,
+        group: "components",
+    },
+    {
+        id: "tree",
+        title: "Tree",
+        keywords: ["file tree", "directories", "filter"],
         component: TreePage,
+        group: "components",
     },
     {
         id: "table",
         title: "Table",
         keywords: ["commit list", "grid", "rows", "columns"],
         component: TablePage,
+        group: "components",
     },
     {
-        id: "toolbar-and-status-bar",
-        title: "Toolbar and status bar",
-        keywords: ["toolbar", "status", "actions", "footer"],
-        component: BarsPage,
+        id: "toolbar",
+        title: "Toolbar",
+        keywords: ["toolbar", "actions", "configuration", "settings"],
+        component: ToolbarPage,
+        group: "components",
+    },
+    {
+        id: "status-bar",
+        title: "Status bar",
+        keywords: ["status", "footer"],
+        component: StatusBarPage,
+        group: "components",
     },
     {
         id: "sidebar",
-        title: "Sidebar navigation",
+        title: "Sidebar",
         keywords: ["navigation", "branches", "remotes", "tags", "stashes"],
         component: SidebarPage,
+        group: "components",
+    },
+    {
+        id: "banners",
+        title: "Banners",
+        keywords: ["alert", "banner", "message", "error"],
+        component: BannersPage,
+        group: "components",
     },
     {
         id: "notifications",
-        title: "Notifications and banners",
-        keywords: ["alert", "toast", "snackbar", "banner", "message", "error"],
+        title: "Notifications",
+        keywords: ["toast", "snackbar", "message", "notification"],
         component: NotificationsPage,
+        group: "components",
     },
     {
         id: "progress",
-        title: "Progress and loading",
+        title: "Progress",
         keywords: ["spinner", "loading", "progress bar", "skeleton"],
         component: ProgressPage,
+        group: "components",
     },
     {
         id: "badges",
-        title: "Badges and chips",
+        title: "Badges",
         keywords: ["chip", "badge", "ref", "branch", "tag", "remote", "label"],
         component: BadgesPage,
+        group: "components",
     },
     {
         id: "command-palette",
         title: "Command palette",
         keywords: ["commands", "search", "ctrl+k", "launcher"],
         component: CommandPalettePage,
+        group: "app",
     },
     {
         id: "shortcuts",
         title: "Shortcuts overlay",
         keywords: ["keyboard", "hotkeys", "keys", "help", "?"],
         component: ShortcutsPage,
+        group: "app",
     },
 ];

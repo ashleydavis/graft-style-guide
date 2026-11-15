@@ -235,7 +235,7 @@ export function OverviewPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Motion" description="Hover over a box to see each duration with the standard easing.">
+            <Section title="Motion" description="Each duration with the standard easing.">
                 <div className="flex flex-wrap gap-4">
                     {["--duration-fast", "--duration-normal", "--duration-slow"].map(name => (
                         <div key={name} className="flex flex-col gap-2">
@@ -253,7 +253,7 @@ export function OverviewPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Fading" description="A row the search does not match, faded beside one that matches.">
+            <Section title="Fading" description="A row the search does not match, beside one that matches.">
                 <div className="flex flex-col gap-2">
                     <span>A commit that matches</span>
                     <span style={{ opacity: "var(--opacity-faded)" }}>A commit that does not match</span>

@@ -51,7 +51,7 @@ test.describe("Opening pages", () => {
 
     test("choosing a page in the sidebar puts its id in the URL", async ({ page }) => {
         await page.goto("/");
-        await page.getByRole("navigation").getByRole("link", { name: "Button" }).click();
+        await page.getByRole("navigation").getByRole("link", { name: "Button", exact: true }).click();
         await expect(page).toHaveURL(/\/page\/button$/);
         await expect(page.getByRole("heading", { level: 1, name: "Button" })).toBeVisible();
     });
@@ -82,7 +82,7 @@ test.describe("Sidebar", () => {
         const navigation = page.getByRole("navigation");
         await navigation.getByRole("button", { name: "Restore sidebar" }).click();
         await expect(page).toHaveURL(/sidebar=open/);
-        await expect(navigation.getByRole("link", { name: "Button" })).toBeVisible();
+        await expect(navigation.getByRole("link", { name: "Button", exact: true })).toBeVisible();
     });
 
     test("the sidebar stays minimised when changing a setting", async ({ page }) => {
@@ -97,7 +97,7 @@ test.describe("Searching", () => {
         await page.goto("/");
         const navigation = page.getByRole("navigation");
         await navigation.getByPlaceholder("Search components").fill("butt");
-        await expect(navigation.getByRole("list", { name: "Pages" }).getByRole("link")).toHaveText(["Button"]);
+        await expect(navigation.getByRole("list", { name: "Pages" }).getByRole("link")).toHaveText(["Button", "Radio buttons"]);
     });
 
     test("typing matches keywords as well as titles", async ({ page }) => {
@@ -544,7 +544,7 @@ test.describe("Component pages", () => {
     });
 
     test("the stage all checkbox is mixed while some files are ticked and ticks them all when clicked", async ({ page }) => {
-        await page.goto("/page/toggles?components=light");
+        await page.goto("/page/checkbox?components=light");
         const stageAll = page.getByRole("checkbox", { name: "Stage all" });
         await expect(stageAll).toHaveAttribute("data-indeterminate", "true");
         await stageAll.click();
@@ -578,7 +578,7 @@ test.describe("Component pages", () => {
     });
 
     test("clicking a folder in the tree closes and opens it", async ({ page }) => {
-        await page.goto("/page/list-and-tree?components=light");
+        await page.goto("/page/tree?components=light");
         const tree = page.getByRole("tree", { name: "Changed files" });
         await expect(tree.getByText("lanes.ts")).toBeVisible();
         await tree.getByRole("treeitem", { name: "graph", exact: true }).click();
@@ -1794,12 +1794,17 @@ test.describe("Left out of the commit message", () => {
 });
 
 test.describe("Find mode", () => {
-    test("Ctrl+F opens the find box in the Changes diff and Escape closes it, back to the diff", async ({ page }) => {
+    test("Ctrl+F searches the Changes list from the list, and opens the find box from the diff, which Escape closes", async ({ page }) => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true }).click();
         await expect(diff.getByRole("textbox", { name: "Find in this diff" })).toHaveCount(0);
+        await page.keyboard.press("Control+f");
+        await expect(area.getByRole("textbox", { name: "Search changed files" })).toBeFocused();
+        await page.keyboard.press("Escape");
+        await area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true }).click();
+        await page.keyboard.press("ArrowRight");
         await page.keyboard.press("Control+f");
         await expect(diff.getByRole("textbox", { name: "Find in this diff" })).toBeFocused();
         await page.keyboard.type("level");
@@ -1831,5 +1836,137 @@ test.describe("No folding for a single file", () => {
         await page.keyboard.press("ArrowRight");
         await page.keyboard.press("e");
         await expect(diff.locator("[data-hunk-index]")).not.toHaveCount(0);
+    });
+});
+
+test.describe("Table filter", () => {
+    test("the filter shows only the matching commits and Escape clears it", async ({ page }) => {
+        await page.goto("/page/table?components=light");
+        const table = page.locator("main section.mb-10").first();
+        const filter = table.getByRole("textbox", { name: "Filter the commits" });
+        await expect(table.getByRole("row")).toHaveCount(5);
+        await filter.fill("ash");
+        await expect(table.getByRole("row")).toHaveCount(3);
+        await filter.press("Escape");
+        await expect(table.getByRole("row")).toHaveCount(5);
+    });
+
+    test("a filter that matches nothing says so", async ({ page }) => {
+        await page.goto("/page/table?components=light");
+        await expect(page.locator("main section.mb-10").nth(1)).toContainText("No commits match the filter.");
+    });
+});
+
+test.describe("Search in large content", () => {
+    test("the table filter shows only the matching commits and Escape clears it", async ({ page }) => {
+        await page.goto("/page/table?components=light");
+        const table = page.locator("main section.mb-10").first();
+        const filter = table.getByRole("textbox", { name: "Filter the commits" });
+        await expect(table.getByRole("row")).toHaveCount(5);
+        await filter.fill("ash");
+        await expect(table.getByRole("row")).toHaveCount(3);
+        await filter.press("Escape");
+        await expect(table.getByRole("row")).toHaveCount(5);
+        await expect(page.locator("main section.mb-10").nth(1)).toContainText("No commits match the filter.");
+    });
+
+    test("the list and the tree filter their rows", async ({ page }) => {
+        await page.goto("/page/list?components=light");
+        const list = page.locator("main section.mb-10").first();
+        await list.getByRole("textbox", { name: "Filter the branches" }).fill("merge");
+        await expect(list.getByRole("list", { name: "Branches" }).getByRole("button")).toHaveCount(1);
+        await page.goto("/page/tree?components=light");
+        const tree = page.locator("main section.mb-10").first();
+        const items = tree.getByRole("treeitem");
+        const before = await items.count();
+        await tree.getByRole("textbox", { name: "Filter the files" }).fill("lanes");
+        await expect.poll(() => items.count()).toBeLessThan(before);
+        await expect(tree).toContainText("lanes.ts");
+    });
+
+    test("Ctrl+F searches the commit's file list, Enter applies and Escape hides the box", async ({ page }) => {
+        await page.goto("/page/commit-explorer?components=light");
+        const section = page.locator("section", { hasText: "Directories inside directories" }).first();
+        const details = section.getByRole("region", { name: "Commit details" }).first();
+        await details.getByRole("button", { name: "Directory backend/src", exact: true }).click();
+        await page.keyboard.press("Control+f");
+        const box = details.getByRole("textbox", { name: "Search the files" });
+        await expect(box).toBeFocused();
+        await page.keyboard.type("zig");
+        await expect(details.getByRole("button", { name: "Directory docs/user-guide", exact: true })).toHaveCount(1);
+        await page.keyboard.press("Enter");
+        await expect(details.getByRole("button", { name: "Directory docs/user-guide", exact: true })).toHaveCount(0);
+        await expect(details).toContainText("3 of 11");
+        await page.keyboard.press("Escape");
+        await expect(box).toHaveCount(0);
+        await expect(details.getByRole("button", { name: "Directory docs/user-guide", exact: true })).toHaveCount(1);
+    });
+
+    test("the Git commands panel searches its commands in search mode", async ({ page }) => {
+        await page.goto("/page/git-commands-panel?components=light");
+        const panel = page.locator("main section.mb-10").nth(2).getByRole("region", { name: "Git commands" });
+        await expect(panel.getByRole("textbox", { name: "Search the commands" })).toHaveCount(0);
+        await panel.getByRole("button", { name: "Search the commands" }).click();
+        await page.keyboard.type("diff-tree");
+        await page.keyboard.press("Enter");
+        await expect(panel.getByRole("list", { name: "Commands" }).getByRole("listitem")).toHaveCount(1);
+        await page.keyboard.press("Escape");
+        await expect(panel.getByRole("list", { name: "Commands" }).getByRole("listitem")).toHaveCount(2);
+    });
+
+    test("the working directory has a menu with copy items and one that opens it", async ({ page }) => {
+        await page.goto("/page/git-commands-panel?components=light");
+        const panel = page.locator("main section.mb-10").nth(1).getByRole("region", { name: "Git commands" });
+        await panel.getByRole("button", { name: /^Path actions for/ }).click();
+        const menu = page.getByRole("menu");
+        await expect(menu.getByRole("menuitem", { name: "Copy full path" })).toBeVisible();
+        await expect(menu.getByRole("menuitem", { name: "Copy cd command" })).toBeVisible();
+        await expect(menu.getByRole("menuitem", { name: /^Open in / })).toBeVisible();
+    });
+
+    test("overflowing tabs have a More button with a filtered list of every tab", async ({ page }) => {
+        await page.goto("/page/tabs?components=light");
+        const section = page.locator("section", { hasText: "More tabs than fit" }).first();
+        await section.getByRole("button", { name: "All tabs" }).click();
+        const dialog = page.getByRole("dialog", { name: "All tabs" });
+        await dialog.getByRole("textbox", { name: "Filter the tabs" }).fill("zig");
+        await expect(dialog.getByRole("list", { name: "Tabs" }).getByRole("button")).toHaveCount(1);
+        await page.keyboard.press("Enter");
+        await expect(section.getByRole("tab", { name: "build.zig" })).toHaveAttribute("aria-selected", "true");
+    });
+});
+
+test.describe("Split pages and the sidebar groups", () => {
+    test("the sidebar lists app features and basic components under their headings", async ({ page }) => {
+        await page.goto("/page/overview?components=light");
+        const pages = page.getByRole("list", { name: "Pages" });
+        await expect(pages).toContainText("App features");
+        await expect(pages).toContainText("Basic components");
+        for (const title of ["Git command", "Checkbox", "Radio buttons", "Switch", "List", "Tree", "Toolbar", "Status bar", "Banners", "Notifications", "Badges", "Progress", "Sidebar", "Commit"]) {
+            await expect(pages.getByRole("link", { name: title, exact: true })).toHaveCount(1);
+        }
+    });
+
+    test("the toolbar's configuration dropdown changes the toolbar straight away", async ({ page }) => {
+        await page.goto("/page/toolbar?components=light");
+        const toolbar = page.getByRole("toolbar", { name: "Repository actions" });
+        await toolbar.getByRole("button", { name: "Toolbar options" }).click();
+        const dialog = page.getByRole("dialog", { name: "Toolbar options" });
+        await dialog.getByRole("switch", { name: "Button names" }).click();
+        await expect(toolbar.getByRole("button", { name: "Fetch" })).toContainText("Fetch");
+        await dialog.getByRole("switch", { name: "Stash button" }).click();
+        await expect(toolbar.getByRole("button", { name: "Stash" })).toHaveCount(0);
+    });
+});
+
+test.describe("Collapsible sidebar groups", () => {
+    test("a group's heading closes and opens it", async ({ page }) => {
+        await page.goto("/page/overview?components=light");
+        const pages = page.getByRole("list", { name: "Pages" });
+        await pages.getByRole("button", { name: "Basic components" }).click();
+        await expect(pages.getByRole("link", { name: "Checkbox", exact: true })).toHaveCount(0);
+        await expect(pages.getByRole("link", { name: "Diff", exact: true })).toHaveCount(1);
+        await pages.getByRole("button", { name: "Basic components" }).click();
+        await expect(pages.getByRole("link", { name: "Checkbox", exact: true })).toHaveCount(1);
     });
 });

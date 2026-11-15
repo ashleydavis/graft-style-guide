@@ -50,13 +50,13 @@ export function SelectPage(): ReactNode {
 
     return (
         <div>
-            <Section title="Default" description="A labelled select. Click it to open the list of choices below it.">
+            <Section title="Default" description="A labelled select.">
                 <RemoteSelect />
             </Section>
 
             <Section
                 title="Open list"
-                description="The list a select opens, drawn here as it looks open: the chosen item on the selected background, the item under the pointer on the hover background and an item that cannot be chosen."
+                description="The list a select opens, with selected, hovered and disabled items."
             >
                 <Paper variant="overlay" sx={{ width: "220px", maxWidth: "100%" }}>
                     <MenuList aria-label="Remote" sx={{ padding: "var(--space-2) var(--space-1)" }}>
@@ -82,7 +82,7 @@ export function SelectPage(): ReactNode {
                 </Paper>
             </Section>
 
-            <Section title="Error" description="No choice made where one is needed, with the reason below.">
+            <Section title="Error" description="A select with an error below it.">
                 <FormControl size="small" error sx={{ minWidth: "200px" }}>
                     <InputLabel id="merge-mode-label">Merge mode</InputLabel>
                     <Select labelId="merge-mode-label" label="Merge mode" value={mergeMode} onChange={event => setMergeMode(event.target.value)}>
@@ -94,7 +94,7 @@ export function SelectPage(): ReactNode {
                 </FormControl>
             </Section>
 
-            <Section title="Disabled" description="A select whose value is locked, drawn in the disabled colours.">
+            <Section title="Disabled" description="A select whose value is locked.">
                 <RemoteSelect disabled />
             </Section>
         </div>

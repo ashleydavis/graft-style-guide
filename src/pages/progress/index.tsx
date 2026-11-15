@@ -31,14 +31,14 @@ export function LabelledProgress({ label, value }: { label: string; value?: numb
 export function ProgressPage(): ReactNode {
     return (
         <div>
-            <Section title="Progress bar" description="Work whose size is known, such as receiving objects, fills the bar. Work whose size is not known slides along it.">
+            <Section title="Progress bar" description="Work of a known size, and work of an unknown size.">
                 <div className="flex flex-col" style={{ gap: "var(--space-4)" }}>
                     <LabelledProgress label="Receiving objects" value={64} />
                     <LabelledProgress label="Connecting to origin" />
                 </div>
             </Section>
 
-            <Section title="Spinner" description="Short work inside a control, such as a button while its action runs, which is disabled until the work ends.">
+            <Section title="Spinner" description="Short work inside a disabled button.">
                 <div className="flex flex-wrap items-center" style={{ gap: "var(--space-4)" }}>
                     <CircularProgress size={16} aria-label="Loading" />
                     <CircularProgress size={24} aria-label="Loading" />
@@ -48,7 +48,7 @@ export function ProgressPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Loading placeholder" description="Grey shapes where content will appear, such as commit rows while the history loads.">
+            <Section title="Loading placeholder" description="Grey shapes where content will appear.">
                 <div className="flex flex-col" style={{ gap: "var(--space-2)", maxWidth: "360px" }}>
                     {[80, 65, 72].map(width => (
                         <div key={width} className="flex items-center" style={{ gap: "var(--space-2)" }}>

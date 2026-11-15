@@ -87,7 +87,7 @@ export function CommitWithBadges(): ReactNode {
 export function BadgesPage(): ReactNode {
     return (
         <div>
-            <Section title="Each kind of ref" description="HEAD, the checked-out branch, another local branch, a remote branch and a tag. Each has its own icon, and the checked-out branch is filled with the accent.">
+            <Section title="Each kind of ref" description="HEAD, the checked-out branch, a local branch, a remote branch and a tag.">
                 <div className="flex flex-wrap" style={{ gap: "var(--space-2)" }}>
                     <RefBadge kind="head" name="HEAD" />
                     <RefBadge kind="current" name="main" />
@@ -97,11 +97,11 @@ export function BadgesPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="On a commit" description="Badges sit before the commit message in the commit list.">
+            <Section title="On a commit" description="Badges before a commit message.">
                 <CommitWithBadges />
             </Section>
 
-            <Section title="Removable" description="A badge with a remove button, as for a filter on the commit list.">
+            <Section title="Removable" description="A badge with a remove button.">
                 <div className="flex flex-wrap" style={{ gap: "var(--space-2)" }}>
                     <RefBadge kind="branch" name="feature/commit-graph" onDelete={() => {}} />
                     <RefBadge kind="tag" name="v1.0.0" onDelete={() => {}} />

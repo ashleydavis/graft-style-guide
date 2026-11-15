@@ -16,17 +16,17 @@ export function ChangesPage(): ReactNode {
         <div>
             <Section
                 title="Staging and committing"
-                description="The changed files on the left, in one list, or in an Unstaged panel and a Staged panel when the Changes options show them apart, each file with a plus that stages it or a minus that unstages it at its left and Discard at its right. Selecting a file shows its diff beside the list, with the same buttons, stage at the left and Discard at the right, for the file and for each change. Discard fades the file, change or lines in place and turns its button into Undo; the Delete key does the same for what the keys are on. To the right of the diff, write a summary and a description, tick Amend or No verify if you need them, and commit. Click the area, then Up and Down move through the files, Right moves into the diff to step through its changes, and Space stages or unstages."
+                description="The changed files, the selected file's diff and the commit message."
             >
                 <ChangesArea startFiles={[zoomChange, ...commitFiles]} />
             </Section>
             <Section
                 title="Directories inside directories"
-                description="A settings feature whose changes sit three and four directories deep beside files at the top of the repo. In the tree view, lines join each directory to the directories and files inside it, the chevron collapses or expands a directory and the focus button, shown on the hovered or selected directory, shows only that directory's changes."
+                description="Changes three and four directories deep, in the tree view."
             >
                 <ChangesArea startFiles={nestedFolderFiles} />
             </Section>
-            <Section title="Nothing to commit" description="The working tree matches the last commit: the file list says so, the diff has nothing to show and the Commit button waits for a change to stage, or for Amend.">
+            <Section title="Nothing to commit" description="A working tree with no changes.">
                 <ChangesArea startFiles={[]} />
             </Section>
         </div>

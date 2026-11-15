@@ -48,7 +48,7 @@ export function TextBoxPage(): ReactNode {
                 />
             </Section>
 
-            <Section title="Disabled" description="A text box whose value is locked, drawn in muted colours.">
+            <Section title="Disabled" description="A text box whose value is locked.">
                 <TextField label="Remote" size="small" defaultValue="origin" disabled />
             </Section>
 

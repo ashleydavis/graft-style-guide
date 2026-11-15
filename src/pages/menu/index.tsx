@@ -181,7 +181,7 @@ export function MenuPage(): ReactNode {
         <div>
             <Section
                 title="Menu"
-                description="The menu drawn open: icons, keyboard shortcuts at the right, dividers between groups, an item that cannot be used and an item that loses work in the danger colour."
+                description="Icons, shortcuts, dividers, a disabled item and a danger item."
             >
                 <Paper variant="overlay" sx={{ display: "inline-block", maxWidth: "100%" }}>
                     <MenuList aria-label="Commit actions" sx={{ padding: "var(--space-2) var(--space-1)" }}>
@@ -190,11 +190,11 @@ export function MenuPage(): ReactNode {
                 </Paper>
             </Section>
 
-            <Section title="Opened from a button" description="A button that opens the menu below it. Choosing an item, pressing Escape or clicking away closes it.">
+            <Section title="Opened from a button" description="The menu below the button that opens it.">
                 <MenuButton />
             </Section>
 
-            <Section title="Context menu" description="The same menu opened at the pointer by a right-click.">
+            <Section title="Context menu" description="The menu at the pointer.">
                 <ContextMenuRow />
             </Section>
         </div>

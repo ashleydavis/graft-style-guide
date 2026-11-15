@@ -53,6 +53,16 @@ interface ISidebarGroup {
 //
 // The groups of the sidebar, top to bottom.
 //
+//
+// The current item: the selected background with a bar down its left edge in the selection colour,
+// like the open commit's row.
+//
+const currentItemStyle = {
+    "&.Mui-selected, &.Mui-selected:hover": {
+        boxShadow: "inset 2px 0 0 var(--color-select-item)",
+    },
+};
+
 const groups: ISidebarGroup[] = [
     {
         title: "Branches",
@@ -154,7 +164,7 @@ export function RepositorySidebar(): ReactNode {
                 <p style={{ padding: "var(--space-2) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Nothing matches "{search.trim()}".</p>
             ) : undefined}
             <List disablePadding sx={isSearching ? { display: "none" } : undefined}>
-                <ListItemButton selected={current === "Changes"} onClick={() => setCurrent("Changes")}>
+                <ListItemButton sx={currentItemStyle} selected={current === "Changes"} onClick={() => setCurrent("Changes")}>
                     <ListItemIcon>
                         <FontAwesomeIcon icon={faCodeCompare} />
                     </ListItemIcon>
@@ -170,7 +180,7 @@ export function RepositorySidebar(): ReactNode {
                             ? group.items.map(item => {
                                   const id = `${group.title}/${item}`;
                                   return (
-                                      <ListItemButton key={id} selected={current === id} onClick={() => setCurrent(id)} aria-current={current === id ? "page" : undefined}>
+                                      <ListItemButton sx={currentItemStyle} key={id} selected={current === id} onClick={() => setCurrent(id)} aria-current={current === id ? "page" : undefined}>
                                           <ListItemIcon>
                                               <FontAwesomeIcon icon={group.icon} />
                                           </ListItemIcon>
@@ -205,7 +215,7 @@ export function SidebarPage(): ReactNode {
         <div>
             <Section
                 title="Repository sidebar"
-                description="The views of a repository by group. Group headings are small capitals in muted text and open or close their group. The current item has the selected background. Type in the search box to narrow every group to the matching names."
+                description="A repository's views by group, with a search box."
             >
                 <RepositorySidebar />
             </Section>

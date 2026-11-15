@@ -34,7 +34,7 @@ export function ButtonPage(): ReactNode {
 
     return (
         <div>
-            <Section title="Kinds" description="Three kinds of button. Commit is filled with the accent for the main action. Stash has a clear border for other actions. Discard has accent words and a soft border for the least important action.">
+            <Section title="Kinds" description="Filled for the main action, outlined for others, text for the least important.">
                 <div className="flex flex-wrap items-center gap-3">
                     <Button variant="contained">Commit</Button>
                     <Button variant="outlined">Stash</Button>
@@ -69,7 +69,7 @@ export function ButtonPage(): ReactNode {
 
             <Section
                 title="Icon buttons"
-                description="An icon with no label, in muted text until the pointer is on it. Each has a tooltip and an accessible name. Medium in toolbars, small inside rows and panels."
+                description="Square buttons with an icon and a tooltip."
             >
                 <div className="flex flex-wrap items-center gap-2">
                     {[
@@ -103,14 +103,14 @@ export function ButtonPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Copy button" description="An icon button that copies a command, hash or path. Once it has copied, its icon turns into a tick in the success colour and its tooltip says Copied for a moment.">
+            <Section title="Copy button" description="Copies a command, hash or path, and shows a tick once copied.">
                 <div className="flex flex-wrap items-center gap-2">
                     <code style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)" }}>a1b2c3d</code>
                     <CopyButton text="a1b2c3d" label="Copy hash" />
                 </div>
             </Section>
 
-            <Section title="Danger" description="The main action of a step that loses work, in the danger colour. It sits beside a safe way out.">
+            <Section title="Danger" description="The main action of a step that loses work, beside a safe way out.">
                 <div className="flex flex-wrap items-center gap-3">
                     <Button variant="text">Keep changes</Button>
                     <Button variant="outlined" color="error" startIcon={<FontAwesomeIcon icon={faTrash} />}>
@@ -121,7 +121,7 @@ export function ButtonPage(): ReactNode {
 
             <Section
                 title="Drop-down buttons"
-                description="A down chevron after the label means the button opens something below it. The first opens a menu of actions. The second opens a small dialog of settings with its own Pull and Cancel buttons."
+                description="Buttons that open a menu or a small dialog below them."
             >
                 <div className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-start gap-3">
@@ -144,7 +144,7 @@ export function ButtonPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Disabled" description="A button whose action is unavailable, drawn in the disabled colours.">
+            <Section title="Disabled" description="Buttons whose action is unavailable.">
                 <div className="flex flex-wrap items-center gap-3">
                     <Button variant="contained" disabled>
                         Commit

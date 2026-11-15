@@ -73,23 +73,32 @@ export function StagingChecklist(): ReactNode {
 }
 
 //
-// Renders one section per control, each shown in the themes of the current mode.
+// Renders the checkbox examples, each shown in the themes of the current mode.
 //
-export function TogglesPage(): ReactNode {
+export function CheckboxPage(): ReactNode {
     return (
         <div>
-            <Section title="Checkbox" description="Picks any number of things. The top box is mixed while some files below it are ticked and some are not.">
+            <Section title="Checkbox" description="Checkboxes, with a mixed one above.">
                 <StagingChecklist />
             </Section>
 
-            <Section title="Disabled checkboxes" description="Checkboxes that cannot be changed, ticked and not.">
+            <Section title="Disabled checkboxes" description="Disabled checkboxes, ticked and not.">
                 <div className="flex flex-col">
                     <FormControlLabel label="Sign commits (no key set up)" control={<Checkbox disabled />} />
                     <FormControlLabel label="Run hooks (required by the repository)" control={<Checkbox disabled checked />} />
                 </div>
             </Section>
+        </div>
+    );
+}
 
-            <Section title="Radio buttons" description="Picks one of a few choices, all in view.">
+//
+// Renders the radio button example, shown in the themes of the current mode.
+//
+export function RadioPage(): ReactNode {
+    return (
+        <div>
+            <Section title="Radio buttons" description="One choice of a few.">
                 <FormControl>
                     <FormLabel id="pull-mode-label">When pulling</FormLabel>
                     <RadioGroup aria-labelledby="pull-mode-label" defaultValue="merge">
@@ -100,8 +109,17 @@ export function TogglesPage(): ReactNode {
                     </RadioGroup>
                 </FormControl>
             </Section>
+        </div>
+    );
+}
 
-            <Section title="Switch" description="Turns a setting on or off straight away, with no Save button.">
+//
+// Renders the switch example, shown in the themes of the current mode.
+//
+export function SwitchPage(): ReactNode {
+    return (
+        <div>
+            <Section title="Switch" description="Settings that switch on or off.">
                 <div className="flex flex-col">
                     <FormControlLabel label="Fetch in the background" control={<Switch defaultChecked />} />
                     <FormControlLabel label="Show whitespace changes" control={<Switch />} />

@@ -22,7 +22,7 @@ export function DialogPage(): ReactNode {
         <div>
             <Section
                 title="Form dialog"
-                description="A title, a line of explanation, text boxes and the buttons that finish or cancel it."
+                description="A title, a line of explanation, text boxes and buttons."
             >
                 <DialogPreview>
                     <CreateBranchContent onClose={() => {}} />
@@ -31,7 +31,7 @@ export function DialogPage(): ReactNode {
 
             <Section
                 title="Confirmation dialog"
-                description="Asks before an action that loses work. The button that does it uses the danger colour."
+                description="A question before an action that loses work."
             >
                 <DialogPreview>
                     <DialogTitle>Discard changes?</DialogTitle>
@@ -49,7 +49,7 @@ export function DialogPage(): ReactNode {
                 </DialogPreview>
             </Section>
 
-            <Section title="Opened" description="Opens the form dialog over the page, with its backdrop.">
+            <Section title="Opened" description="The form dialog over the page.">
                 <DialogOpener />
             </Section>
         </div>

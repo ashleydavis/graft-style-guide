@@ -22,6 +22,7 @@ import Tooltip from "@mui/material/Tooltip";
 import { FilePathMenu } from "../../components/file-path-menu";
 import { Tip } from "../../components/tip";
 import { Section } from "../../components/section";
+import { FilterBox, matchesSearch } from "../../components/search-box";
 
 //
 // How a file differs from the last commit, as Git's one-letter status.
@@ -214,12 +215,41 @@ export function TreeRows({
 }
 
 //
-// Renders the file tree with every folder open and one file selected. Clicking a folder opens
-// or closes it, and clicking a file selects it.
+// Returns `nodes` with only the files whose path from the top, under `path`, holds `query`, and the
+// directories that hold them. Every node stays for an empty query.
+//
+function filteredTree(nodes: ITreeNode[], query: string, path = ""): ITreeNode[] {
+    if (query.trim() === "") {
+        return nodes;
+    }
+    return nodes.flatMap(node => {
+        const nodePath = `${path}/${node.name}`;
+        if (node.children === undefined) {
+            return matchesSearch(nodePath.slice(1), query) ? [node] : [];
+        }
+        const children = filteredTree(node.children, query, nodePath);
+        return children.length > 0 ? [{ ...node, children }] : [];
+    });
+}
+
+//
+// Returns the paths of every directory in `nodes`, under `path`.
+//
+function directoryPaths(nodes: ITreeNode[], path = ""): string[] {
+    return nodes.flatMap(node => (node.children === undefined ? [] : [`${path}/${node.name}`, ...directoryPaths(node.children, `${path}/${node.name}`)]));
+}
+
+//
+// Renders the file tree with every folder open and one file selected, under a filter box. Clicking
+// a folder opens or closes it, and clicking a file selects it. Typing in the filter box keeps only
+// the files whose path holds the text and the directories that hold them, every one of them open.
 //
 export function FileTree(): ReactNode {
     const [openFolders, setOpenFolders] = useState(new Set(["/src", "/src/graph"]));
     const [selectedPath, setSelectedPath] = useState("/src/graph/lanes.ts");
+    const [filter, setFilter] = useState("");
+    const isFiltering = filter.trim() !== "";
+    const shownTree = filteredTree(fileTree, filter);
 
     function toggle(path: string): void {
         const next = new Set(openFolders);
@@ -234,12 +264,16 @@ export function FileTree(): ReactNode {
 
     return (
         <Paper variant="outlined" sx={{ maxWidth: "360px" }}>
+            <div style={{ padding: "var(--space-2)", borderBottom: "1px solid var(--color-border)" }}>
+                <FilterBox value={filter} onChange={setFilter} label="Filter the files" placeholder="Filter by path" />
+            </div>
+            {shownTree.length === 0 ? <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No files match the filter.</p> : undefined}
             <List role="tree" aria-label="Changed files" dense sx={{ padding: "var(--space-1)" }}>
                 <TreeRows
-                    nodes={fileTree}
+                    nodes={shownTree}
                     depth={0}
                     path=""
-                    openFolders={openFolders}
+                    openFolders={isFiltering ? new Set(directoryPaths(shownTree)) : openFolders}
                     selectedPath={selectedPath}
                     onToggle={toggle}
                     onSelect={setSelectedPath}
@@ -268,15 +302,22 @@ const branches = [
 ];
 
 //
-// Renders the flat list of branches with the checked-out branch selected.
+// Renders the flat list of branches with the checked-out branch selected, under a filter box that
+// keeps only the branches whose name or detail holds the typed text.
 //
 export function BranchList(): ReactNode {
     const [selected, setSelected] = useState("main");
+    const [filter, setFilter] = useState("");
+    const shown = branches.filter(branch => matchesSearch(branch.name, filter) || matchesSearch(branch.detail, filter));
 
     return (
         <Paper variant="outlined" sx={{ maxWidth: "360px" }}>
+            <div style={{ padding: "var(--space-2)", borderBottom: "1px solid var(--color-border)" }}>
+                <FilterBox value={filter} onChange={setFilter} label="Filter the branches" placeholder="Filter by name" />
+            </div>
+            {shown.length === 0 ? <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No branches match the filter.</p> : undefined}
             <List aria-label="Branches" sx={{ padding: "var(--space-1)" }}>
-                {branches.map(branch => (
+                {shown.map(branch => (
                     <ListItemButton key={branch.name} selected={branch.name === selected} onClick={() => setSelected(branch.name)}>
                         <ListItemIcon>
                             <FontAwesomeIcon icon={faCodeBranch} />
@@ -301,18 +342,27 @@ export function BranchList(): ReactNode {
 }
 
 //
-// Renders one section per kind of list, each shown in the themes of the current mode.
+// Renders the list example, shown in the themes of the current mode.
+//
+export function ListPage(): ReactNode {
+    return (
+        <div>
+            <Section title="List" description="Rows with a second line of detail, under a filter box.">
+                <BranchList />
+            </Section>
+        </div>
+    );
+}
+
+//
+// Renders the tree example, shown in the themes of the current mode.
 //
 export function TreePage(): ReactNode {
     return (
         <div>
-            <Section title="List" description="A flat list of rows with a second line of detail. The selected row has the selected background and the row under the pointer has the hover background.">
-                <BranchList />
-            </Section>
-
             <Section
                 title="Tree"
-                description="Changed files by directory. Click a directory to open or close it. Each file shows its status letter: modified in the warning colour, added in the success colour and deleted in the danger colour, struck through."
+                description="Changed files by directory, under a filter box."
             >
                 <FileTree />
             </Section>

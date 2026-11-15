@@ -827,7 +827,15 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     function onKeyDown(event: KeyboardEvent): void {
-        if (isFindKey(event) && activePane !== 2) {
+        if (isFindKey(event) && activePane === 0) {
+            //
+            // Ctrl+F in the file list puts the keys in its search box.
+            //
+            event.preventDefault();
+            areaRef.current?.querySelector<HTMLInputElement>('input[placeholder="Search changed files"]')?.focus();
+            return;
+        }
+        if (isFindKey(event) && activePane === 1) {
             //
             // Ctrl+F starts find mode in the diff the keys are on: the current file of a
             // directory's stacked diffs, or the selected file's diff, the unstaged side first in
@@ -1123,7 +1131,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         </IconButton>
                     </Tooltip>
                 </span>
-                <FilePathMenu path={item.path} />
+                <FilePathMenu path={item.path} kind="directory" />
                 <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
                     {isDiscarded ? (
                         <UndoButton what="directory" onClick={() => discardFolder(item)} />

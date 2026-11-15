@@ -280,7 +280,7 @@ export function ShortcutsPage(): ReactNode {
         <div>
             <Section
                 title="Overlay"
-                description="Every shortcut in groups, each action with its keys drawn as key caps. Type in the search box to narrow the list by action or key."
+                description="Every shortcut by group, with a search box."
             >
                 <Paper variant="overlay" sx={{ width: "520px", maxWidth: "100%", overflow: "hidden" }}>
                     <ShortcutsList />

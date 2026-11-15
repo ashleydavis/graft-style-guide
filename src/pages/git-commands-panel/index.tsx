@@ -27,15 +27,15 @@ export function PanelFrame({ commands }: { commands: string[] }): ReactNode {
 export function GitCommandsPanelPage(): ReactNode {
     return (
         <div>
-            <Section title="No commands" description="A view that showed nothing read from Git, such as the welcome page, says so.">
+            <Section title="No commands" description="A view that ran no Git commands.">
                 <PanelFrame commands={[]} />
             </Section>
 
-            <Section title="One command" description="The commit list, read by one git log. The directory the command runs in sits above it, with a button that copies the cd into it.">
+            <Section title="One command" description="One command and the directory it runs in.">
                 <PanelFrame commands={["git log --max-count=50"]} />
             </Section>
 
-            <Section title="Two commands" description="An open commit, read by a git log of the commit and a git diff-tree of its files. Each copy button turns into a tick for a moment once it has copied.">
+            <Section title="Two commands" description="Two commands, each with a copy button.">
                 <PanelFrame
                     commands={[
                         "git log --max-count=1 a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",

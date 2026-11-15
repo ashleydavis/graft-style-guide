@@ -24,14 +24,14 @@ export function CommitExplorerPage(): ReactNode {
         <div>
             <Section
                 title="Commit list"
-                description="The commits newest first, with their refs, author, date and short hash. Click a commit, or select one with the arrow keys and press Enter, to open it. The active pane, the one the keys act on, has an accent border."
+                description="The commits newest first, with their refs, author, date and hash."
             >
                 <CommitExplorer />
             </Section>
 
             <Section
                 title="A commit open"
-                description="The commit's details open to the right: its message, who wrote it and when, its hash and parents and the files it changed with their line counts. The open commit has an accent bar."
+                description="A commit's details beside the list: its message, author, hash, parents and changed files."
             >
                 <CommitExplorer
                     initialState={{
@@ -46,7 +46,7 @@ export function CommitExplorerPage(): ReactNode {
 
             <Section
                 title="A file open"
-                description="The changed file's diff opens to the right, with old and new line numbers, added lines on the added colour and deleted lines on the deleted colour. Escape closes the rightmost pane."
+                description="A changed file's diff beside the commit's details."
             >
                 <CommitExplorer
                     initialState={{
@@ -61,7 +61,7 @@ export function CommitExplorerPage(): ReactNode {
 
             <Section
                 title="A file with several changes"
-                description="A file the commit changed in three places, so its diff has three hunks, each after a bar that counts the unchanged lines left out. With the diff active, Up and Down step from hunk to hunk, marking the current one with an accent bar, and Shift with Up or Down moves to the commit's previous or next file."
+                description="A file changed in three places."
             >
                 <CommitExplorer
                     initialState={{
@@ -76,7 +76,7 @@ export function CommitExplorerPage(): ReactNode {
 
             <Section
                 title="Several branches at once"
-                description="Four lanes. A blame view is in progress on its own branch while two other branches are merged past it, so each merge's curve crosses the lanes between, and the stash branch crosses the blame branch on its way back to main. The open commit has a long title, cut short in the list and wrapped in full in its details, and a description of several paragraphs and a list."
+                description="Four lanes, with merges crossing between them and a commit with a long message."
             >
                 <CommitExplorer
                     history={releaseHistory}
@@ -92,7 +92,7 @@ export function CommitExplorerPage(): ReactNode {
 
             <Section
                 title="Directories inside directories"
-                description="A commit whose files sit three and four directories deep beside files at the top of the repo. In the tree view, lines join each directory to the directories and files inside it, the chevron collapses or expands a directory and the focus button, shown on the hovered or selected directory, shows only that directory's files."
+                description="A commit whose files sit three and four directories deep, in the tree view."
             >
                 <CommitExplorer
                     history={nestedFoldersHistory}
@@ -108,7 +108,7 @@ export function CommitExplorerPage(): ReactNode {
 
             <Section
                 title="A long-running branch"
-                description="Thirty commits on up to five lanes. A settings branch runs beside main for its whole history, takes main's changes twice with merges of its own and grows a themes branch that merges back into it, while a commit graph branch, two hotfixes and a zoom branch leave main and return around it. The lanes shift and cross as branches start and end; scroll the commit pane to follow them down."
+                description="Thirty commits on up to five lanes."
             >
                 <CommitExplorer history={longBranchHistory} />
             </Section>

@@ -5,6 +5,7 @@
 
 import { useState, type ReactNode } from "react";
 import Paper from "@mui/material/Paper";
+import { FilterBox, matchesSearch } from "../../components/search-box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -44,14 +45,21 @@ const commits = [
 ];
 
 //
-// Renders the commit table with the second commit selected. Clicking a row selects it. On a
-// narrow screen the table scrolls sideways inside its frame.
+// Renders the commit table with the second commit selected, under a filter box that starts with
+// `initialFilter`. The table shows only the commits whose message, author or hash holds the
+// filter's text, ignoring case, and says so when none does. Clicking a row selects it. On a narrow
+// screen the table scrolls sideways inside its frame.
 //
-export function CommitTable({ isEmpty = false }: { isEmpty?: boolean }): ReactNode {
+export function CommitTable({ initialFilter = "" }: { initialFilter?: string }): ReactNode {
     const [selectedHash, setSelectedHash] = useState("e4f5a6b");
+    const [filter, setFilter] = useState(initialFilter);
+    const shown = commits.filter(commit => [commit.message, commit.author, commit.hash].some(field => matchesSearch(field, filter)));
 
     return (
         <TableContainer component={Paper} variant="outlined">
+            <div style={{ padding: "var(--space-2)", borderBottom: "1px solid var(--color-border)" }}>
+                <FilterBox value={filter} onChange={setFilter} label="Filter the commits" placeholder="Filter by message, author or hash" />
+            </div>
             <Table size="small" aria-label="Commits">
                 <TableHead>
                     <TableRow>
@@ -62,14 +70,14 @@ export function CommitTable({ isEmpty = false }: { isEmpty?: boolean }): ReactNo
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                    {isEmpty ? (
+                    {shown.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={4} sx={{ color: "var(--color-text-muted)", textAlign: "center", padding: "var(--space-6)" }}>
                                 No commits match the filter.
                             </TableCell>
                         </TableRow>
                     ) : (
-                        commits.map(commit => (
+                        shown.map(commit => (
                             <TableRow
                                 key={commit.hash}
                                 hover
@@ -92,21 +100,18 @@ export function CommitTable({ isEmpty = false }: { isEmpty?: boolean }): ReactNo
     );
 }
 
-//
-// Renders one section per state of the table, each shown in the themes of the current mode.
-//
 export function TablePage(): ReactNode {
     return (
         <div>
             <Section
                 title="Commit table"
-                description="A header row in muted text, then one row per commit. The selected row has the selected background and the row under the pointer has the hover background. Click a row to select it."
+                description="Commits in rows under a filter box."
             >
                 <CommitTable />
             </Section>
 
-            <Section title="Empty" description="A table with no rows says why, in muted text, where the rows would be.">
-                <CommitTable isEmpty />
+            <Section title="Empty" description="A table whose filter matches nothing.">
+                <CommitTable initialFilter="rebase" />
             </Section>
         </div>
     );

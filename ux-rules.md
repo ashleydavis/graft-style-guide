@@ -43,6 +43,10 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 - Every button and control has room around it, so it never touches a neighbouring control, a border or the edge of its container. The gap is `--space-2` or more between a control and anything beside it, and `--space-2` or more between a control and a border round it, such as the current hunk's border.
 - A control inside a bordered or highlighted area keeps that room on every side the area's border runs along.
 
+## Search
+
+- Tables, trees, lists, text blocks and other potentially large content controls should all come with a search input. In some cases where there whould be too much visual clutter the search input should only be displayed when we enter search mode (ctrl+f). Enter should apply the search. Escape exits search mode and hides the search input. The search should filter for tables, trees and lists. For text content it should highlight the matches and have up/down buttons (and possibly hotkeys) to navigate the matches.
+
 ## Screens
 
 - All UI pages and components need to work in desktop, mobile, portrait and landscape.

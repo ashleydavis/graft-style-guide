@@ -7,6 +7,8 @@ import type { ReactNode } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFolder, faTerminal } from "@fortawesome/free-solid-svg-icons";
 import { CopyButton } from "../../../components/copy-button";
+import { FilePathMenu } from "../../../components/file-path-menu";
+import { isSearchKey, matchesSearch, SearchModeBox, SearchModeButton, useSearchMode } from "../../../components/search-box";
 
 //
 // What the panel shows.
@@ -74,12 +76,29 @@ export function CommandBlock({ command }: { command: string }): ReactNode {
 // none.
 //
 export function GitCommandsPanel({ repoPath, commands }: IGitCommandsPanelProps): ReactNode {
+    const search = useSearchMode();
+    const shown = commands.filter(command => matchesSearch(command, search.query));
     return (
-        <section aria-label="Git commands" className="flex flex-col" style={{ gap: "var(--space-4)", padding: "var(--space-4)" }}>
+        <section
+            aria-label="Git commands"
+            className="flex flex-col"
+            style={{ gap: "var(--space-4)", padding: "var(--space-4)" }}
+            //
+            // Ctrl+F anywhere in the panel starts search mode, which keeps only the commands that
+            // hold the search.
+            //
+            onKeyDown={event => {
+                if (isSearchKey(event) && commands.length > 0) {
+                    event.preventDefault();
+                    search.open();
+                }
+            }}
+        >
             <div className="flex flex-col" style={{ gap: "var(--space-1)" }}>
                 <h2 className="flex items-center" style={{ gap: "var(--space-2)", fontSize: "var(--text-lg)", fontWeight: "var(--weight-bold)", lineHeight: "var(--leading-tight)" }}>
                     <FontAwesomeIcon icon={faTerminal} style={{ fontSize: "var(--icon-md)", color: "var(--color-accent)" }} />
-                    Git commands
+                    <span className="flex-1">Git commands</span>
+                    {commands.length > 0 ? <SearchModeButton mode={search} what="the commands" /> : undefined}
                 </h2>
                 <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>The Git commands this page ran. Copy one to run it in a terminal.</p>
             </div>
@@ -105,10 +124,16 @@ export function GitCommandsPanel({ repoPath, commands }: IGitCommandsPanelProps)
                         <span className="min-w-0 flex-1 truncate">
                             Runs in <code style={{ fontFamily: "var(--font-mono)", color: "var(--color-text)" }}>{repoPath}</code>
                         </span>
-                        <CopyButton text={`cd ${repoPath}`} label="Copy cd command" />
+                        <FilePathMenu path={repoPath} kind="working-directory" />
                     </div>
+                    {search.isOpen ? (
+                        <div style={{ margin: "0 calc(var(--space-2) * -1)" }}>
+                            <SearchModeBox mode={search} label="Search the commands" placeholder="Search the commands, then Enter" result={`${shown.length} of ${commands.length}`} />
+                        </div>
+                    ) : undefined}
+                    {shown.length === 0 ? <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>No commands match the search.</p> : undefined}
                     <ol aria-label="Commands" className="flex flex-col" style={{ gap: "var(--space-2)" }}>
-                        {commands.map(command => (
+                        {shown.map(command => (
                             <CommandBlock key={command} command={command} />
                         ))}
                     </ol>

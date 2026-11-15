@@ -70,7 +70,7 @@ export function TooltipWithShortcut({ label, shortcut }: { label: string; shortc
 export function TooltipPage(): ReactNode {
     return (
         <div>
-            <Section title="Drawn open" description="A tooltip as it looks when shown: a short label and its keyboard shortcut below an icon button.">
+            <Section title="Drawn open" description="A tooltip with a label and its shortcut.">
                 <OpenTooltip title={<TooltipWithShortcut label="Fetch" shortcut="F5" />}>
                     <IconButton aria-label="Fetch">
                         <FontAwesomeIcon icon={faArrowsRotate} />
@@ -78,7 +78,7 @@ export function TooltipPage(): ReactNode {
                 </OpenTooltip>
             </Section>
 
-            <Section title="On hover and focus" description="Rest the pointer on a button, or move to it with Tab, to show its tooltip after a short delay.">
+            <Section title="On hover and focus" description="Buttons with tooltips.">
                 <div className="flex flex-wrap" style={{ gap: "var(--space-2)" }}>
                     {toolbarButtons.map(button => (
                         <Tooltip key={button.label} title={<TooltipWithShortcut label={button.label} shortcut={button.shortcut} />} arrow>
@@ -90,7 +90,7 @@ export function TooltipPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Full value of cut-off text" description="A long value cut off with an ellipsis shows the whole of it in a tooltip.">
+            <Section title="Full value of cut-off text" description="A tooltip with the full text of a cut-off value.">
                 <Tooltip title="feature/commit-graph-lane-colours-for-merges">
                     <span
                         tabIndex={0}

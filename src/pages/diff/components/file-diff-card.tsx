@@ -288,15 +288,15 @@ function PickModeSwitch({ isSelectingLines, onSelectingLines }: { isSelectingLin
 //
 // Renders one row of the options dialog: what the option does, its control and its key.
 //
-export function OptionRow({ label, detail, control, keyName }: { label: string; detail: string; control: ReactNode; keyName: string }): ReactNode {
+export function OptionRow({ label, detail, control, keyName }: { label: string; detail: string; control: ReactNode; keyName?: string }): ReactNode {
     return (
-        <div className="grid items-center" style={{ gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "var(--space-3)" }}>
+        <div className="grid items-center" style={{ gridTemplateColumns: keyName ? "minmax(0, 1fr) auto auto" : "minmax(0, 1fr) auto", gap: "var(--space-3)" }}>
             <div className="flex min-w-0 flex-col">
                 <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)" }}>{label}</span>
                 <span style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)" }}>{detail}</span>
             </div>
             {control}
-            <KeyCaps keys={keyName.toUpperCase()} />
+            {keyName ? <KeyCaps keys={keyName.toUpperCase()} /> : undefined}
         </div>
     );
 }

@@ -50,7 +50,7 @@ Each gets its own explorer page, built from MUI components where MUI has one.
 - [x] Progress and loading states.
 - [x] Badges and chips for branches, tags and remotes.
 - [x] Command palette.
-- [ ] Pick the component looks on the Choices page: status colours as text, tabs, switch, tooltip, banners, ref badges, table rows, sidebar current item and tree guides.
+- [x] Pick the component looks on the Choices page: status colours as text, tabs, switch, tooltip, banners, ref badges, table rows, sidebar current item and tree guides.
 
 ## Git views
 

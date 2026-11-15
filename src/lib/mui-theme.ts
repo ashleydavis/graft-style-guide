@@ -901,8 +901,13 @@ export const graftTheme: Theme = createTheme({
                     props: {
                         variant: kind,
                     },
+                    //
+                    // Each kind of ref is outlined in its colour, with no fill, and its icon takes
+                    // the same colour.
+                    //
                     style: {
-                        backgroundColor: "var(--color-raised)",
+                        backgroundColor: "transparent",
+                        boxShadow: `inset 0 0 0 1px ${refChipColours[kind]}`,
                         color: "var(--color-text)",
                         "& .MuiChip-icon": {
                             color: refChipColours[kind],

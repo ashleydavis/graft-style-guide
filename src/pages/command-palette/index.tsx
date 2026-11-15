@@ -244,7 +244,7 @@ export function CommandPalettePage(): ReactNode {
         <div>
             <Section
                 title="Palette"
-                description="Type to narrow the commands. The highlighted command has the selected background; Up and Down move it and Enter runs it. Each command shows its keyboard shortcut."
+                description="Commands with their shortcuts, narrowed by a search box."
             >
                 <div className="flex flex-col" style={{ gap: "var(--space-2)" }}>
                     <Paper variant="overlay" sx={{ width: "480px", maxWidth: "100%", overflow: "hidden" }}>
@@ -254,7 +254,7 @@ export function CommandPalettePage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Opened over the page" description="Opens near the top of the window over a backdrop. Escape or a click outside closes it.">
+            <Section title="Opened over the page" description="The palette over a backdrop.">
                 <CommandPaletteOpener />
             </Section>
         </div>

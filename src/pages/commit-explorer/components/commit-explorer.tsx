@@ -19,6 +19,7 @@ import { CommitDetailsPane, CommitInfoPane } from "./commit-details-pane";
 import { CommitPane } from "./commit-pane";
 import { DirectoryPane, FilePane } from "./file-pane";
 import { directoryKeyAction } from "../../../components/tree-guides";
+import { isSearchKey, matchesSearch, useSearchMode } from "../../../components/search-box";
 import { ResizeHandle } from "./resize-handle";
 import { COLLAPSE_KEY } from "../../../components/collapse";
 import { withViewTransition } from "../../../lib/view-transition";
@@ -84,6 +85,14 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     const [treeRoot, setTreeRoot] = useState("");
     const [rootHistory, setRootHistory] = useState<string[]>([]);
     const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set());
+    const fileSearch = useSearchMode();
+
+    //
+    // Returns the files of a commit the file list's search keeps.
+    //
+    function searchedFiles<File extends { path: string }>(files: File[]): File[] {
+        return files.filter(file => matchesSearch(file.path, fileSearch.query));
+    }
 
     //
     // Collapses the folder `path` in the commit's file list, hiding the rows inside it, or expands
@@ -255,7 +264,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         if (!openCommit) {
             return;
         }
-        const paths = [COMMIT_SUMMARY_PATH, ...filePathsInViewOrder(openCommit.files, fileView, shownRoot, collapsedFolders)];
+        const paths = [COMMIT_SUMMARY_PATH, ...filePathsInViewOrder(searchedFiles(openCommit.files), fileView, shownRoot, collapsedFolders)];
         const index = state.openPath === undefined ? -1 : paths.indexOf(state.openPath);
         const next = paths[Math.min(Math.max(index + step, 0), paths.length - 1)];
         if (next !== undefined) {
@@ -264,6 +273,21 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     }
 
     function onKeyDown(event: KeyboardEvent): void {
+        if (isSearchKey(event) && state.activePaneIndex === 0) {
+            //
+            // Ctrl+F in the commit list puts the keys in its search box.
+            //
+            event.preventDefault();
+            event.stopPropagation();
+            explorerRef.current?.querySelector<HTMLInputElement>('input[aria-label="Search commits"]')?.focus();
+            return;
+        }
+        if (isSearchKey(event) && state.activePaneIndex === 1 && openCommit && openCommit.files.length > 0) {
+            event.preventDefault();
+            event.stopPropagation();
+            fileSearch.open();
+            return;
+        }
         if (isFindKey(event) && (openFile || openFolder !== undefined)) {
             //
             // Ctrl+F starts find mode in the diff the keys are on: the current file of a
@@ -388,7 +412,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         setState(current =>
             stateAfterKey(current, event.key, {
                 commitHashes: commits.map(commit => commit.hash),
-                filePaths: current.openHash !== undefined ? [COMMIT_SUMMARY_PATH, ...rowPathsInViewOrder(commitByHash(history, current.openHash).files, fileView, shownRoot, FOLDER_PREFIX, collapsedFolders)] : [],
+                filePaths: current.openHash !== undefined ? [COMMIT_SUMMARY_PATH, ...rowPathsInViewOrder(searchedFiles(commitByHash(history, current.openHash).files), fileView, shownRoot, FOLDER_PREFIX, collapsedFolders)] : [],
             }),
         );
     }
@@ -496,6 +520,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                         onDrillOut={drillOut}
                         collapsedFolders={collapsedFolders}
                         onToggleFolder={path => toggleCollapsedFolder(path)}
+                        fileSearch={fileSearch}
                         onSelectFile={path => setState(current => selectFile(current, path))}
                         onClose={() => setState(closeCommitDetailsPane)}
                     />

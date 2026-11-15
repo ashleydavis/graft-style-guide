@@ -56,7 +56,7 @@ function commit(message: string, hash: string, lane: number, options: Partial<IG
 const examples: IGraphExample[] = [
     {
         title: "Straight history",
-        description: "One branch, each commit on top of the last.",
+        description: "One branch.",
         laneCount: 1,
         rows: [
             commit("Updated the readme", "a1b2c3d", 1, { joinsAbove: false }),
@@ -67,7 +67,7 @@ const examples: IGraphExample[] = [
     },
     {
         title: "Feature branch merged",
-        description: "A branch leaves main, gets two commits and is merged back.",
+        description: "A branch merged back into main.",
         laneCount: 2,
         rows: [
             commit("Merged feature/diffs", "f1e2d3c", 1, { joinsAbove: false, startsHere: [2] }),
@@ -79,7 +79,7 @@ const examples: IGraphExample[] = [
     },
     {
         title: "Branch not merged yet",
-        description: "A branch with work in progress above main's latest commit. Its lane is dotted, because it is not merged yet, as an open pull request is not.",
+        description: "An unmerged branch, with a dotted lane.",
         laneCount: 2,
         rows: [
             commit("Started the blame view", "9f8e7d6", 2, { joinsAbove: false, dottedBelow: true }),
@@ -90,7 +90,7 @@ const examples: IGraphExample[] = [
     },
     {
         title: "Two branches at once",
-        description: "Two branches in progress side by side. One is merged and has a solid lane; the other is still open and its lane is dotted.",
+        description: "A merged branch and an unmerged one side by side.",
         laneCount: 3,
         rows: [
             commit("Added the stash list", "5e6f7a8", 3, { joinsAbove: false, dottedBelow: true }),
@@ -104,7 +104,7 @@ const examples: IGraphExample[] = [
     },
     {
         title: "Every lane colour",
-        description: "Six branches at once, one commit on each, so every lane colour shows next to the others.",
+        description: "Six branches, one in each lane colour.",
         laneCount: 6,
         rows: [1, 2, 3, 4, 5, 6].map(lane =>
             commit(`Commit on lane ${lane}`, `${lane}a${lane}b${lane}c${lane}`, lane, {

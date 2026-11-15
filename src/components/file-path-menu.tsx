@@ -15,12 +15,80 @@ import Popper from "@mui/material/Popper";
 import Divider from "@mui/material/Divider";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faChevronDown, faCopy, faFile, faFolderOpen, faPenToSquare, faRoute } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faChevronDown, faCopy, faFile, faFolder, faFolderOpen, faPenToSquare, faRoute, faTerminal, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
 //
 // The folder the example repository sits in, which the full path starts with.
 //
 export const exampleRepoRoot = "/home/you/projects/graft";
+
+//
+// What a path menu is for: a file in the repository, a directory in the repository, or the
+// directory a command runs in, given as a full path.
+//
+export type PathKind = "file" | "directory" | "working-directory";
+
+//
+// One item of a path menu: its label and icon, and the text it copies, or no text for an item
+// that opens the path.
+//
+interface IPathMenuItem {
+    label: string;
+    icon: IconDefinition;
+    copies?: string;
+}
+
+//
+// Returns the items of a path menu for a path of `kind`, with a divider between the copy items
+// and the open items. A file can be copied as its full path, its path from the repository root or
+// its name, and shown in the file manager or opened in the editor. A directory can be copied as its
+// full path, its path from the repository root or its name, and opened in the file manager. The
+// directory a command runs in can be copied as its full path, as a cd command into it or as its
+// name, and opened in the file manager.
+//
+function menuItems(kind: PathKind, fullPath: string, path: string, name: string): (IPathMenuItem | "divider")[] {
+    if (kind === "working-directory") {
+        return [
+            { label: "Copy full path", icon: faCopy, copies: fullPath },
+            { label: "Copy cd command", icon: faTerminal, copies: `cd ${fullPath}` },
+            { label: "Copy directory name", icon: faFolder, copies: name },
+            "divider",
+            { label: directoryManagerLabel(), icon: faFolderOpen },
+        ];
+    }
+    if (kind === "directory") {
+        return [
+            { label: "Copy full path", icon: faCopy, copies: fullPath },
+            { label: "Copy relative path", icon: faRoute, copies: path },
+            { label: "Copy directory name", icon: faFolder, copies: name },
+            "divider",
+            { label: directoryManagerLabel(), icon: faFolderOpen },
+        ];
+    }
+    return [
+        { label: "Copy full file path", icon: faCopy, copies: fullPath },
+        { label: "Copy relative file path", icon: faRoute, copies: path },
+        { label: "Copy file name", icon: faFile, copies: name },
+        "divider",
+        { label: fileManagerLabel(), icon: faFolderOpen },
+        { label: "Open in editor", icon: faPenToSquare },
+    ];
+}
+
+//
+// Returns the name of the menu item that opens a directory in the computer's file manager, as each
+// platform names its own.
+//
+export function directoryManagerLabel(): string {
+    const platform = navigator.userAgent;
+    if (/Mac/.test(platform)) {
+        return "Open in Finder";
+    }
+    if (/Win/.test(platform)) {
+        return "Open in Explorer";
+    }
+    return "Open in file manager";
+}
 
 //
 // How long the tick shows after a copy, in milliseconds.
@@ -45,19 +113,20 @@ export function fileManagerLabel(): string {
 }
 
 //
-// Renders the button and, while open, its menu below it. `path` is the file's path from the root
-// of the repository, and `repoRoot` the folder the repository sits in. The copy items copy the
-// full path, the path from the repository root or the file name, then the button shows a tick for
-// a moment. The open items show the file in the file manager or open it in the editor, which the
-// backend does in Graft; here they close the menu. A click on the button stays with it and never
+// Renders the button and, while open, its menu below it. `path` is the path from the root of the
+// repository, or the full path of a working directory, and `repoRoot` the directory the repository
+// sits in. `kind` picks the menu's items. A copy item copies its text, then the button shows a tick
+// for a moment. The open items open the path in the file manager or the editor, which the backend
+// does in Graft; here they close the menu. A click on the button stays with it and never
 // reaches a row the button sits in. The menu floats over the page without blocking it: a click
 // anywhere outside it closes it and still reaches what was clicked, and Escape or Tab closes it.
 // The button stays in view while its menu is open, even in a row that shows it only on hover.
 //
-export function FilePathMenu({ path, repoRoot = exampleRepoRoot }: { path: string; repoRoot?: string }): ReactNode {
+export function FilePathMenu({ path, repoRoot = exampleRepoRoot, kind = "file" }: { path: string; repoRoot?: string; kind?: PathKind }): ReactNode {
     const [anchor, setAnchor] = useState<HTMLElement | undefined>(undefined);
     const [isCopied, setIsCopied] = useState(false);
     const name = path.slice(path.lastIndexOf("/") + 1);
+    const fullPath = kind === "working-directory" ? path : `${repoRoot}/${path}`;
 
     useEffect(() => {
         if (!isCopied) {
@@ -126,37 +195,18 @@ export function FilePathMenu({ path, repoRoot = exampleRepoRoot }: { path: strin
                 >
                     <Paper variant="overlay" sx={{ marginTop: "var(--space-1)" }}>
                     <MenuList autoFocusItem onKeyDown={onMenuKey} sx={{ padding: "var(--space-2) var(--space-1)" }}>
-                <MenuItem onClick={() => copy(`${repoRoot}/${path}`)}>
-                    <ListItemIcon>
-                        <FontAwesomeIcon icon={faCopy} />
-                    </ListItemIcon>
-                    <ListItemText>Copy full file path</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={() => copy(path)}>
-                    <ListItemIcon>
-                        <FontAwesomeIcon icon={faRoute} />
-                    </ListItemIcon>
-                    <ListItemText>Copy relative file path</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={() => copy(name)}>
-                    <ListItemIcon>
-                        <FontAwesomeIcon icon={faFile} />
-                    </ListItemIcon>
-                    <ListItemText>Copy file name</ListItemText>
-                </MenuItem>
-                <Divider />
-                <MenuItem onClick={close}>
-                    <ListItemIcon>
-                        <FontAwesomeIcon icon={faFolderOpen} />
-                    </ListItemIcon>
-                    <ListItemText>{fileManagerLabel()}</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={close}>
-                    <ListItemIcon>
-                        <FontAwesomeIcon icon={faPenToSquare} />
-                    </ListItemIcon>
-                    <ListItemText>Open in editor</ListItemText>
-                </MenuItem>
+                {menuItems(kind, fullPath, path, name).map((item, index) =>
+                    item === "divider" ? (
+                        <Divider key={`divider-${index}`} />
+                    ) : (
+                        <MenuItem key={item.label} onClick={() => (item.copies === undefined ? close() : copy(item.copies))}>
+                            <ListItemIcon>
+                                <FontAwesomeIcon icon={item.icon} />
+                            </ListItemIcon>
+                            <ListItemText>{item.label}</ListItemText>
+                        </MenuItem>
+                    ),
+                )}
                     </MenuList>
                     </Paper>
                 </ClickAwayListener>

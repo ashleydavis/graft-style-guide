@@ -22,8 +22,9 @@ export function ChoicesPage(): ReactNode {
                     maxWidth: "720px",
                 }}
             >
-                Each choice shows its options on the same small Graft screen. An option changes only the tokens of its own choice, and the rest of the screen uses graft.css as it stands. The last option of each choice paints the choice's tokens bright red to show where they appear on the screen, and is not a candidate. Pick a letter for each choice.
+                Each choice's options on the same small Graft screen. The last option paints the choice's tokens red to show where they appear.
             </p>
+            {choices.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No choices are open. Every component look has been picked.</p> : undefined}
             {choices.map(choice => (
                 <Section key={choice.title} title={choice.title} description={choice.description}>
                     <div

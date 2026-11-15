@@ -15,7 +15,7 @@ export function FontsPage(): ReactNode {
         <div>
             <Section
                 title="UI font"
-                description="Mona Sans, GitHub's open-source typeface, for all interface text: labels, buttons, menus, commit messages and headings."
+                description="Mona Sans, for all interface text."
             >
                 <div
                     className="flex flex-col"
@@ -42,7 +42,7 @@ export function FontsPage(): ReactNode {
 
             <Section
                 title="Monospace font"
-                description="Monaspace Neon, GitHub's open-source code font, for hashes, file names, branch names and diffs."
+                description="Monaspace Neon, for hashes, paths, branch names and diffs."
             >
                 <div
                     className="flex flex-col"
@@ -72,7 +72,7 @@ export function FontsPage(): ReactNode {
                 </div>
             </Section>
 
-            <Section title="Sizes" description="Every type size, in the UI font.">
+            <Section title="Sizes" description="Every type size.">
                 <div
                     className="flex flex-col"
                     style={{
@@ -125,7 +125,7 @@ export function FontsPage(): ReactNode {
 
             <Section
                 title="Line heights"
-                description="Tight for headings and single lines such as list rows, normal for running text such as commit descriptions."
+                description="Tight for headings and single lines, normal for running text."
             >
                 <div
                     className="flex flex-col"
@@ -152,7 +152,7 @@ export function FontsPage(): ReactNode {
 
             <Section
                 title="Characters to tell apart"
-                description="Characters that look alike in many fonts. In hashes and code each must be easy to tell from the others."
+                description="Characters that look alike in many fonts."
             >
                 <div
                     className="flex flex-col"
