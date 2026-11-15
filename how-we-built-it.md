@@ -265,6 +265,7 @@ More across the explorers:
 - **One diff is one list again.** The Staged and Unstaged panels show only with the unstaged and the staged changes apart; One diff lists each file once, a minus on a file staged whole and a plus on the rest.
 - **Changes options.** The Changes header's switches moved into a Changes options dialog under one button, as a new UX rule asks of a crowded toolbar: the diff view, one diff or apart (key S), and the panels, stacked or side by side (key H). Side by side, the Changes pane widens so both panels read.
 - **Room under the bar's button.** Bars of unchanged lines got room under their show or hide button.
+- **Staged paths tinged green.** In the Changes list, a staged file's folder and name take a slight tinge of `--color-success`, mixed into their own colours.
 - **Icon-only stage buttons.** The Stage and Unstage buttons lost their words: a plus stages and a minus unstages, and the tooltip names what each does, "for the next commit".
 - **Screens rule.** Every page and component works on a desktop and on a phone, upright and on its side, as the phone tests check for each page.
 - **No scrollbar flicker.** MUI locks the page's scrolling while a popover, menu or dialog is open, which hides the page's scrollbar and makes the page flicker as the popup opens and closes. The theme turns that lock off for all three, so the scrollbar stays put.

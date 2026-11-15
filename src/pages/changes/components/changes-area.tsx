@@ -737,7 +737,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     {discardsOf(file.path).isFile ? undefined : <StageButton isStaged={isChecked} what="file" onClick={() => toggleEntry(entry)} />}
                 </span>
                 <span className="min-w-0 flex-1">
-                    <FilePath path={file.path} />
+                    {/* A staged file's path takes a slight green tinge. */}
+                    <FilePath path={file.path} tint={isChecked ? "var(--color-success)" : undefined} />
                 </span>
                 <FilePathMenu path={file.path} />
                 <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
