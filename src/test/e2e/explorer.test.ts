@@ -1327,7 +1327,7 @@ test.describe("Runs of unchanged lines in the lines mode", () => {
 });
 
 test.describe("Any shown line can be picked", () => {
-    test("kept lines and shown unchanged lines can be picked, and the buttons float over the pick", async ({ page }) => {
+    test("kept lines and shown unchanged lines can be picked, and the buttons sit just across the pick's top edge", async ({ page }) => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
@@ -1339,10 +1339,13 @@ test.describe("Any shown line can be picked", () => {
         await expect(kept).toHaveAttribute("data-picked", "true");
         await expect(diff.getByRole("button", { name: "Discard this line" })).toHaveCount(0);
         const added = diff.locator('[data-line="added"]').filter({ hasText: "saveState" });
-        const heightBefore = (await added.boundingBox())!.height;
         await added.click();
-        await expect(diff.getByRole("button", { name: "Discard this line" })).toBeVisible();
-        expect((await added.boundingBox())!.height).toBeLessThan(heightBefore + 20);
+        const discard = diff.getByRole("button", { name: "Discard this line" });
+        await expect(discard).toBeVisible();
+        const row = (await added.boundingBox())!;
+        const button = (await discard.boundingBox())!;
+        expect(button.y).toBeGreaterThan(row.y - 12);
+        expect(button.y + button.height).toBeLessThan(row.y + row.height);
         await diff.getByText("24 unchanged lines").click();
         await page.keyboard.press("Space");
         await page.keyboard.press("ArrowDown");
@@ -1454,5 +1457,29 @@ test.describe("Path menu, hover and configuration", () => {
         const dialog = page.getByRole("dialog", { name: "Configuration" });
         await expect(dialog.getByRole("group", { name: "Components" })).toBeVisible();
         await expect(dialog.getByRole("group", { name: "Explorer" })).toBeVisible();
+    });
+});
+
+test.describe("Commit toast and tooltips", () => {
+    test("a commit's toast shows at the bottom centre of the screen", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        await area.getByRole("textbox", { name: "Summary" }).fill("Tidy the themes");
+        await area.getByRole("button", { name: "Commit 3 files" }).click();
+        const toast = area.getByText("Committed 3 files: Tidy the themes");
+        await expect(toast).toBeVisible();
+        const box = (await toast.boundingBox())!;
+        const viewport = page.viewportSize()!;
+        expect(Math.abs(box.x + box.width / 2 - viewport.width / 2)).toBeLessThan(viewport.width * 0.25);
+        expect(box.y).toBeGreaterThan(viewport.height / 2);
+    });
+
+    test("a floating button's tooltip is wider than the button group", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const diff = page.getByRole("application", { name: "Changes" }).first().getByRole("region", { name: "File diff" });
+        await diff.getByRole("button", { name: "Discard this hunk" }).first().hover();
+        const tooltip = page.getByRole("tooltip").filter({ hasText: "Discard this hunk" });
+        await expect(tooltip).toBeVisible();
+        expect((await tooltip.boundingBox())!.width).toBeGreaterThan(160);
     });
 });

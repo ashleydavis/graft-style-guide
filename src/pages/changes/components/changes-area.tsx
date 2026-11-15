@@ -30,6 +30,7 @@ import { noDiscards, withFileDiscarded, withHunkMarked, type IDiscards } from ".
 import { parseHunks, sectionDiff, type ISectionDiff } from "../../diff/model";
 import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
 import { withViewTransition } from "../../../lib/view-transition";
+import { LiveToast, ToastStack } from "../../notifications";
 import { COLLAPSE_KEY } from "../../../components/collapse";
 
 //
@@ -255,7 +256,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [description, setDescription] = useState("");
     const [amend, setAmend] = useState(false);
     const [skipHooks, setSkipHooks] = useState(false);
-    const [committed, setCommitted] = useState<string | undefined>(undefined);
+    const [committed, setCommitted] = useState<{ id: number; text: string } | undefined>(undefined);
+    const closeCommitted = useRef(() => setCommitted(undefined)).current;
     const [diffMode, setDiffMode] = useState<"one" | "split">("one");
     const [maximised, setMaximised] = useState<0 | 1 | 2 | undefined>(undefined);
     const [collapsed, setCollapsed] = useState<ReadonlySet<0 | 2>>(new Set());
@@ -429,7 +431,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         setSelectedPath(left.find(file => file.path === selectedPath)?.path ?? left[0]?.path);
         setCurrentHunk(undefined);
         setActivePane(0);
-        setCommitted(amend ? `Amended the last commit: ${summary.trim()}` : `Committed ${count} ${count === 1 ? "file" : "files"}: ${summary.trim()}`);
+        setCommitted({ id: Date.now(), text: amend ? `Amended the last commit: ${summary.trim()}` : `Committed ${count} ${count === 1 ? "file" : "files"}: ${summary.trim()}` });
         setSummary("");
         setDescription("");
         setAmend(false);
@@ -893,11 +895,6 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     isRailResponsive
                 >
                 <div className="flex h-full flex-col" style={{ gap: "var(--space-4)", padding: "var(--space-4) var(--space-3) var(--space-3)" }}>
-                    {committed ? (
-                        <Alert severity="success" onClose={() => setCommitted(undefined)}>
-                            {committed}
-                        </Alert>
-                    ) : undefined}
                     <TextField
                         size="small"
                         fullWidth
@@ -981,6 +978,16 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     </span>
                 ))}
             </div>
+            {committed ? (
+                //
+                // The commit's toast shows at the bottom centre of the screen.
+                //
+                <div className="fixed left-1/2 z-[1400] -translate-x-1/2" style={{ bottom: "var(--space-6)", width: "min(calc(var(--space-8) * 11), calc(100vw - var(--space-8)))" }}>
+                    <ToastStack>
+                        <LiveToast key={committed.id} toast={{ id: committed.id, message: { kind: "success", label: "Committed", text: committed.text } }} onClose={closeCommitted} />
+                    </ToastStack>
+                </div>
+            ) : undefined}
         </div>
     );
 }

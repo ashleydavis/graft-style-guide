@@ -259,28 +259,28 @@ export interface ISidedActions {
 }
 
 //
-// Renders one floating panel of buttons at the top `side` of a hunk or a run of picked lines, on a
-// small raised panel, so it adds nothing to their height. `top` and `transform` place it across
-// or inside the top edge.
+// How far the floating buttons reach above the top edge of their hunk or run of picked lines: a
+// little, so they sit just across the edge and mostly inside.
+//
+const EDGE_OVERLAP = "translateY(calc(var(--space-1) * -1.5))";
+
+//
+// Renders floating buttons at the top `side` of a hunk or a run of picked lines, each button on its
+// own with nothing round it, so they add nothing to their height. `top` and `transform` place them
+// across or inside the top edge.
 //
 function FloatingPanel({ side, top, transform, children }: { side: "left" | "right"; top: string; transform: string | undefined; children: ReactNode }): ReactNode {
     return (
         <div
             data-floating-actions
-            className="flex"
+            className="graft-floating-buttons flex"
             onClick={event => event.stopPropagation()}
             style={{
                 position: "absolute",
                 top,
                 [side]: "var(--space-4)",
                 transform,
-                zIndex: 2,
                 gap: "var(--space-2)",
-                padding: "var(--space-1)",
-                background: "var(--color-panel)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-md)",
-                boxShadow: "var(--shadow-raised)",
                 fontFamily: "var(--font-sans)",
             }}
         >
@@ -318,19 +318,20 @@ function useLinePick(line: IDiffLine | undefined): { id: string; isPicked: boole
         id,
         isPicked,
         //
-        // The picked lines' buttons float across the top border of the run, the stage button at the
-        // left and Discard at the right, adding nothing to the lines' height.
+        // The picked lines' buttons float just across the top border of the run, the stage button at
+        // the left and Discard at the right, and the line that carries them keeps the same room above
+        // it as a hunk with buttons, so they hide no line number or text.
         //
         actions:
             id === selection.actionsLine ? (
                 <>
                     {selection.actions.left ? (
-                        <FloatingPanel side="left" top="0px" transform="translateY(-50%)">
+                        <FloatingPanel side="left" top="0px" transform={EDGE_OVERLAP}>
                             {selection.actions.left}
                         </FloatingPanel>
                     ) : undefined}
                     {selection.actions.right ? (
-                        <FloatingPanel side="right" top="0px" transform="translateY(-50%)">
+                        <FloatingPanel side="right" top="0px" transform={EDGE_OVERLAP}>
                             {selection.actions.right}
                         </FloatingPanel>
                     ) : undefined}
@@ -340,7 +341,12 @@ function useLinePick(line: IDiffLine | undefined): { id: string; isPicked: boole
         // A run of picked lines has room inside its border above its first line and below its
         // last, as a hunk has inside the current hunk's border.
         //
-        padding: isPicked ? { paddingTop: before ? undefined : "var(--space-2)", paddingBottom: after ? undefined : "var(--space-2)" } : {},
+        padding: isPicked
+            ? {
+                  paddingTop: before ? undefined : id === selection.actionsLine && (selection.actions.left || selection.actions.right) ? "var(--space-3)" : "var(--space-2)",
+                  paddingBottom: after ? undefined : "var(--space-2)",
+              }
+            : {},
         //
         // Shift and Ctrl clicks pick lines, so they leave the page's text unselected.
         //
@@ -633,7 +639,6 @@ export function GapRows({
     onToggle,
     isCurrent,
     onSelect,
-    reservesActions = false,
 }: {
     gap: IGap;
     position: number;
@@ -644,7 +649,6 @@ export function GapRows({
     onToggle: () => void;
     isCurrent: boolean;
     onSelect?: () => void;
-    reservesActions?: boolean;
 }): ReactNode {
     if (gap.count === 0) {
         return undefined;
@@ -656,16 +660,10 @@ export function GapRows({
             <div
                 role="row"
                 data-line="gap"
-                className={[lines && onSelect ? "graft-hoverable" : "", "flex items-center", reservesActions ? "justify-center" : ""].join(" ").trim()}
+                className={lines && onSelect ? "graft-hoverable flex items-center" : "flex items-center"}
                 style={{
                     gap: "var(--space-3)",
-                    //
-                    // A bar before a hunk with buttons keeps both ends clear for the hunk's floating
-                    // buttons, with its count and its button in the middle.
-                    //
                     minHeight: "calc(var(--space-6) + var(--space-1))",
-                    paddingLeft: reservesActions ? "calc(var(--space-8) * 2)" : undefined,
-                    paddingRight: reservesActions ? "calc(var(--space-8) * 2)" : undefined,
                     background: "var(--color-raised)",
                     color: "var(--color-text-muted)",
                 }}
@@ -697,14 +695,14 @@ export function GapRows({
     );
 }
 //
-// Renders a hunk's buttons on two small raised panels that float at its top edge, the stage button
-// at the left and Discard at the right, so they add nothing to the hunk's height. The panels sit
-// across the hunk's top edge, over the ends of the bar of unchanged lines before it, which keeps
-// both ends clear, or just inside the hunk for a hunk at the very top of the diff.
+// Renders a hunk's buttons floating at its top edge, the stage button at the left and Discard at the
+// right, so they add nothing to the hunk's height. They sit just across the hunk's top edge and
+// mostly inside it, reaching only the bottom edge of a bar of unchanged lines above, or just inside
+// the hunk for a hunk at the very top of the diff.
 //
 export function HunkActions({ isAtTop, actions }: { isAtTop: boolean; actions: ISidedActions }): ReactNode {
     const top = isAtTop ? "var(--space-2)" : "0px";
-    const transform = isAtTop ? undefined : "translateY(-50%)";
+    const transform = isAtTop ? undefined : EDGE_OVERLAP;
     return (
         <div data-floating-actions style={{ position: "absolute", top: 0, left: 0, right: 0, height: 0 }}>
             {actions.left ? (
@@ -829,7 +827,6 @@ export function DiffView({
     function gapRows(position: number): ReactNode {
         return (
             <GapRows
-                reservesActions={hunkAction !== undefined}
                 key={`gap-${position}`}
                 gap={gaps[position]}
                 position={position}
@@ -879,7 +876,7 @@ export function DiffView({
                                 // their lower half, so they hide no line number or text, and the
                                 // current hunk has room inside its border above and below.
                                 //
-                                paddingTop: !hideHunkActions && hunkAction ? "calc(var(--space-4) + var(--space-1))" : currentHunk === index ? "var(--space-2)" : undefined,
+                                paddingTop: !hideHunkActions && hunkAction ? "var(--space-3)" : currentHunk === index ? "var(--space-2)" : undefined,
                                 paddingBottom: currentHunk === index ? "var(--space-2)" : undefined,
                             }}
                         >

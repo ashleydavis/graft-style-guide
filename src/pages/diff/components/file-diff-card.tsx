@@ -406,10 +406,20 @@ export function DiffOptions({ layout, onLayout, wrap, onWrap, showAllLines, onSh
     );
 }
 //
+// The size of the stage, Discard and Undo buttons where they sit on a hunk, on picked lines or in a
+// file row: 0.65 of a small icon button, its icon and its padding both scaled down. In a toolbar,
+// such as the diff's header, they take the size of the toolbar's other icon buttons.
+//
+const ACTION_BUTTON_SIZE = {
+    fontSize: "calc(var(--icon-md) * 0.65)",
+    padding: "calc(var(--space-1) * 0.8)",
+};
+
+//
 // Renders the button that stages or unstages a whole file, a hunk or picked lines: an icon button
 // with a plus while it is unstaged and a minus once it is staged, its tooltip naming what it does.
 //
-export function StageButton({ isStaged, what, onClick }: { isStaged: boolean; what: string; onClick: () => void }): ReactNode {
+export function StageButton({ isStaged, what, onClick, isCompact = true }: { isStaged: boolean; what: string; onClick: () => void; isCompact?: boolean }): ReactNode {
     const label = isStaged ? `Unstage this ${what}` : `Stage this ${what}`;
     return (
         <Tooltip
@@ -423,6 +433,7 @@ export function StageButton({ isStaged, what, onClick }: { isStaged: boolean; wh
             <IconButton
                 size="small"
                 aria-label={label}
+                sx={isCompact ? ACTION_BUTTON_SIZE : undefined}
                 onClick={event => {
                     event.stopPropagation();
                     onClick();
@@ -445,13 +456,14 @@ export const DISCARD_KEYS = ["Delete", "Backspace"];
 // trash can in the danger colour. The part stays in view, faded and struck through, until Undo
 // brings it back.
 //
-export function DiscardButton({ what, onClick }: { what: string; onClick: () => void }): ReactNode {
+export function DiscardButton({ what, onClick, isCompact = true }: { what: string; onClick: () => void; isCompact?: boolean }): ReactNode {
     return (
         <Tooltip title={<Tip title={`Discard this ${what}`} detail={`Puts the ${what} back as it was in the last commit. Undo brings it back. Key: Delete`} />}>
             <IconButton
                 size="small"
                 color="error"
                 aria-label={`Discard this ${what}`}
+                sx={isCompact ? ACTION_BUTTON_SIZE : undefined}
                 onClick={event => {
                     event.stopPropagation();
                     onClick();
@@ -467,12 +479,13 @@ export function DiscardButton({ what, onClick }: { what: string; onClick: () => 
 // Renders the Undo button that takes the place of a discarded part's Discard button and brings the
 // part back.
 //
-export function UndoButton({ what, onClick }: { what: string; onClick: () => void }): ReactNode {
+export function UndoButton({ what, onClick, isCompact = true }: { what: string; onClick: () => void; isCompact?: boolean }): ReactNode {
     return (
         <Tooltip title={<Tip title={`Undo the discard of this ${what}`} detail="Brings the changes back. Key: Delete" />}>
             <IconButton
                 size="small"
                 aria-label={`Undo the discard of this ${what}`}
+                sx={isCompact ? ACTION_BUTTON_SIZE : undefined}
                 onClick={event => {
                     event.stopPropagation();
                     onClick();
@@ -1139,7 +1152,7 @@ export function FileDiffCard({
                         <FontAwesomeIcon icon={isOpen ? faChevronDown : faChevronRight} />
                     </IconButton>
                 </Tooltip>
-                {stageable && discards?.isFile !== true ? <StageButton isStaged={section === undefined ? fileStaged : section === "staged"} what="file" onClick={toggleFile} /> : undefined}
+                {stageable && discards?.isFile !== true ? <StageButton isStaged={section === undefined ? fileStaged : section === "staged"} what="file" onClick={toggleFile} isCompact={false} /> : undefined}
                 <span
                     className="flex flex-1 items-center"
                     //
@@ -1190,9 +1203,9 @@ export function FileDiffCard({
                     //
                     <span className="flex flex-none" style={{ marginLeft: "var(--space-4)" }}>
                         {discards.isFile ? (
-                            <UndoButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, false))} />
+                            <UndoButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, false))} isCompact={false} />
                         ) : (
-                            <DiscardButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, true))} />
+                            <DiscardButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, true))} isCompact={false} />
                         )}
                     </span>
                 ) : undefined}

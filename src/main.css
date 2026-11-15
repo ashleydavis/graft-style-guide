@@ -88,3 +88,33 @@ html {
     background: var(--color-hover);
     pointer-events: none;
 }
+
+/*
+ * Buttons that float by themselves over a diff, such as a hunk's stage and Discard buttons. Each
+ * button stands on its own backing in the panel colour with the raised shadow, under the button's
+ * own border and hover wash, so the code beneath never shows through. Their tooltips mount beside
+ * them and keep their own look. The group under the pointer or the keys comes to the front, so its
+ * tooltip shows over every other floating button.
+ */
+.graft-floating-buttons {
+    z-index: 2;
+}
+
+.graft-floating-buttons:hover,
+.graft-floating-buttons:focus-within {
+    z-index: 3;
+}
+
+.graft-floating-buttons > button {
+    position: relative;
+}
+
+.graft-floating-buttons > button::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--color-panel);
+    box-shadow: var(--shadow-raised);
+}

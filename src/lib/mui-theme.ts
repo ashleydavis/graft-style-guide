@@ -761,6 +761,11 @@ export const graftTheme: Theme = createTheme({
                 // its own instead of taking the control's, such as a heading's capitals.
                 //
                 tooltip: {
+                    //
+                    // A tooltip takes the width of its text, up to its widest, so a tooltip on a
+                    // button in a narrow spot does not squeeze its words onto many lines.
+                    //
+                    width: "max-content",
                     maxWidth: "280px",
                     backgroundColor: "var(--color-text)",
                     color: "var(--color-bg)",
