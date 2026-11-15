@@ -313,7 +313,25 @@ export const StagedLineContext = createContext<(line: IDiffLine) => boolean>(() 
 //
 // The bar at the left of a staged line: a slight tinge of the success green.
 //
-const STAGED_BAR = "inset 3px 0 0 color-mix(in srgb, var(--color-success) 55%, transparent)";
+const STAGED_BAR_COLOUR = "color-mix(in srgb, var(--color-success) 55%, transparent)";
+const STAGED_BAR = `inset var(--space-1) 0 0 ${STAGED_BAR_COLOUR}`;
+
+//
+// True for the lines of the current hunk, whose colours stop at the hunk's border.
+//
+export const InsideBorderContext = createContext(false);
+
+//
+// Returns a line's background drawn only between the left and right edges of the border round
+// the current hunk or picked lines, so the line's colour stops at the border. `sides` says which
+// edges the line meets: both in the unified layout, and the left or the right in the side-by-side
+// layout.
+//
+function insideBorder(colour: string, sides: "both" | "left" | "right"): string {
+    const left = sides === "right" ? "0px" : "var(--space-1)";
+    const width = sides === "both" ? "calc(100% - var(--space-1) * 2)" : "calc(100% - var(--space-1))";
+    return `linear-gradient(${colour}, ${colour}) ${left} 0 / ${width} 100% no-repeat`;
+}
 
 //
 // Holds the diff view's line selection for the lines it draws.
@@ -532,6 +550,7 @@ export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: 
     const pick = useLinePick(line);
     const isDiscarded = useContext(DiscardedLineContext)(line);
     const isStaged = useContext(StagedLineContext)(line);
+    const isInsideHunkBorder = useContext(InsideBorderContext);
     return (
         <div
             role="row"
@@ -542,7 +561,7 @@ export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: 
             onMouseDown={pick?.onMouseDown}
             data-discarded={isDiscarded || undefined}
             className={["flex", isDiscarded ? "graft-discarded" : "", pick ? "graft-hoverable" : ""].join(" ").trim()}
-            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, boxShadow: isStaged ? STAGED_BAR : undefined, ...pick?.padding }}
+            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: isInsideHunkBorder || pick?.isPicked ? insideBorder(lineStyles[line.kind].background, "both") : lineStyles[line.kind].background, boxShadow: isStaged ? STAGED_BAR : undefined, ...pick?.padding }}
         >
             {pick?.border}
             {pick?.actions}
@@ -562,6 +581,7 @@ export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | und
     const pick = useLinePick(line);
     const isDiscardedLine = useContext(DiscardedLineContext);
     const isStagedLine = useContext(StagedLineContext);
+    const isInsideBorderOfHunk = useContext(InsideBorderContext);
     if (!line) {
         return <div className="min-w-0 flex-1" data-side={side} data-empty="true" style={{ background: EMPTY_SIDE }} />;
     }
@@ -575,7 +595,13 @@ export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | und
             data-picked={pick?.isPicked}
             onClick={pick?.onClick}
             onMouseDown={pick?.onMouseDown}
-            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, boxShadow: isStagedLine(line) ? STAGED_BAR : undefined, ...pick?.padding }}
+            style={{
+                position: pick ? "relative" : undefined,
+                cursor: pick ? "pointer" : undefined,
+                background: isInsideBorderOfHunk || pick?.isPicked ? insideBorder(lineStyles[line.kind].background, side === "old" ? "left" : "right") : lineStyles[line.kind].background,
+                boxShadow: isStagedLine(line) ? STAGED_BAR : undefined,
+                ...pick?.padding,
+            }}
         >
             {pick?.border}
             {pick?.actions}
@@ -587,12 +613,12 @@ export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | und
 }
 //
 // Renders the button in the first line number column of a gap bar that shows or hides a run of
-// unchanged lines, with a tooltip that says which: a small bordered button in the middle of the
-// column, its border firming and the hover wash showing under the pointer.
+// unchanged lines, with a tooltip that says which: a small bordered button lined up with the
+// column's line numbers, its border firming and the hover wash showing under the pointer.
 //
 function GapButton({ label, detail, icon, onClick }: { label: string; detail: string; icon: IconDefinition; onClick: () => void }): ReactNode {
     return (
-        <span className="flex flex-none items-center justify-center" style={{ width: GUTTER_WIDTH }}>
+        <span className="flex flex-none items-center justify-end" style={{ width: GUTTER_WIDTH, paddingRight: "var(--space-2)" }}>
             <Tooltip title={<Tip title={label} detail={detail} />}>
                 <ButtonBase
                     aria-label={label}
@@ -639,7 +665,10 @@ function CurrentBorder(): ReactNode {
             aria-hidden="true"
             style={{
                 position: "absolute",
-                inset: "calc(var(--space-1) / 2) var(--space-1)",
+                //
+                // The left edge sits just past the staged bar, so the border meets it.
+                //
+                inset: "calc(var(--space-1) / 2) var(--space-1) calc(var(--space-1) / 2) var(--space-1)",
                 border: "2px solid var(--color-select-item)",
                 borderRadius: "var(--radius-sm)",
                 pointerEvents: "none",
@@ -816,6 +845,23 @@ export function DiffView({
     // its hunk or run in the unified layout, and the neighbouring lines of the same kind in the
     // side-by-side layout, where added and deleted lines sit on different sides.
     //
+    function isWholeHunkStaged(hunk: IHunk): boolean {
+        if (!isStagedLine) {
+            return false;
+        }
+        const changed = hunk.lines.filter(line => line.kind !== "context");
+        return changed.length > 0 && changed.every(line => isStagedLine(lineIds.get(line) ?? ""));
+    }
+
+    //
+    // Returns true for a line of a hunk staged whole, whose staged bar the hunk draws down its full
+    // height instead of each line drawing its own.
+    //
+    function isInWholeStagedHunk(line: IDiffLine): boolean {
+        const hunk = hunks.find(each => each.lines.includes(line));
+        return hunk !== undefined && isWholeHunkStaged(hunk);
+    }
+
     function isLineOnlyDiscarded(line: IDiffLine): boolean {
         const id = lineIds.get(line);
         return id !== undefined && discardedLines?.has(id) === true && discardedHunks?.has(Number(id.split(":")[0])) !== true;
@@ -879,7 +925,7 @@ export function DiffView({
         <DiffSearchContext.Provider value={{ needle: search.trim(), current: currentMatch, firstMatch }}>
         <LineSelectionContext.Provider value={lineSelection ? { ...lineSelection, idOf: line => lineIds.get(line), neighbours: line => pickedNeighbours(line, layout) } : undefined}>
         <DiscardedLineContext.Provider value={isLineOnlyDiscarded}>
-        <StagedLineContext.Provider value={line => line.kind !== "context" && isStagedLine !== undefined && lineIds.has(line) && isStagedLine(lineIds.get(line) ?? "")}>
+        <StagedLineContext.Provider value={line => line.kind !== "context" && isStagedLine !== undefined && lineIds.has(line) && isStagedLine(lineIds.get(line) ?? "") && !isInWholeStagedHunk(line)}>
         <div
             role="table"
             aria-label={layout === "unified" ? "Unified diff" : "Side-by-side diff"}
@@ -915,8 +961,16 @@ export function DiffView({
                                 paddingBottom: currentHunk === index ? "var(--space-2)" : undefined,
                             }}
                         >
+                            {isWholeHunkStaged(hunk) ? (
+                                //
+                                // A hunk staged whole has one staged bar down its full height, past
+                                // its lines into the room above and below them.
+                                //
+                                <span aria-hidden="true" style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: "var(--space-1)", background: STAGED_BAR_COLOUR, pointerEvents: "none" }} />
+                            ) : undefined}
                             {currentHunk === index ? <CurrentBorder /> : undefined}
                             {!hideHunkActions && hunkAction ? <HunkActions isAtTop={position === 0 && gaps[0].count === 0} actions={hunkAction(index)} /> : undefined}
+                            <InsideBorderContext.Provider value={currentHunk === index}>
                             {layout === "unified"
                                 ? hunk.lines.map((line, lineIndex) => <UnifiedRow key={lineIndex} line={line} partner={partners.get(line)} wrap={wrap} />)
                                 : splitRows(hunk.lines).map((row, rowIndex) => (
@@ -925,6 +979,7 @@ export function DiffView({
                                           <SplitSide line={row.new} side="new" partner={row.new ? partners.get(row.new) : undefined} wrap={wrap} />
                                       </div>
                                   ))}
+                            </InsideBorderContext.Provider>
                         </div>
                     </Fragment>
                 );

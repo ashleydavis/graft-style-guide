@@ -21,6 +21,7 @@
 
 /* Raw palette: the same in both themes. */
 :root {
+    --black: #000000;
     --gray-0: #ffffff;
     --gray-50: #fafafa;
     --gray-100: #f4f4f5;
@@ -148,6 +149,8 @@
     --color-disabled: var(--gray-100);
     --color-text-disabled: var(--gray-500);
     --opacity-faded: 0.35;
+    --color-stage-button: var(--gray-100);
+    --color-on-stage-button: var(--gray-900);
     --color-accent: var(--violet-600);
     --color-accent-hover: var(--violet-700);
     --color-on-accent: var(--gray-0);
@@ -193,6 +196,8 @@
     --color-disabled: var(--gray-800);
     --color-text-disabled: var(--gray-500);
     --opacity-faded: 0.35;
+    --color-stage-button: var(--black);
+    --color-on-stage-button: var(--gray-0);
     --color-accent: var(--violet-400);
     --color-accent-hover: var(--violet-300);
     --color-on-accent: var(--violet-950);

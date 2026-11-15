@@ -410,14 +410,22 @@ export function DiffOptions({ layout, onLayout, wrap, onWrap, showAllLines, onSh
 // file row: 0.65 of a small icon button, its icon and its padding both scaled down. In a toolbar,
 // such as the diff's header, they take the size of the toolbar's other icon buttons.
 //
+//
+// The side of the square stage button: in a toolbar, the height of a small icon button; on a
+// hunk, picked lines or a file row, the height of the smaller action buttons.
+//
+const STAGE_SIZE = "calc(var(--icon-md) + var(--space-2) + var(--space-1) / 2)";
+const COMPACT_STAGE_SIZE = "calc(var(--icon-md) * 0.65 + var(--space-1) * 1.6)";
+
 const ACTION_BUTTON_SIZE = {
     fontSize: "calc(var(--icon-md) * 0.65)",
     padding: "calc(var(--space-1) * 0.8)",
 };
 
 //
-// Renders the button that stages or unstages a whole file, a hunk or picked lines: an icon button
-// with a plus while it is unstaged and a minus once it is staged, its tooltip naming what it does.
+// Renders the button that stages or unstages a whole file, a hunk or picked lines: a square icon
+// button, in the stage button colours while it is unstaged and a minus on a slight green tinge
+// once it is staged, its tooltip naming what it does.
 //
 export function StageButton({ isStaged, what, onClick, isCompact = true }: { isStaged: boolean; what: string; onClick: () => void; isCompact?: boolean }): ReactNode {
     const label = isStaged ? `Unstage this ${what}` : `Stage this ${what}`;
@@ -433,7 +441,30 @@ export function StageButton({ isStaged, what, onClick, isCompact = true }: { isS
             <IconButton
                 size="small"
                 aria-label={label}
-                sx={isCompact ? ACTION_BUTTON_SIZE : undefined}
+                //
+                // A square button. Staged, it has a slight green tinge on its background, a little
+                // stronger under the pointer; unstaged, it takes the stage button colours, a pale grey square in light and a black one in dark, with the control border.
+                //
+                sx={{
+                    ...(isCompact ? ACTION_BUTTON_SIZE : {}),
+                    width: isCompact ? COMPACT_STAGE_SIZE : STAGE_SIZE,
+                    height: isCompact ? COMPACT_STAGE_SIZE : STAGE_SIZE,
+                    padding: 0,
+                    ...(isStaged
+                        ? {
+                              backgroundColor: "color-mix(in srgb, var(--color-success) 12%, transparent)",
+                              "&:hover": { backgroundColor: "color-mix(in srgb, var(--color-success) 22%, transparent)" },
+                          }
+                        : {
+                              backgroundColor: "var(--color-stage-button)",
+                              color: "var(--color-on-stage-button)",
+                              boxShadow: "inset 0 0 0 1px var(--color-border-control)",
+                              "&:hover": {
+                                  backgroundColor: "color-mix(in srgb, var(--color-stage-button) 85%, var(--color-on-stage-button))",
+                                  color: "var(--color-on-stage-button)",
+                              },
+                          }),
+                }}
                 onClick={event => {
                     event.stopPropagation();
                     onClick();

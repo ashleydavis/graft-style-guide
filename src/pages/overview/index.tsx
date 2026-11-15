@@ -31,7 +31,7 @@ export function OverviewPage(): ReactNode {
                         ["--blue-100", "--blue-300", "--blue-400", "--blue-500", "--blue-500-a08", "--blue-500-a14", "--blue-500-a16", "--blue-500-a26", "--blue-600", "--blue-700", "--blue-900"],
                         ["--cyan-400", "--cyan-600", "--cyan-650", "--cyan-700"],
                         ["--pink-400", "--pink-600"],
-                        ["--black-40", "--black-60"],
+                        ["--black", "--black-40", "--black-60"],
                     ].map(names => (
                         <div key={names[0]} className="flex flex-wrap gap-3">
                             {names.map(name => (
@@ -65,6 +65,8 @@ export function OverviewPage(): ReactNode {
                         "--color-focus",
                         "--color-select-pane",
                         "--color-select-item",
+                        "--color-stage-button",
+                        "--color-on-stage-button",
                         "--color-scrollbar-thumb",
                         "--color-scrollbar-track",
                         "--color-success",

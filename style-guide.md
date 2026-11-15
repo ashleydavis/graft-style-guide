@@ -31,6 +31,7 @@ Every text and control colour meets WCAG 2.2 AA in both themes: 4.5 to 1 for tex
 | `--color-border-control` | `--color-bg`, `--color-panel` | 3 | 3.1 or more | 3.7 or more |
 | `--color-focus` | `--color-bg`, `--color-panel` | 3 | 10.4 | 14.5 or more |
 | `--color-scrollbar-thumb` | `--color-bg`, `--color-panel`, `--color-raised` | 3 | 3.0 or more | 3.1 or more |
+| `--color-on-stage-button` | `--color-stage-button` | 3 | 16.1 | 21 |
 | `--color-select-pane` | `--color-bg`, `--color-panel` | 3 | 3.5 or more | 4.8 or more |
 | `--color-select-item` | `--color-bg`, `--color-panel`, `--color-diff-added` | 3 | 6.1 or more | 8.2 or more |
 | `--color-accent` as a button fill | `--color-panel` | 3 | 5.7 | 6.5 |
