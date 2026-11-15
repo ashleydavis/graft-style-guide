@@ -7,6 +7,7 @@
 //
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { openPage } from "./themes";
 import { explorerPages } from "../../explorer-pages";
 
 //
@@ -108,9 +109,9 @@ for (const orientation of orientations) {
         });
 
         for (const explorerPage of explorerPages) {
-            for (const mode of ["both", "light", "dark"]) {
+            for (const mode of ["both", "light", "dark"] as const) {
                 test(`the ${explorerPage.title} page fits the screen width with components=${mode}`, async ({ page }) => {
-                    await page.goto(`/page/${explorerPage.id}?components=${mode}`);
+                    await openPage(page, `/page/${explorerPage.id}`, { components: mode });
                     await expect(page.getByRole("heading", { level: 1, name: explorerPage.title })).toBeVisible();
                     expect(await sidewaysOverflow(page)).toBe(0);
                 });
@@ -141,7 +142,7 @@ for (const orientation of orientations) {
             await expect.poll(async () => (await navigation.boundingBox())?.x).toBe(0);
             await expectOnScreen(navigation.getByPlaceholder("Search components"), orientation);
             await navigation.getByRole("link", { name: "Dialog" }).tap();
-            await expect(page).toHaveURL(/\/page\/dialog\?sidebar=minimised$/);
+            await expect(page).toHaveURL(/\/page\/dialog$/);
             await expect(page.getByRole("heading", { level: 1, name: "Dialog" })).toBeVisible();
             await expect(navigation).toHaveCount(0);
         });
@@ -162,18 +163,66 @@ for (const orientation of orientations) {
             await expect(page.getByRole("navigation")).toBeVisible();
             await page.mouse.click(orientation.width - 10, orientation.height - 10);
             await expect(page.getByRole("navigation")).toHaveCount(0);
-            await expect(page).toHaveURL(/sidebar=minimised/);
         });
 
         test("the Configuration dropdown can be reached and changed", async ({ page }) => {
             await page.goto("/page/button");
             await page.getByRole("button", { name: "Configuration" }).tap();
             const explorerSwitch = page.getByRole("dialog", { name: "Configuration" }).getByRole("group", { name: "Explorer" });
-            await explorerSwitch.getByRole("button", { name: "Dark", exact: true }).tap();
-            await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+            await explorerSwitch.getByRole("button", { name: "Light", exact: true }).tap();
+            await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
             await page.getByRole("dialog", { name: "Configuration" }).getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).tap();
-            await expect(page).toHaveURL(/components=light/);
             await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
+        });
+
+        test("moving to a pane on the left of the commit explorer scrolls it into view", async ({ page }) => {
+            await page.goto("/page/commit-explorer");
+            const section = page.locator("section", { has: page.getByRole("heading", { name: "A file open" }) });
+            const explorer = section.getByRole("application", { name: "Commit explorer" }).first();
+            const row = explorer.locator(".overflow-x-auto").first();
+            const isInView = (label: string) =>
+                row.evaluate((element, paneLabel) => {
+                    const pane = element.querySelector(`section[aria-label="${paneLabel}"]`)!.getBoundingClientRect();
+                    const box = element.getBoundingClientRect();
+                    return pane.left >= box.left - 1 && pane.left < box.right;
+                }, label);
+            await explorer.getByRole("region", { name: "File diff" }).click();
+            await expect.poll(() => isInView("File diff")).toBe(true);
+            await page.keyboard.press("ArrowLeft");
+            await expect.poll(() => isInView("Commit details")).toBe(true);
+            await page.keyboard.press("ArrowLeft");
+            await expect.poll(() => isInView("Commits")).toBe(true);
+            await page.keyboard.press("ArrowRight");
+            await page.keyboard.press("ArrowRight");
+            await expect.poll(() => isInView("File diff")).toBe(true);
+            await explorer.getByRole("button", { name: "Close file diff" }).tap();
+            await expect.poll(() => isInView("Commit details")).toBe(true);
+        });
+
+        test("a tap on the strip of a pane beside the one in view scrolls it into view and opens nothing", async ({ page }) => {
+            await page.goto("/page/commit-explorer");
+            const section = page.locator("section", { has: page.getByRole("heading", { name: "A file open" }) });
+            const explorer = section.getByRole("application", { name: "Commit explorer" }).first();
+            const row = explorer.locator(".overflow-x-auto").first();
+            await explorer.scrollIntoViewIfNeeded();
+            await expect.poll(() => row.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+            //
+            // Waits for the row to finish sliding to the opened file, as a person would.
+            //
+            await expect
+                .poll(async () => {
+                    const before = await row.evaluate(element => element.scrollLeft);
+                    await page.waitForTimeout(200);
+                    return (await row.evaluate(element => element.scrollLeft)) === before;
+                })
+                .toBe(true);
+            const box = (await row.boundingBox())!;
+            const details = explorer.getByRole("region", { name: "Commit details" });
+            const detailsBox = (await details.boundingBox())!;
+            expect(detailsBox.x + detailsBox.width).toBeGreaterThan(box.x + 16);
+            await page.touchscreen.tap(box.x + 8, box.y + 200);
+            await expect.poll(async () => (await details.boundingBox())!.x).toBeGreaterThanOrEqual(box.x - 1);
+            await expect(explorer.getByRole("region", { name: "File diff" })).toHaveCount(1);
         });
 
         test("the about popup fits on the screen and closes", async ({ page }) => {
@@ -188,7 +237,7 @@ for (const orientation of orientations) {
         });
 
         test("the example dialog fits on the screen", async ({ page }) => {
-            await page.goto("/page/dialog?components=dark");
+            await openPage(page, "/page/dialog", { components: "dark" });
             await page.getByRole("button", { name: "Open dialog" }).tap();
             const dialog = page.getByRole("dialog").first();
             await expect(dialog).toBeVisible();

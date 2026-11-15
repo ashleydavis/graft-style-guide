@@ -7,19 +7,17 @@ import type { ReactNode } from "react";
 import { createRootRoute, createRoute, createRouter, Navigate } from "@tanstack/react-router";
 import { ExplorerLayout } from "./components/explorer-layout";
 import { ExplorerPage } from "./pages/explorer-page";
-import { readExplorerSearch } from "./lib/explorer-mode";
 
 //
 // Sends the bare URL to the overview, the page the explorer opens on.
 //
-export function OpenOverview(): ReactNode {
+export function OpenCommitExplorer(): ReactNode {
     return (
         <Navigate
             to="/page/$pageId"
             params={{
-                pageId: "overview",
+                pageId: "commit-explorer",
             }}
-            search={true}
             replace={true}
         />
     );
@@ -30,7 +28,6 @@ export function OpenOverview(): ReactNode {
 //
 export const rootRoute = createRootRoute({
     component: ExplorerLayout,
-    validateSearch: readExplorerSearch,
 });
 
 //
@@ -39,7 +36,7 @@ export const rootRoute = createRootRoute({
 export const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/",
-    component: OpenOverview,
+    component: OpenCommitExplorer,
 });
 
 //

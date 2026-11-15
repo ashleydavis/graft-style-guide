@@ -7,7 +7,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { SettingSwitch } from "./setting-switch";
 import { AboutDialog } from "./about-dialog";
-import { Link, Outlet, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router";
 import TextField from "@mui/material/TextField";
 import InputAdornment from "@mui/material/InputAdornment";
 import IconButton from "@mui/material/IconButton";
@@ -18,7 +18,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAnglesLeft, faAnglesRight, faBars, faChevronDown, faChevronRight, faCircleInfo, faGear, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import { explorerPages, PAGE_GROUPS, type IExplorerPage } from "../explorer-pages";
-import { readExplorerSearch } from "../lib/explorer-mode";
+import { setExplorerSettings, useExplorerSettings, type ComponentMode, type ExplorerTheme, type SidebarState } from "../lib/explorer-mode";
 
 //
 // Screens narrower than this, such as phones in either orientation and tablets held upright,
@@ -32,12 +32,23 @@ const NARROW_SCREEN = "(max-width: 1023.98px)";
 const CLOSED_GROUPS_KEY = "graft-style-guide-closed-groups";
 
 //
+// The backing of the buttons that float over the page's corners: the panel colour, rounded and
+// raised, so the page scrolling under them never shows through.
+//
+const FLOATING_STYLE = {
+    background: "var(--color-panel)",
+    borderRadius: "var(--radius-md)",
+    boxShadow: "var(--shadow-raised)",
+};
+
+//
 // Renders the sidebar and the page the router has chosen. Pressing Enter in the search box
-// opens the first page that matches. The component mode switch sets ?components= in the URL
-// and the explorer theme switch sets ?explorer=, which also sets data-theme on the page. The
-// minimise button hides the sidebar, gives the page the full width with a restore button
-// floating in its top-left corner and sets ?sidebar=minimised. On a narrow screen the sidebar
-// starts minimised, opens as a drawer over the page and closes when a page is chosen.
+// opens the first page that matches. The component mode, the explorer theme and whether the
+// sidebar is minimised are kept in this browser's storage and remembered between visits; the
+// explorer theme also sets data-theme on the page. The minimise button hides the sidebar and gives
+// the page the full width with a restore button floating in its top-left corner. On a narrow
+// screen the sidebar starts minimised, opens as a drawer over the page and closes when a page is
+// chosen.
 //
 export function ExplorerLayout(): ReactNode {
     const [search, setSearch] = useState("");
@@ -47,29 +58,18 @@ export function ExplorerLayout(): ReactNode {
     const { pageId } = useParams({
         strict: false,
     });
-    const { components, explorer, sidebar } = useSearch({
-        strict: false,
-    });
-    const componentMode = components ?? "both";
-    const explorerTheme = explorer ?? "light";
+    const { components: componentMode, explorer: explorerTheme, sidebar } = useExplorerSettings();
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const narrow = useMediaQuery(NARROW_SCREEN, {
         noSsr: true,
     });
-    const sidebarState = sidebar ?? (narrow ? "minimised" : "open");
+    const sidebarState: SidebarState = narrow ? (isDrawerOpen ? "open" : "minimised") : sidebar;
 
-    //
-    // The settings a page link or a search keeps in the URL. On a narrow screen choosing a page
-    // also closes the drawer.
-    //
-    const pageSearch = readExplorerSearch({
-        components,
-        explorer,
-        sidebar: narrow ? "minimised" : sidebar,
-    });
 
     useEffect(() => {
         document.documentElement.dataset.theme = explorerTheme;
     }, [explorerTheme]);
+
 
     const query = search.trim().toLowerCase();
 
@@ -127,7 +127,7 @@ export function ExplorerLayout(): ReactNode {
                 params={{
                     pageId: page.id,
                 }}
-                search={pageSearch}
+                onClick={() => setIsDrawerOpen(false)}
                 className="block px-3 py-1.5"
                 style={{
                     borderRadius: "var(--radius-md)",
@@ -150,24 +150,21 @@ export function ExplorerLayout(): ReactNode {
             params: {
                 pageId: firstMatch.id,
             },
-            search: pageSearch,
         });
+        setIsDrawerOpen(false);
     }
 
-    async function changeSetting(name: string, value: string): Promise<void> {
-        await navigate({
-            to: ".",
-            search: readExplorerSearch({
-                components,
-                explorer,
-                sidebar,
-                [name]: value,
-            }),
-        });
-    }
-
-    function setSidebar(value: string): void {
-        changeSetting("sidebar", value).catch(error => console.error("Could not change the sidebar.", error));
+    //
+    // Opens or minimises the sidebar: on a narrow screen the drawer, for this visit only, and on a
+    // wide screen the sidebar beside the page, remembered in the browser.
+    //
+    function setSidebar(value: SidebarState): void {
+        if (narrow) {
+            setIsDrawerOpen(value === "open");
+        }
+        else {
+            setExplorerSettings({ sidebar: value });
+        }
     }
 
     //
@@ -175,7 +172,7 @@ export function ExplorerLayout(): ReactNode {
     // dark settings, and About.
     //
     const aboutButton = (
-        <div className="fixed top-2 right-2 z-10 flex items-center gap-2">
+        <div className="fixed top-2 right-2 z-10 flex items-center gap-2" style={FLOATING_STYLE}>
             <Tooltip title="Configuration" placement="bottom">
                 <IconButton onClick={event => setConfigurationAnchor(event.currentTarget)} aria-label="Configuration" aria-haspopup="dialog" aria-expanded={configurationAnchor !== undefined}>
                     <FontAwesomeIcon icon={faGear} />
@@ -213,7 +210,7 @@ export function ExplorerLayout(): ReactNode {
                         },
                     ]}
                     onChange={value => {
-                        changeSetting("components", value).catch(error => console.error("Could not change the component mode.", error));
+                        setExplorerSettings({ components: value as ComponentMode });
                     }}
                 />
                 <SettingSwitch
@@ -230,7 +227,7 @@ export function ExplorerLayout(): ReactNode {
                         },
                     ]}
                     onChange={value => {
-                        changeSetting("explorer", value).catch(error => console.error("Could not change the explorer theme.", error));
+                        setExplorerSettings({ explorer: value as ExplorerTheme });
                     }}
                 />
             </div>
@@ -345,7 +342,7 @@ export function ExplorerLayout(): ReactNode {
     if (narrow) {
         return (
             <div className="min-h-screen">
-                <div className="fixed top-2 left-2 z-10">{restoreButton}</div>
+                <div className="fixed top-2 left-2 z-10" style={FLOATING_STYLE}>{restoreButton}</div>
                 <Drawer open={sidebarState === "open"} onClose={() => setSidebar("minimised")} disableScrollLock>
                     <nav className="flex min-h-full w-64 flex-col gap-3 p-4">{sidebarContent}</nav>
                 </Drawer>
@@ -357,7 +354,7 @@ export function ExplorerLayout(): ReactNode {
     if (sidebarState === "minimised") {
         return (
             <div className="min-h-screen">
-                <nav className="fixed top-2 left-2 z-10">{restoreButton}</nav>
+                <nav className="fixed top-2 left-2 z-10" style={FLOATING_STYLE}>{restoreButton}</nav>
                 <main className="min-w-0 pt-3.5 pr-8 pb-8 pl-8 [&_h1]:pl-8">{pageArea}</main>
             </div>
         );

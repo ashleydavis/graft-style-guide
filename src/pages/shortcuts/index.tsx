@@ -15,12 +15,11 @@ import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import ListSubheader from "@mui/material/ListSubheader";
 import Paper from "@mui/material/Paper";
-import { useSearch } from "@tanstack/react-router";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { Section } from "../../components/section";
 import { KeyCaps } from "../../components/shortcut";
-import { modeThemes } from "../../lib/explorer-mode";
+import { modeThemes, useExplorerSettings } from "../../lib/explorer-mode";
 import { PanelThemeContext } from "../../lib/panel-theme";
 
 //
@@ -220,9 +219,7 @@ export function ShortcutsOverlayOpener(): ReactNode {
     const searchRef = useRef<HTMLInputElement>(null);
     const [isOpen, setIsOpen] = useState(false);
     const panelTheme = useContext(PanelThemeContext);
-    const { components } = useSearch({
-        strict: false,
-    });
+    const { components } = useExplorerSettings();
     const isFirstPanel = modeThemes(components)[0] === panelTheme;
 
     useEffect(() => {

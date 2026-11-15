@@ -13,7 +13,7 @@ import { faCodeBranch } from "@fortawesome/free-solid-svg-icons";
 import { changedFile, commitByHash, graftHistory, type ICommit, type IHistory } from "../data";
 import { closeCommitDetailsPane, closeFilePane, COMMIT_SUMMARY_PATH, explorerKeys, FOLDER_PREFIX, initialExplorerState, selectCommit, selectFile, stateAfterKey, type IExplorerState } from "../explorer-state";
 import { filePathsInViewOrder, isUnder, parentFolder, rowPathsInViewOrder, type FileListView } from "../file-views";
-import { scrollLastChildIntoView, scrollSelectionIntoView } from "../scroll";
+import { scrollLastChildIntoView, scrollPaneIntoView, scrollSelectionIntoView } from "../scroll";
 import { parseHunks } from "../../diff/model";
 import { CommitDetailsPane, CommitInfoPane } from "./commit-details-pane";
 import { CommitPane } from "./commit-pane";
@@ -55,7 +55,7 @@ function isOwnKeyTarget(target: EventTarget, key: string): boolean {
 // The panes' labels in order, so a pane's position, as the explorer's state counts them, comes
 // from its label.
 //
-const PANE_LABELS = ["Commits", "Commit details", "File diff", "Full commit details"];
+const PANE_LABELS = ["Commits", "Commit details", "File diff", "Full commit details", "Directory diffs"];
 
 //
 export function matchingCommits(commits: ICommit[], search: string): ICommit[] {
@@ -150,6 +150,12 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     const matchingHashes = new Set(commits.map(commit => commit.hash));
     const isSearching = search.trim() !== "";
     const columnsRef = useRef<HTMLDivElement>(null);
+
+    //
+    // True from a press on a pane less than half in view until its click, which the press spends
+    // on scrolling the pane into view.
+    //
+    const isRevealPress = useRef(false);
     const explorerRef = useRef<HTMLDivElement>(null);
     const openCommit = state.openHash !== undefined ? commitByHash(history, state.openHash) : undefined;
     const isCommitOpen = state.openPath === COMMIT_SUMMARY_PATH;
@@ -235,6 +241,19 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             scrollLastChildIntoView(columnsRef.current);
         }
     }, [state.openHash, state.openPath]);
+
+    //
+    // Keeps the active pane in view in a row of panes too wide for the screen, as on a phone, so
+    // moving to a pane on the left, by Left, Escape or a click, scrolls it back into view.
+    //
+    useEffect(() => {
+        const row = columnsRef.current;
+        const labels = state.activePaneIndex === 2 ? PANE_LABELS.slice(2) : [PANE_LABELS[state.activePaneIndex]];
+        const pane = row ? labels.map(label => row.querySelector<HTMLElement>(`section[aria-label="${label}"]`)).find(element => element) : undefined;
+        if (row && pane) {
+            scrollPaneIntoView(row, pane);
+        }
+    }, [state.activePaneIndex]);
 
     useEffect(() => {
         const selector = currentStop?.kind === "gap" ? `[data-gap-index="${currentStop.gap}"]` : `[data-hunk-index="${currentHunk}"]`;
@@ -453,16 +472,42 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
 
             <div
                 ref={columnsRef}
-                className="flex min-h-0 flex-1 items-stretch overflow-x-auto"
+                //
+                // No pane is wider than the row less a strip, so on a narrow screen the pane beside
+                // the one in view always shows a strip to tap.
+                //
+                className="flex min-h-0 flex-1 items-stretch overflow-x-auto [&>*]:max-w-[calc(100%-var(--space-8)*1.5)]"
                 style={{ paddingTop: "var(--space-3)" }}
                 //
-                // A press anywhere in a pane makes it the active pane, found by the pane's label.
+                // A press anywhere in a pane makes it the active pane, found by the pane's label, and
+                // scrolls the whole pane into view. A press on a pane less than half in view, such
+                // as the strip of the pane beside the one on a phone's screen, does nothing else, so
+                // the row or button under the press waits for a press once the pane can be seen.
                 //
                 onPointerDown={event => {
-                    const pane = (event.target as Element).closest(PANE_LABELS.map(label => `section[aria-label="${label}"]`).join(", "))?.getAttribute("aria-label");
+                    const section = (event.target as Element).closest<HTMLElement>(PANE_LABELS.map(label => `section[aria-label="${label}"]`).join(", "));
+                    const pane = section?.getAttribute("aria-label");
                     const index = pane ? Math.min(PANE_LABELS.indexOf(pane), 2) : -1;
                     if (index >= 0) {
                         setState(current => (current.activePaneIndex === index ? current : { ...current, activePaneIndex: index }));
+                    }
+                    const row = columnsRef.current;
+                    isRevealPress.current = false;
+                    if (row && section) {
+                        const rowBox = row.getBoundingClientRect();
+                        const paneBox = section.getBoundingClientRect();
+                        if (paneBox.left < rowBox.left - 1 || paneBox.right > rowBox.right + 1) {
+                            const visibleWidth = Math.min(paneBox.right, rowBox.right) - Math.max(paneBox.left, rowBox.left);
+                            isRevealPress.current = visibleWidth < paneBox.width / 2;
+                            scrollPaneIntoView(row, section);
+                        }
+                    }
+                }}
+                onClickCapture={event => {
+                    if (isRevealPress.current) {
+                        isRevealPress.current = false;
+                        event.preventDefault();
+                        event.stopPropagation();
                     }
                 }}
             >

@@ -4,8 +4,7 @@
 //
 
 import type { ReactNode } from "react";
-import { useSearch } from "@tanstack/react-router";
-import { modeThemes } from "../lib/explorer-mode";
+import { modeThemes, useExplorerSettings } from "../lib/explorer-mode";
 import { PanelThemeContext } from "../lib/panel-theme";
 
 //
@@ -13,9 +12,7 @@ import { PanelThemeContext } from "../lib/panel-theme";
 // role tokens in graft.css resolve to that theme's values inside it.
 //
 export function ThemePanels({ children }: { children: ReactNode }): ReactNode {
-    const { components } = useSearch({
-        strict: false,
-    });
+    const { components } = useExplorerSettings();
     const themes = modeThemes(components);
 
     return (

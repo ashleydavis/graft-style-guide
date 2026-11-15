@@ -6,6 +6,7 @@
 //
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { openPage } from "./themes";
 import { choices } from "../../pages/choices/options";
 import { graftHistory } from "../../pages/commit-explorer/data";
 import { longBranchHistory, releaseHistory } from "../../pages/commit-explorer/histories";
@@ -43,10 +44,10 @@ async function showStagedAndUnstaged(page: Page, area: Locator): Promise<void> {
 }
 
 test.describe("Opening pages", () => {
-    test("the bare URL opens the overview", async ({ page }) => {
+    test("the bare URL opens the commit explorer", async ({ page }) => {
         await page.goto("/");
-        await expect(page).toHaveURL(/\/page\/overview$/);
-        await expect(page.getByRole("heading", { level: 1, name: "Overview" })).toBeVisible();
+        await expect(page).toHaveURL(/\/page\/commit-explorer$/);
+        await expect(page.getByRole("heading", { level: 1, name: "Commit explorer" })).toBeVisible();
     });
 
     test("choosing a page in the sidebar puts its id in the URL", async ({ page }) => {
@@ -68,25 +69,27 @@ test.describe("Opening pages", () => {
 });
 
 test.describe("Sidebar", () => {
-    test("minimising hides the page list and puts the setting in the URL", async ({ page }) => {
+    test("minimising hides the page list, leaves the URL alone and is remembered on the next visit", async ({ page }) => {
         await page.goto("/page/button");
         const navigation = page.getByRole("navigation");
         await navigation.getByRole("button", { name: "Minimise sidebar" }).click();
-        await expect(page).toHaveURL(/sidebar=minimised/);
+        await expect(page).toHaveURL(/\/page\/button$/);
         await expect(navigation.getByRole("link")).toHaveCount(0);
         await expect(page.getByRole("heading", { level: 1, name: "Button" })).toBeVisible();
+        await page.goto("/page/text-box");
+        await expect(page.getByRole("navigation").getByRole("button", { name: "Restore sidebar" })).toBeVisible();
     });
 
     test("restoring brings back the page list", async ({ page }) => {
-        await page.goto("/page/button?sidebar=minimised");
+        await openPage(page, "/page/button", { sidebar: "minimised" });
         const navigation = page.getByRole("navigation");
         await navigation.getByRole("button", { name: "Restore sidebar" }).click();
-        await expect(page).toHaveURL(/sidebar=open/);
+        await expect(page).toHaveURL(/\/page\/button$/);
         await expect(navigation.getByRole("link", { name: "Button", exact: true })).toBeVisible();
     });
 
     test("the sidebar stays minimised when changing a setting", async ({ page }) => {
-        await page.goto("/page/button?sidebar=minimised&explorer=dark");
+        await openPage(page, "/page/button", { sidebar: "minimised", explorer: "dark" });
         await expect(page.getByRole("navigation").getByRole("button", { name: "Restore sidebar" })).toBeVisible();
         await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     });
@@ -126,7 +129,7 @@ test.describe("Searching", () => {
 
 test.describe("Themes", () => {
     test("every section shows a light and a dark panel", async ({ page }) => {
-        await page.goto("/page/button");
+        await openPage(page, "/page/button", { components: "both" });
         const sections = page.locator("main section");
         const sectionCount = await sections.count();
         expect(sectionCount).toBeGreaterThan(0);
@@ -138,7 +141,7 @@ test.describe("Themes", () => {
     });
 
     test("a button takes different colours from the light and dark tokens", async ({ page }) => {
-        await page.goto("/page/button");
+        await openPage(page, "/page/button", { components: "both" });
         const kinds = page.locator("main section").first();
         const lightButton = kinds.locator('[data-theme="light"]').getByRole("button", { name: "Commit" });
         const darkButton = kinds.locator('[data-theme="dark"]').getByRole("button", { name: "Commit" });
@@ -150,7 +153,7 @@ test.describe("Themes", () => {
     });
 
     test("a swatch shows the value its token resolves to in each theme", async ({ page }) => {
-        await page.goto("/page/overview");
+        await openPage(page, "/page/overview", { components: "both" });
         const roleColours = page.locator("main section").nth(1);
         const lightValue = roleColours
             .locator('[data-theme="light"]')
@@ -168,17 +171,18 @@ test.describe("Themes", () => {
 });
 
 test.describe("Component mode and explorer theme", () => {
-    test("a URL naming neither shows dark next to light in a light explorer", async ({ page }) => {
+    test("a first visit shows dark components in a dark explorer, with nothing in the URL", async ({ page }) => {
         await page.goto("/page/button");
-        const componentSwitch = (await openConfiguration(page)).getByRole("group", { name: "Components" });
-        const explorerSwitch = (await openConfiguration(page)).getByRole("group", { name: "Explorer" });
-        await expect(componentSwitch.getByRole("button", { name: "Dark next to light" })).toHaveAttribute("aria-pressed", "true");
-        await expect(explorerSwitch.getByRole("button", { name: "Light", exact: true })).toHaveAttribute("aria-pressed", "true");
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+        const configuration = await openConfiguration(page);
+        await expect(configuration.getByRole("group", { name: "Components" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
+        await expect(configuration.getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+        await expect(page.locator('main [data-theme="light"]')).toHaveCount(0);
+        await expect(page).toHaveURL(/\/page\/button$/);
     });
 
     test("dark next to light draws the dark panel on the left", async ({ page }) => {
-        await page.goto("/page/button");
+        await openPage(page, "/page/button", { components: "both" });
         const panels = page.locator("main section").first().locator("[data-theme]");
         await expect(panels).toHaveCount(2);
         await expect(panels.nth(0)).toHaveAttribute("data-theme", "dark");
@@ -188,60 +192,51 @@ test.describe("Component mode and explorer theme", () => {
         expect(darkBox!.x).toBeLessThan(lightBox!.x);
     });
 
-    test("dark component mode shows only dark panels and leaves the explorer light", async ({ page }) => {
+    test("light component mode shows only light panels and leaves the explorer and the URL as they were", async ({ page }) => {
         await page.goto("/page/button");
-        await (await openConfiguration(page)).getByRole("group", { name: "Components" }).getByRole("button", { name: "Dark", exact: true }).click();
-        await expect(page).toHaveURL(/\/page\/button\?components=dark$/);
+        await (await openConfiguration(page)).getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).click();
+        await expect(page).toHaveURL(/\/page\/button$/);
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+        await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
+        await expect(page.locator('main [data-theme="light"]').first()).toBeVisible();
+    });
+
+    test("the light explorer theme lightens the frame and leaves the component mode as it was", async ({ page }) => {
+        await page.goto("/page/button");
+        await (await openConfiguration(page)).getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Light", exact: true }).click();
         await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
         await expect(page.locator('main [data-theme="light"]')).toHaveCount(0);
         await expect(page.locator('main [data-theme="dark"]').first()).toBeVisible();
     });
 
-    test("light component mode shows only light panels", async ({ page }) => {
+    test("the settings are remembered on the next visit and when another page is chosen", async ({ page }) => {
         await page.goto("/page/button");
-        await (await openConfiguration(page)).getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).click();
-        await expect(page).toHaveURL(/\/page\/button\?components=light$/);
-        await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
-        await expect(page.locator('main [data-theme="light"]').first()).toBeVisible();
-    });
-
-    test("the dark explorer theme darkens the frame and leaves the component mode as it was", async ({ page }) => {
-        await page.goto("/page/button?components=light");
-        await (await openConfiguration(page)).getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Dark", exact: true }).click();
-        await expect(page).toHaveURL(/\/page\/button\?components=light&explorer=dark$/);
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-        await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
-        await expect(page.locator('main [data-theme="light"]').first()).toBeVisible();
-    });
-
-    test("opening a URL with both settings shows them", async ({ page }) => {
-        await page.goto("/page/text-box?components=dark&explorer=dark");
-        await expect((await openConfiguration(page)).getByRole("group", { name: "Components" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
-        await expect((await openConfiguration(page)).getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-        await expect(page.locator('main [data-theme="light"]')).toHaveCount(0);
-    });
-
-    test("both settings stay when another page is chosen", async ({ page }) => {
-        await page.goto("/page/button?components=dark&explorer=dark");
+        const configuration = await openConfiguration(page);
+        await configuration.getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).click();
+        await configuration.getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Light", exact: true }).click();
+        await page.keyboard.press("Escape");
         await page.getByRole("navigation").getByRole("link", { name: "Text box" }).click();
-        await expect(page).toHaveURL(/\/page\/text-box\?components=dark&explorer=dark$/);
+        await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
+        await page.goto("/");
+        await expect(page).toHaveURL(/\/page\/commit-explorer$/);
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+        await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
     });
 
-    test("the dark explorer theme is in place before the app's script runs", async ({ page }) => {
+    test("the light explorer theme is in place before the app's script runs", async ({ page }) => {
         await page.goto("/page/button");
-        const lightBackground = await computedStyle(page.locator("html"), "background-color");
+        const darkBackground = await computedStyle(page.locator("html"), "background-color");
 
         //
         // Blocking the app's script leaves the page as index.html draws it, which is what a
         // refresh shows before the app starts.
         //
         await page.route("**/src/main.tsx*", route => route.abort());
-        await page.goto("/page/button?explorer=dark");
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-        const darkBackground = await computedStyle(page.locator("html"), "background-color");
-        expect(darkBackground).not.toBe("rgba(0, 0, 0, 0)");
-        expect(darkBackground).not.toBe(lightBackground);
+        await openPage(page, "/page/button", { explorer: "light" });
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+        const lightBackground = await computedStyle(page.locator("html"), "background-color");
+        expect(lightBackground).not.toBe("rgba(0, 0, 0, 0)");
+        expect(lightBackground).not.toBe(darkBackground);
     });
 });
 
@@ -254,7 +249,7 @@ test.describe("Dialog", () => {
     });
 
     test("the danger button has red words and a red border on no fill", async ({ page }) => {
-        await page.goto("/page/dialog?components=light");
+        await openPage(page, "/page/dialog", { components: "light" });
         const discard = page.getByRole("button", { name: "Discard", exact: true });
         const keep = page.getByRole("button", { name: "Keep changes" });
         const danger = await page.locator('[data-theme="light"]').first().evaluate(element => {
@@ -272,7 +267,7 @@ test.describe("Dialog", () => {
     });
 
     test("the opened dialog takes the theme of the panel it opened from and closes on Cancel", async ({ page }) => {
-        await page.goto("/page/dialog");
+        await openPage(page, "/page/dialog", { components: "both" });
         const opened = page.locator("main section").nth(2);
 
         await opened.locator('[data-theme="dark"]').getByRole("button", { name: "Open dialog" }).click();
@@ -294,7 +289,7 @@ test.describe("Dialog", () => {
 
 test.describe("About", () => {
     test("the info button in the top-right corner opens the about popup centred on the page", async ({ page }) => {
-        await page.goto("/page/button?explorer=dark");
+        await openPage(page, "/page/button", { explorer: "dark" });
         const info = page.getByRole("button", { name: "About" });
         const infoBox = await info.boundingBox();
         const viewport = page.viewportSize()!;
@@ -303,7 +298,7 @@ test.describe("About", () => {
         await info.click();
         const popup = page.getByRole("dialog", { name: "About" });
         await expect(popup).toBeVisible();
-        await expect(page).toHaveURL(/\/page\/button\?explorer=dark$/);
+        await expect(page).toHaveURL(/\/page\/button$/);
         const popupBox = await popup.boundingBox();
         expect(popupBox!.width).toBeLessThanOrEqual(600);
         const centreX = popupBox!.x + popupBox!.width / 2;
@@ -312,11 +307,12 @@ test.describe("About", () => {
         expect(Math.abs(centreY - viewport.height / 2)).toBeLessThan(20);
     });
 
-    test("the about popup links to Graft on GitHub and to the YouTube channel and closes on Close", async ({ page }) => {
+    test("the about popup links to Graft and the style guide on GitHub and to the YouTube channel and closes on Close", async ({ page }) => {
         await page.goto("/page/button");
         await page.getByRole("button", { name: "About" }).click();
         const popup = page.getByRole("dialog", { name: "About" });
-        await expect(popup.getByRole("link", { name: "github.com/ashleydavis/Graft" })).toHaveAttribute("href", "https://github.com/ashleydavis/Graft");
+        await expect(popup.getByRole("link", { name: "github.com/ashleydavis/Graft", exact: true })).toHaveAttribute("href", "https://github.com/ashleydavis/Graft");
+        await expect(popup.getByRole("link", { name: "github.com/ashleydavis/graft-style-guide" })).toHaveAttribute("href", "https://github.com/ashleydavis/graft-style-guide");
         await expect(popup.getByRole("link", { name: "Code Capers" })).toHaveAttribute("href", "https://www.youtube.com/@CodeCapers");
         await popup.getByRole("button", { name: "Close" }).click();
         await expect(popup).toHaveCount(0);
@@ -336,7 +332,7 @@ test.describe("About", () => {
     });
 
     test("the info button stays when the sidebar is minimised", async ({ page }) => {
-        await page.goto("/page/button?sidebar=minimised");
+        await openPage(page, "/page/button", { sidebar: "minimised" });
         await expect(page.getByRole("button", { name: "About" })).toBeVisible();
     });
 
@@ -424,7 +420,7 @@ test.describe("Tokens", () => {
 
 test.describe("Commit graph", () => {
     test("every lane runs unbroken from one commit row to the next", async ({ page }) => {
-        await page.goto("/page/commit-graph?components=dark");
+        await openPage(page, "/page/commit-graph", { components: "dark" });
         const graph = page.locator('main [data-theme="dark"] [data-graph="Every lane colour"]');
         for (const lane of [1, 2, 3, 4, 5, 6]) {
             const segments = graph.locator(`line[data-lane="${lane}"]`);
@@ -443,7 +439,7 @@ test.describe("Commit graph", () => {
     });
 
     test("the page shows each history with every lane colour", async ({ page }) => {
-        await page.goto("/page/commit-graph?components=light");
+        await openPage(page, "/page/commit-graph", { components: "light" });
         for (const title of ["Straight history", "Feature branch merged", "Branch not merged yet", "Two branches at once", "Every lane colour"]) {
             await expect(page.locator(`main [data-graph="${title}"]`)).toBeVisible();
         }
@@ -471,7 +467,7 @@ test.describe("Fonts", () => {
     });
 
     test("the fonts page shows each font in use", async ({ page }) => {
-        await page.goto("/page/fonts?components=light");
+        await openPage(page, "/page/fonts", { components: "light" });
         await expect(page.getByRole("heading", { level: 1, name: "Fonts" })).toBeVisible();
         const uiSample = page.getByText("Fixed the merge base lookup").first();
         const codeSample = page.getByText("a1b2c3d feature/style-guide src/lib/graph.ts").first();
@@ -494,7 +490,7 @@ export async function isFontLoaded(page: Page, family: string): Promise<boolean>
 test.describe("Component pages", () => {
     test("the drop-down menu button opens its menu below it and choosing an item closes it", async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 2400 });
-        await page.goto("/page/button?components=light");
+        await openPage(page, "/page/button", { components: "light" });
         const merge = page.getByRole("button", { name: "Merge" });
         const buttonBox = await merge.boundingBox();
         await merge.click();
@@ -508,7 +504,7 @@ test.describe("Component pages", () => {
 
     test("the drop-down dialog button opens its settings below it, runs on Pull and closes on Cancel", async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 2400 });
-        await page.goto("/page/button?components=light");
+        await openPage(page, "/page/button", { components: "light" });
         const pull = page.getByRole("button", { name: "Pull", exact: true });
         const buttonBox = await pull.boundingBox();
         await pull.click();
@@ -524,7 +520,7 @@ test.describe("Component pages", () => {
     });
 
     test("a menu takes the theme of the panel it opens from", async ({ page }) => {
-        await page.goto("/page/button");
+        await openPage(page, "/page/button", { components: "both" });
         const dropDowns = page.locator("main section").filter({ hasText: "Drop-down buttons" });
         await dropDowns.locator('[data-theme="dark"]').getByRole("button", { name: "Merge" }).click();
         const darkBackground = await computedStyle(page.getByRole("menu").locator(".."), "background-color");
@@ -536,7 +532,7 @@ test.describe("Component pages", () => {
     });
 
     test("a select opens its list and shows the chosen item", async ({ page }) => {
-        await page.goto("/page/select?components=light");
+        await openPage(page, "/page/select", { components: "light" });
         const select = page.getByRole("combobox").first();
         await select.click();
         await page.getByRole("option", { name: "upstream" }).click();
@@ -544,7 +540,7 @@ test.describe("Component pages", () => {
     });
 
     test("the stage all checkbox is mixed while some files are ticked and ticks them all when clicked", async ({ page }) => {
-        await page.goto("/page/checkbox?components=light");
+        await openPage(page, "/page/checkbox", { components: "light" });
         const stageAll = page.getByRole("checkbox", { name: "Stage all" });
         await expect(stageAll).toHaveAttribute("data-indeterminate", "true");
         await stageAll.click();
@@ -553,7 +549,7 @@ test.describe("Component pages", () => {
     });
 
     test("clicking a tab or pressing the arrow keys switches the view below", async ({ page }) => {
-        await page.goto("/page/tabs?components=light");
+        await openPage(page, "/page/tabs", { components: "light" });
         const tabs = page.getByRole("tablist", { name: "Repository views" });
         await tabs.getByRole("tab", { name: /History/ }).click();
         await expect(page.getByText("128 commits on main.")).toBeVisible();
@@ -564,21 +560,21 @@ test.describe("Component pages", () => {
     });
 
     test("right-clicking a commit opens the context menu", async ({ page }) => {
-        await page.goto("/page/menu?components=light");
+        await openPage(page, "/page/menu", { components: "light" });
         await page.getByText("Right-click this commit").click({ button: "right" });
         await expect(page.getByRole("menu")).toBeVisible();
         await expect(page.getByRole("menuitem", { name: /Reset to here/ })).toBeVisible();
     });
 
     test("a tooltip shows when the pointer rests on its button", async ({ page }) => {
-        await page.goto("/page/tooltip?components=light");
+        await openPage(page, "/page/tooltip", { components: "light" });
         const section = page.locator("main section").filter({ hasText: "On hover and focus" });
         await section.getByRole("button", { name: "Push" }).hover();
         await expect(page.getByRole("tooltip").filter({ hasText: "Push" })).toBeVisible();
     });
 
     test("clicking a folder in the tree closes and opens it", async ({ page }) => {
-        await page.goto("/page/tree?components=light");
+        await openPage(page, "/page/tree", { components: "light" });
         const tree = page.getByRole("tree", { name: "Changed files" });
         await expect(tree.getByText("lanes.ts")).toBeVisible();
         await tree.getByRole("treeitem", { name: "graph", exact: true }).click();
@@ -588,7 +584,7 @@ test.describe("Component pages", () => {
     });
 
     test("the command palette narrows as you type and runs the highlighted command on Enter", async ({ page }) => {
-        await page.goto("/page/command-palette?components=light");
+        await openPage(page, "/page/command-palette", { components: "light" });
         await page.getByRole("button", { name: "Open command palette" }).click();
         const search = page.getByRole("textbox", { name: "Command" }).last();
         await expect(search).toBeFocused();
@@ -601,7 +597,7 @@ test.describe("Component pages", () => {
     });
 
     test("toasts of each kind stack up at the bottom of the screen and close on Dismiss", async ({ page }) => {
-        await page.goto("/page/notifications?components=light");
+        await openPage(page, "/page/notifications", { components: "light" });
         for (const label of ["Plain", "Info", "Success", "Warning", "Error"]) {
             await page.getByRole("button", { name: label, exact: true }).click();
         }
@@ -617,7 +613,7 @@ test.describe("Component pages", () => {
     });
 
     test("pressing ? opens the shortcuts overlay, typing narrows the list and Escape closes it", async ({ page }) => {
-        await page.goto("/page/shortcuts?components=light");
+        await openPage(page, "/page/shortcuts", { components: "light" });
         await page.locator("main h1").click();
         await page.keyboard.press("?");
         const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });
@@ -633,7 +629,7 @@ test.describe("Component pages", () => {
 
 test.describe("Commit explorer", () => {
     test("the arrow keys, Enter and Escape move through the commit, details and file panes", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         await explorer.focus();
         await page.keyboard.press("ArrowDown");
@@ -662,7 +658,7 @@ test.describe("Commit explorer", () => {
     });
 
     test("clicking a commit opens it and its close button closes it", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         await explorer.getByText("Initial commit").click();
         const details = explorer.getByRole("region", { name: "Commit details" });
@@ -673,7 +669,7 @@ test.describe("Commit explorer", () => {
     });
 
     test("the main lane runs unbroken from the newest commit to the first, with the feature branch beside it", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const commitPane = page.getByRole("application", { name: "Commit explorer" }).first().getByRole("region", { name: "Commits" });
         const segments = commitPane.locator('line[data-lane="1"]');
         const boxes = [];
@@ -700,7 +696,7 @@ test.describe("Commit explorer", () => {
     });
 
     test("opening a pane scrolls only inside the explorer, never the page", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         await page.waitForTimeout(500);
         expect(await page.evaluate(() => window.scrollY)).toBe(0);
     });
@@ -708,7 +704,7 @@ test.describe("Commit explorer", () => {
 
 test.describe("Git commands panel", () => {
     test("the panel shows no commands, one command or two commands, with no recent or earlier labels", async ({ page }) => {
-        await page.goto("/page/git-commands-panel?components=light");
+        await openPage(page, "/page/git-commands-panel", { components: "light" });
         const panels = page.getByRole("region", { name: "Git commands" });
         await expect(panels.nth(0)).toContainText("This page ran no Git commands.");
         await expect(panels.nth(1).getByRole("listitem")).toHaveCount(1);
@@ -721,7 +717,7 @@ test.describe("Git commands panel", () => {
 
     test("a copy button copies its command and shows a tick for a moment", async ({ page, context }) => {
         await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-        await page.goto("/page/git-commands-panel?components=light");
+        await openPage(page, "/page/git-commands-panel", { components: "light" });
         const panel = page.getByRole("region", { name: "Git commands" }).nth(1);
         await panel.getByRole("button", { name: "Copy command" }).click();
         await expect(panel.getByRole("button", { name: "Copied" })).toBeVisible();
@@ -732,7 +728,7 @@ test.describe("Git commands panel", () => {
 
 test.describe("Diff", () => {
     test("the unified view marks changed words and shows the unchanged lines between hunks on request", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         const diff = card.getByRole("table", { name: "Unified diff" });
         await expect(diff.locator('mark[data-word-change="deleted"]')).toContainText(["body"]);
@@ -744,7 +740,7 @@ test.describe("Diff", () => {
     });
 
     test("the layout switch shows the old and new files side by side, striping a side with no line", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await card.getByRole("button", { name: "Diff options" }).click();
         await page.getByRole("dialog", { name: "Diff options" }).getByRole("button", { name: "Side by side" }).click();
@@ -756,7 +752,7 @@ test.describe("Diff", () => {
     });
 
     test("the wrap switch wraps long lines inside the view", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").filter({ has: page.getByRole("heading", { name: "Long lines" }) }).getByRole("region", { name: "docs/user-guide.md" }).first();
         const row = card.locator('[data-line="added"]');
         const oneRowHeight = (await row.boundingBox())!.height;
@@ -767,7 +763,7 @@ test.describe("Diff", () => {
     });
 
     test("a deleted file starts folded and a large diff waits behind a button", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const kinds = page.locator("main section.mb-10").filter({ has: page.getByRole("heading", { name: "Diff explorer" }) });
         const deleted = kinds.getByRole("region", { name: "frontend/src/lib/old-theme.ts" });
         await expect(deleted.getByRole("table")).toHaveCount(0);
@@ -782,7 +778,7 @@ test.describe("Diff", () => {
 
 test.describe("Commit explorer search and file views", () => {
     test("the search box fades the commits that do not match and keeps the graph", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         const commitPane = explorer.getByRole("region", { name: "Commits" });
         const lanesBefore = await commitPane.locator("line[data-lane]").count();
@@ -797,7 +793,7 @@ test.describe("Commit explorer search and file views", () => {
     });
 
     test("the tree view lists files by folder and the arrow keys follow its order", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         await explorer.getByText("Show a changed file").click();
         const details = explorer.getByRole("region", { name: "Commit details" });
@@ -817,13 +813,13 @@ test.describe("Commit explorer search and file views", () => {
 
 test.describe("Dotted lanes and sidebar search", () => {
     test("an unmerged branch's lane is dotted and a merged branch's is solid", async ({ page }) => {
-        await page.goto("/page/commit-graph?components=light");
+        await openPage(page, "/page/commit-graph", { components: "light" });
         expect(await page.locator('[data-graph="Branch not merged yet"] [data-dotted="true"]').count()).toBeGreaterThan(0);
         await expect(page.locator('[data-graph="Feature branch merged"] [data-dotted="true"]')).toHaveCount(0);
     });
 
     test("the repository sidebar's search box narrows every group to the matching names", async ({ page }) => {
-        await page.goto("/page/sidebar?components=light");
+        await openPage(page, "/page/sidebar", { components: "light" });
         const sidebar = page.getByRole("navigation", { name: "Repository" });
         await sidebar.getByRole("textbox", { name: "Search the repository" }).fill("v1");
         await expect(sidebar.getByText("v1.0.0")).toBeVisible();
@@ -836,7 +832,7 @@ test.describe("Dotted lanes and sidebar search", () => {
 test.describe("File paths, staging and tooltips", () => {
     test("a file path's menu copies the relative path, the full path and the file name", async ({ page, context }) => {
         await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         for (const [item, expected] of [
             ["Copy relative file path", "frontend/src/lib/zoom.ts"],
@@ -855,7 +851,7 @@ test.describe("File paths, staging and tooltips", () => {
     });
 
     test("Stage and Unstage buttons flip on a click, and some changes start staged", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.getByRole("application", { name: "Diff explorer" }).getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         const hunkButtons = card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage) this hunk$/ });
         await expect.poll(() => hunkButtons.evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label")))).toEqual(["Unstage this hunk", "Stage this hunk"]);
@@ -871,7 +867,7 @@ test.describe("File paths, staging and tooltips", () => {
     });
 
     test("the diff explorer steps from change to change and file to file", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const explorer = page.getByRole("application", { name: "Diff explorer" });
         await explorer.focus();
         await page.keyboard.press("ArrowDown");
@@ -891,7 +887,7 @@ test.describe("File paths, staging and tooltips", () => {
     });
 
     test("the commit explorer's file pane steps through changes and files", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
         const file = explorer.getByRole("region", { name: "File diff" });
         await file.click();
@@ -903,7 +899,7 @@ test.describe("File paths, staging and tooltips", () => {
     });
 
     test("Space stages and unstages the current change in the diff explorer", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const explorer = page.getByRole("application", { name: "Diff explorer" });
         const card = explorer.getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         const hunkButtons = card.getByRole("table").getByRole("button", { name: /^(Stage|Unstage) this hunk$/ });
@@ -918,7 +914,7 @@ test.describe("File paths, staging and tooltips", () => {
     });
 
     test("a standalone card steps through its changes with Up and Down and stages with Space", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await card.focus();
         for (let step = 0; step < 4; step++) {
@@ -930,7 +926,7 @@ test.describe("File paths, staging and tooltips", () => {
     });
 
     test("the whole-file switch shows every unchanged line and folds them back", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         const context = card.locator('[data-line="context"]');
         const before = await context.count();
@@ -945,7 +941,7 @@ test.describe("File paths, staging and tooltips", () => {
     });
 
     test("the info button lists the change's stats with labels", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await card.getByRole("button", { name: "Change details" }).click();
         const info = page.getByRole("dialog", { name: "Change details" });
@@ -956,7 +952,7 @@ test.describe("File paths, staging and tooltips", () => {
     });
 
     test("the commit explorer's file pane switches to side by side", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
         const file = explorer.getByRole("region", { name: "File diff" });
         await file.getByRole("button", { name: "Diff options" }).click();
@@ -968,7 +964,7 @@ test.describe("File paths, staging and tooltips", () => {
 
 test.describe("Changes and commit", () => {
     test("Up and Down move through the files, Space stages one and committing takes the staged files away", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.focus();
         await page.keyboard.press("ArrowUp");
@@ -986,7 +982,7 @@ test.describe("Changes and commit", () => {
     });
 
     test("ticking Amend brings in the last commit's message", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("checkbox", { name: "Amend" }).check();
         await expect(area.getByRole("textbox", { name: "Summary" })).toHaveValue("Show the Git commands each page runs");
@@ -995,7 +991,7 @@ test.describe("Changes and commit", () => {
     });
 
     test("the split view lists staged and unstaged files apart and shows the diff in two sections", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await showStagedAndUnstaged(page, area);
         await expect(area.getByText("Staged (3)")).toBeVisible();
@@ -1007,7 +1003,7 @@ test.describe("Changes and commit", () => {
     });
 
     test("the search box narrows the changed files", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("textbox", { name: "Search changed files" }).fill("theme");
         await expect(area.getByRole("region", { name: "Changed files" }).locator("li[aria-label]:not([aria-label^=\"Directory \"])")).toHaveCount(3);
@@ -1015,7 +1011,7 @@ test.describe("Changes and commit", () => {
     });
 
     test("an image file shows its old and new versions side by side", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("button", { name: "assets/graft-512.png" }).getByText("graft-512.png").click();
         await expect(area.getByRole("img", { name: /^Before/ })).toBeVisible();
@@ -1023,7 +1019,7 @@ test.describe("Changes and commit", () => {
     });
 
     test("M and the maximise button make a pane fill the area and put it back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.focus();
         await page.keyboard.press("m");
@@ -1039,7 +1035,7 @@ test.describe("Changes and commit", () => {
 
 test.describe("Finding, clicking hunks, resizing and maximising", () => {
     test("the find box counts matches and steps through them", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await expect(card.getByRole("textbox", { name: "Find in this diff" })).toHaveCount(0);
         await card.getByText("saveState({ zoom: value });").click();
@@ -1060,14 +1056,14 @@ test.describe("Finding, clicking hunks, resizing and maximising", () => {
     });
 
     test("clicking a hunk makes it the current one", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await card.getByText("saveState({ zoom: value });").click();
         await expect(card.locator('[data-current="true"][data-hunk-index="1"]')).toHaveCount(1);
     });
 
     test("the commit explorer's resize handle widens the commit list and M maximises a pane", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         const commits = explorer.getByRole("region", { name: "Commits" });
         const before = (await commits.boundingBox())!.width;
@@ -1085,7 +1081,7 @@ test.describe("Finding, clicking hunks, resizing and maximising", () => {
 
 test.describe("Whole file, search in shown lines and clicking panes", () => {
     test("search finds matches in unchanged lines once the whole file shows", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await card.getByRole("button", { name: "Open the find box" }).click();
         const find = card.getByRole("textbox", { name: "Find in this diff" });
@@ -1100,7 +1096,7 @@ test.describe("Whole file, search in shown lines and clicking panes", () => {
     });
 
     test("every changed text file in the commit explorer can show the whole file", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const section = page.locator("section", { has: page.getByRole("heading", { name: "A file with several changes" }) });
         const explorer = section.getByRole("application", { name: "Commit explorer" }).first();
         const pane = explorer.getByRole("region", { name: "File diff" });
@@ -1114,7 +1110,7 @@ test.describe("Whole file, search in shown lines and clicking panes", () => {
     });
 
     test("a press anywhere in a commit explorer pane makes it active", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
         await explorer.getByRole("region", { name: "Commit details" }).getByText("Files changed").click();
         await expect(explorer.getByRole("region", { name: "Commit details" })).toHaveAttribute("data-active", "true");
@@ -1125,7 +1121,7 @@ test.describe("Whole file, search in shown lines and clicking panes", () => {
 
 test.describe("Discarding changes", () => {
     test("discarding a hunk fades it in place and Undo brings it back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
         await expect(card.getByRole("button", { name: "Discard this hunk" })).toHaveCount(0);
@@ -1139,7 +1135,7 @@ test.describe("Discarding changes", () => {
     });
 
     test("discarding a file fades its row and its diff, and Undo brings it back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
         await area.getByRole("region", { name: "Changed files" }).getByRole("button", { name: "Discard this file" }).click();
@@ -1152,7 +1148,7 @@ test.describe("Discarding changes", () => {
     });
 
     test("the Delete key discards what the keys are on and brings it back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
         const row = area.getByRole("region", { name: "Changed files" }).getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
@@ -1173,7 +1169,7 @@ test.describe("Discarding changes", () => {
 
 test.describe("Runs of unchanged lines and the full commit details", () => {
     test("Up and Down stop on runs of unchanged lines and Space shows and folds them", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         const context = card.locator('[data-line="context"]');
         const before = await context.count();
@@ -1190,7 +1186,7 @@ test.describe("Runs of unchanged lines and the full commit details", () => {
     });
 
     test("clicking a run of unchanged lines makes it the current stop", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByText("24 unchanged lines").click();
@@ -1200,7 +1196,7 @@ test.describe("Runs of unchanged lines and the full commit details", () => {
     });
 
     test("the commit's row opens its full details, with copy buttons for the summary and description", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         await explorer.getByText("Show the Git commands each page runs").click();
         const details = explorer.getByRole("region", { name: "Commit details" });
@@ -1215,7 +1211,7 @@ test.describe("Runs of unchanged lines and the full commit details", () => {
 
 test.describe("Diff options and picking lines", () => {
     test("the options dialog names every option with its key, and the keys work", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await card.getByRole("button", { name: "Diff options" }).click();
         const dialog = page.getByRole("dialog", { name: "Diff options" });
@@ -1229,7 +1225,7 @@ test.describe("Diff options and picking lines", () => {
     });
 
     test("picked lines stage on their own and show apart in the split view", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("button", { name: ".gitignore", exact: true }).getByText(".gitignore").click();
         const diff = area.getByRole("region", { name: "File diff" });
@@ -1249,7 +1245,7 @@ test.describe("Diff options and picking lines", () => {
     });
 
     test("discarding picked lines fades them and Undo brings them back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByRole("button", { name: "Diff options" }).click();
@@ -1266,7 +1262,7 @@ test.describe("Diff options and picking lines", () => {
 
 test.describe("Popups and the page scrollbar", () => {
     test("opening a dropdown dialog leaves the page free to scroll", async ({ page }) => {
-        await page.goto("/page/diff?components=light");
+        await openPage(page, "/page/diff", { components: "light" });
         const card = page.locator("main section.mb-10").first().getByRole("region", { name: "frontend/src/lib/zoom.ts" });
         await card.getByRole("button", { name: "Change details" }).click();
         await expect(page.getByRole("dialog", { name: "Change details" })).toBeVisible();
@@ -1276,7 +1272,7 @@ test.describe("Popups and the page scrollbar", () => {
 
 test.describe("Danger icon buttons", () => {
     test("the Discard icon buttons draw their icon and border in the danger colour", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const button = page.getByRole("application", { name: "Changes" }).first().getByRole("button", { name: "Discard this file" }).first();
         const colours = await button.evaluate(element => {
             const style = getComputedStyle(element);
@@ -1294,7 +1290,7 @@ test.describe("Danger icon buttons", () => {
 
 test.describe("Picking lines like hunks", () => {
     test("a click picks a line, Shift picks a run, Ctrl adds a line and the keys move the pick", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByRole("button", { name: "Diff options" }).click();
@@ -1320,7 +1316,7 @@ test.describe("Picking lines like hunks", () => {
 
 test.describe("One selection at a time", () => {
     test("the lines mode shows only the picked lines' border, not the current hunk's", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.locator('[data-hunk-index="1"]').click();
@@ -1334,7 +1330,7 @@ test.describe("One selection at a time", () => {
 
 test.describe("Runs of unchanged lines in the lines mode", () => {
     test("Up and Down stop on runs between lines, a click picks a run and Space opens it", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByRole("button", { name: "Diff options" }).click();
@@ -1355,7 +1351,7 @@ test.describe("Runs of unchanged lines in the lines mode", () => {
 
 test.describe("Any shown line can be picked", () => {
     test("kept lines and shown unchanged lines can be picked, and the buttons sit just across the pick's top edge", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await diff.getByRole("button", { name: "Diff options" }).click();
@@ -1382,7 +1378,7 @@ test.describe("Any shown line can be picked", () => {
 
 test.describe("Nothing to commit", () => {
     test("an empty working tree says there is nothing to commit", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).last();
         await expect(area).toContainText("No changes. The working tree matches the last commit.");
         await expect(area).toContainText("Nothing to commit.");
@@ -1392,7 +1388,7 @@ test.describe("Nothing to commit", () => {
 
 test.describe("Collapsing panes", () => {
     test("the Changes and Commit panes collapse to their sides and come back, by button and by C", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const files = area.getByRole("region", { name: "Changed files" });
         await files.getByRole("button", { name: "Collapse the pane" }).click();
@@ -1410,7 +1406,7 @@ test.describe("Collapsing panes", () => {
     });
 
     test("every commit explorer pane collapses to the left and C restores the active one", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
         for (const name of ["Commits", "Commit details", "File diff"]) {
             await explorer.getByRole("region", { name, exact: true }).getByRole("button", { name: "Collapse the pane" }).click();
@@ -1424,7 +1420,7 @@ test.describe("Collapsing panes", () => {
 
 test.describe("Staged and Unstaged panels", () => {
     test("each panel collapses to its heading, maximises over the other and comes back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await showStagedAndUnstaged(page, area);
         const staged = area.getByRole("region", { name: "Staged files", exact: true });
@@ -1441,7 +1437,7 @@ test.describe("Staged and Unstaged panels", () => {
     });
 
     test("Right from the diff moves into the commit message, and Escape and Left come back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.focus();
         await page.keyboard.press("ArrowRight");
@@ -1457,7 +1453,7 @@ test.describe("Staged and Unstaged panels", () => {
 
 test.describe("Path menu, hover and configuration", () => {
     test("the path menu closes on a click anywhere outside it and the click still lands", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("region", { name: "File diff" }).getByRole("button", { name: /^Path actions for/ }).click();
         await expect(page.getByRole("menu")).toBeVisible();
@@ -1470,7 +1466,7 @@ test.describe("Path menu, hover and configuration", () => {
     });
 
     test("a hunk that a click picks shows the hover wash under the pointer", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const hunk = page.getByRole("application", { name: "Changes" }).first().getByRole("region", { name: "File diff" }).locator('[data-hunk-index="1"]');
         await expect(hunk).toHaveClass(/graft-hoverable/);
         await hunk.hover();
@@ -1479,7 +1475,7 @@ test.describe("Path menu, hover and configuration", () => {
     });
 
     test("the light and dark settings live in the Configuration dropdown, not the sidebar", async ({ page }) => {
-        await page.goto("/page/button?components=light");
+        await openPage(page, "/page/button", { components: "light" });
         await expect(page.getByRole("navigation").getByRole("group", { name: "Explorer" })).toHaveCount(0);
         await page.getByRole("button", { name: "Configuration" }).click();
         const dialog = page.getByRole("dialog", { name: "Configuration" });
@@ -1490,7 +1486,7 @@ test.describe("Path menu, hover and configuration", () => {
 
 test.describe("Commit toast and tooltips", () => {
     test("a commit's toast shows at the bottom centre of the screen", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("textbox", { name: "Summary" }).fill("Tidy the themes");
         await area.getByRole("button", { name: "Commit 3 files" }).click();
@@ -1503,7 +1499,7 @@ test.describe("Commit toast and tooltips", () => {
     });
 
     test("a floating button's tooltip is wider than the button group", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const diff = page.getByRole("application", { name: "Changes" }).first().getByRole("region", { name: "File diff" });
         await diff.locator('[data-hunk-index="0"]').click();
         await diff.getByRole("button", { name: "Discard this hunk" }).hover();
@@ -1515,7 +1511,7 @@ test.describe("Commit toast and tooltips", () => {
 
 test.describe("Discard only on the selection", () => {
     test("only the selected file row and the row under the pointer show Discard, and a discarded row keeps Undo", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const list = area.getByRole("region", { name: "Changed files" });
         const visibleDiscards = list.getByRole("button", { name: "Discard this file" }).filter({ visible: true });
@@ -1531,7 +1527,7 @@ test.describe("Discard only on the selection", () => {
 
 test.describe("Counts leave out discarded files", () => {
     test("discarding a file takes it out of its panel's count and the header's, and Undo puts it back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const list = area.getByRole("region", { name: "Changed files" });
         await showStagedAndUnstaged(page, area);
@@ -1549,7 +1545,7 @@ test.describe("Counts leave out discarded files", () => {
 
 test.describe("Changes options", () => {
     test("one diff shows one list, and the options dialog and S switch to the panels and back", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const list = area.getByRole("region", { name: "Changed files" });
         await expect(list.getByRole("region", { name: "Staged files", exact: true })).toHaveCount(0);
@@ -1571,7 +1567,7 @@ test.describe("Changes options", () => {
 
 test.describe("Folders in the tree", () => {
     test("a folder is selected with the keys, stages its files with Space and shows only itself with Enter", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const list = area.getByRole("region", { name: "Changed files" });
         const folder = list.getByRole("button", { name: "Directory frontend/src/lib", exact: true });
@@ -1595,7 +1591,7 @@ test.describe("Folders in the tree", () => {
 
 test.describe("Folders in the commit's file list", () => {
     test("a folder is selected with the keys, has a copy menu and shows only itself with Enter", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         await explorer.getByText("Show a changed file").click();
         const details = explorer.getByRole("region", { name: "Commit details" });
@@ -1616,7 +1612,7 @@ test.describe("Folders in the commit's file list", () => {
 
 test.describe("Tree lines and collapsing folders", () => {
     test("folders collapse and expand by their button", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const list = area.getByRole("region", { name: "Changed files" });
         await list.getByRole("button", { name: "Collapse frontend/src/lib" }).click();
@@ -1627,13 +1623,13 @@ test.describe("Tree lines and collapsing folders", () => {
     });
 
     test("the tree draws lines joining folders to what is inside them", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const row = page.getByRole("application", { name: "Changes" }).first().getByRole("button", { name: "docs/README.md", exact: true });
         await expect(row.locator('[aria-hidden="true"] > span > span')).not.toHaveCount(0);
     });
 
     test("the commit's directories collapse and the focus button shows on the hovered directory", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
         await explorer.getByText("Show a changed file").click();
         const details = explorer.getByRole("region", { name: "Commit details" });
@@ -1650,7 +1646,7 @@ test.describe("Tree lines and collapsing folders", () => {
 
 test.describe("A selected directory's diffs", () => {
     test("a commit's directory shows the diffs of its files stacked, each collapsing on its own", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const section = page.locator("section", { hasText: "Directories inside directories" }).first();
         const details = section.getByRole("region", { name: "Commit details" }).first();
         await details.getByRole("button", { name: "Directory backend/src", exact: true }).click();
@@ -1661,7 +1657,7 @@ test.describe("A selected directory's diffs", () => {
     });
 
     test("stage buttons name their key", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.getByRole("button", { name: /^Stage this file$/ }).first().hover();
         await expect(page.getByRole("tooltip")).toContainText("Key: Space");
@@ -1670,7 +1666,7 @@ test.describe("A selected directory's diffs", () => {
 
 test.describe("Directory keys", () => {
     test("E collapses and expands, F focuses and U goes back up", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const list = area.getByRole("region", { name: "Changed files" });
         await list.getByRole("button", { name: "Directory frontend/src/lib", exact: true }).click();
@@ -1685,7 +1681,7 @@ test.describe("Directory keys", () => {
     });
 
     test("the commit's file list takes the same keys", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const section = page.locator("section", { hasText: "Directories inside directories" }).first();
         const details = section.getByRole("region", { name: "Commit details" }).first();
         await details.getByRole("button", { name: "Directory backend/src", exact: true }).click();
@@ -1701,7 +1697,7 @@ test.describe("Directory keys", () => {
 
 test.describe("Stacked diffs keep their height", () => {
     test("a directory's diffs keep their full height and the column scrolls through them", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).nth(1);
         await area.getByRole("button", { name: "Directory frontend/src", exact: true }).click();
         const column = area.getByRole("region", { name: "Diffs in frontend/src" });
@@ -1715,7 +1711,7 @@ test.describe("Stacked diffs keep their height", () => {
 
 test.describe("Keys in a directory's stacked diffs", () => {
     test("Right goes to the first file's diff, Up and Down step through the changes and Ctrl jumps file to file", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).nth(1);
         await area.getByRole("button", { name: "Directory backend/src", exact: true }).click();
         const column = area.getByRole("region", { name: "Diffs in backend/src" });
@@ -1736,7 +1732,7 @@ test.describe("Keys in a directory's stacked diffs", () => {
     });
 
     test("the commit's directory pane takes the same keys", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const section = page.locator("section", { hasText: "Directories inside directories" }).first();
         await section.getByRole("region", { name: "Commit details" }).first().getByRole("button", { name: "Directory backend/src", exact: true }).click();
         const pane = section.getByRole("region", { name: "Directory diffs" });
@@ -1752,7 +1748,7 @@ test.describe("Keys in a directory's stacked diffs", () => {
 
 test.describe("Folding a diff with E", () => {
     test("E folds away and shows the stacked diff the keys are on", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).nth(1);
         await area.getByRole("button", { name: "Directory backend/src", exact: true }).click();
         await page.keyboard.press("ArrowRight");
@@ -1764,7 +1760,7 @@ test.describe("Folding a diff with E", () => {
     });
 
     test("E folds away the commit's open file diff", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const section = page.locator("section", { hasText: "Directories inside directories" }).first();
         await section.getByRole("region", { name: "Commit details" }).first().getByRole("button", { name: "Directory backend/src", exact: true }).click();
         await page.keyboard.press("ArrowRight");
@@ -1775,7 +1771,7 @@ test.describe("Folding a diff with E", () => {
 
 test.describe("Left out of the commit message", () => {
     test("Left at the start of the summary or description moves to the diff, and elsewhere moves the cursor", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true }).click();
@@ -1795,7 +1791,7 @@ test.describe("Left out of the commit message", () => {
 
 test.describe("Find mode", () => {
     test("Ctrl+F searches the Changes list from the list, and opens the find box from the diff, which Escape closes", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true }).click();
@@ -1817,7 +1813,7 @@ test.describe("Find mode", () => {
     });
 
     test("Ctrl+F opens the find box in the commit's open diff", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const section = page.locator("section", { has: page.getByRole("heading", { name: "A file with several changes" }) });
         const pane = section.getByRole("application", { name: "Commit explorer" }).first().getByRole("region", { name: "File diff" });
         await pane.click();
@@ -1828,7 +1824,7 @@ test.describe("Find mode", () => {
 
 test.describe("No folding for a single file", () => {
     test("a single selected file's diff has no fold button and E leaves it open", async ({ page }) => {
-        await page.goto("/page/changes?components=light");
+        await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const diff = area.getByRole("region", { name: "File diff" });
         await area.getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true }).click();
@@ -1841,7 +1837,7 @@ test.describe("No folding for a single file", () => {
 
 test.describe("Table filter", () => {
     test("the filter shows only the matching commits and Escape clears it", async ({ page }) => {
-        await page.goto("/page/table?components=light");
+        await openPage(page, "/page/table", { components: "light" });
         const table = page.locator("main section.mb-10").first();
         const filter = table.getByRole("textbox", { name: "Filter the commits" });
         await expect(table.getByRole("row")).toHaveCount(5);
@@ -1852,14 +1848,14 @@ test.describe("Table filter", () => {
     });
 
     test("a filter that matches nothing says so", async ({ page }) => {
-        await page.goto("/page/table?components=light");
+        await openPage(page, "/page/table", { components: "light" });
         await expect(page.locator("main section.mb-10").nth(1)).toContainText("No commits match the filter.");
     });
 });
 
 test.describe("Search in large content", () => {
     test("the table filter shows only the matching commits and Escape clears it", async ({ page }) => {
-        await page.goto("/page/table?components=light");
+        await openPage(page, "/page/table", { components: "light" });
         const table = page.locator("main section.mb-10").first();
         const filter = table.getByRole("textbox", { name: "Filter the commits" });
         await expect(table.getByRole("row")).toHaveCount(5);
@@ -1871,11 +1867,11 @@ test.describe("Search in large content", () => {
     });
 
     test("the list and the tree filter their rows", async ({ page }) => {
-        await page.goto("/page/list?components=light");
+        await openPage(page, "/page/list", { components: "light" });
         const list = page.locator("main section.mb-10").first();
         await list.getByRole("textbox", { name: "Filter the branches" }).fill("merge");
         await expect(list.getByRole("list", { name: "Branches" }).getByRole("button")).toHaveCount(1);
-        await page.goto("/page/tree?components=light");
+        await openPage(page, "/page/tree", { components: "light" });
         const tree = page.locator("main section.mb-10").first();
         const items = tree.getByRole("treeitem");
         const before = await items.count();
@@ -1885,7 +1881,7 @@ test.describe("Search in large content", () => {
     });
 
     test("Ctrl+F searches the commit's file list, Enter applies and Escape hides the box", async ({ page }) => {
-        await page.goto("/page/commit-explorer?components=light");
+        await openPage(page, "/page/commit-explorer", { components: "light" });
         const section = page.locator("section", { hasText: "Directories inside directories" }).first();
         const details = section.getByRole("region", { name: "Commit details" }).first();
         await details.getByRole("button", { name: "Directory backend/src", exact: true }).click();
@@ -1903,7 +1899,7 @@ test.describe("Search in large content", () => {
     });
 
     test("the Git commands panel searches its commands in search mode", async ({ page }) => {
-        await page.goto("/page/git-commands-panel?components=light");
+        await openPage(page, "/page/git-commands-panel", { components: "light" });
         const panel = page.locator("main section.mb-10").nth(2).getByRole("region", { name: "Git commands" });
         await expect(panel.getByRole("textbox", { name: "Search the commands" })).toHaveCount(0);
         await panel.getByRole("button", { name: "Search the commands" }).click();
@@ -1915,7 +1911,7 @@ test.describe("Search in large content", () => {
     });
 
     test("the working directory has a menu with copy items and one that opens it", async ({ page }) => {
-        await page.goto("/page/git-commands-panel?components=light");
+        await openPage(page, "/page/git-commands-panel", { components: "light" });
         const panel = page.locator("main section.mb-10").nth(1).getByRole("region", { name: "Git commands" });
         await panel.getByRole("button", { name: /^Path actions for/ }).click();
         const menu = page.getByRole("menu");
@@ -1925,7 +1921,7 @@ test.describe("Search in large content", () => {
     });
 
     test("overflowing tabs have a More button with a filtered list of every tab", async ({ page }) => {
-        await page.goto("/page/tabs?components=light");
+        await openPage(page, "/page/tabs", { components: "light" });
         const section = page.locator("section", { hasText: "More tabs than fit" }).first();
         await section.getByRole("button", { name: "All tabs" }).click();
         const dialog = page.getByRole("dialog", { name: "All tabs" });
@@ -1938,7 +1934,7 @@ test.describe("Search in large content", () => {
 
 test.describe("Split pages and the sidebar groups", () => {
     test("the sidebar lists app features and basic components under their headings", async ({ page }) => {
-        await page.goto("/page/overview?components=light");
+        await openPage(page, "/page/overview", { components: "light" });
         const pages = page.getByRole("list", { name: "Pages" });
         await expect(pages).toContainText("App features");
         await expect(pages).toContainText("Basic components");
@@ -1948,7 +1944,7 @@ test.describe("Split pages and the sidebar groups", () => {
     });
 
     test("the toolbar's configuration dropdown changes the toolbar straight away", async ({ page }) => {
-        await page.goto("/page/toolbar?components=light");
+        await openPage(page, "/page/toolbar", { components: "light" });
         const toolbar = page.getByRole("toolbar", { name: "Repository actions" });
         await toolbar.getByRole("button", { name: "Toolbar options" }).click();
         const dialog = page.getByRole("dialog", { name: "Toolbar options" });
@@ -1961,7 +1957,7 @@ test.describe("Split pages and the sidebar groups", () => {
 
 test.describe("Collapsible sidebar groups", () => {
     test("a group's heading closes and opens it", async ({ page }) => {
-        await page.goto("/page/overview?components=light");
+        await openPage(page, "/page/overview", { components: "light" });
         const pages = page.getByRole("list", { name: "Pages" });
         await pages.getByRole("button", { name: "Basic components" }).click();
         await expect(pages.getByRole("link", { name: "Checkbox", exact: true })).toHaveCount(0);
@@ -1970,3 +1966,4 @@ test.describe("Collapsible sidebar groups", () => {
         await expect(pages.getByRole("link", { name: "Checkbox", exact: true })).toHaveCount(1);
     });
 });
+

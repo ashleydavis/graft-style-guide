@@ -164,7 +164,8 @@ export function FileRow({ file, depth, guides = [], label, isSelected, isOpen, s
         >
             <TreeGuides guides={guides} />
             <FileIcon path={file.path} />
-            <span className="min-w-0 flex-1">{label}</span>
+            {/* The label cuts itself short with an ellipsis before the path menu beside it. */}
+            <span className="min-w-0 flex-1 truncate">{label}</span>
             <FilePathMenu path={file.path} />
             <StatusLetter status={file.status} />
             <LineCounts added={file.linesAdded} deleted={file.linesDeleted} />

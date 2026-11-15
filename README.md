@@ -2,6 +2,8 @@
 
 The visual style of Graft, the Git client: design tokens as CSS variables and the rules for using them. Every style has a light and a dark version.
 
+Live style explorer: https://ashleydavis.github.io/graft-style-guide/
+
 - `graft.css`: every colour, size, font, radius, shadow and timing value as a CSS variable, with light values on `:root` and dark values under `[data-theme="dark"]`.
 - `style-guide.md`: the design intent and the rules for which token to use when.
 - `areas/`: rules for one area of the app, such as the diff view, that take priority over `style-guide.md` there.

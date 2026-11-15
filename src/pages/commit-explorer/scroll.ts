@@ -48,3 +48,21 @@ export function scrollSelectionIntoView(element: HTMLElement | null): void {
         scrollIntoViewVertically(container, element);
     }
 }
+
+//
+// Scrolls `container`, a row of panes that scrolls sideways, the least distance that shows the
+// whole of `pane`, or its left end when the pane is wider than the row.
+//
+export function scrollPaneIntoView(container: HTMLElement, pane: HTMLElement): void {
+    const containerBox = container.getBoundingClientRect();
+    const paneBox = pane.getBoundingClientRect();
+    const overflowLeft = containerBox.left - paneBox.left;
+    const overflowRight = paneBox.right - containerBox.right;
+    const left = overflowLeft > 0 || paneBox.width > containerBox.width ? -overflowLeft : overflowRight > 0 ? overflowRight + 1 : 0;
+    if (left !== 0) {
+        container.scrollBy({
+            left,
+            behavior: "smooth",
+        });
+    }
+}

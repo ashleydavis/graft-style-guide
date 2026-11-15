@@ -1,6 +1,6 @@
 //
-// The about popup: what the style explorer is for, with links to Graft on GitHub and to the
-// YouTube channel where the series about building Graft is published.
+// The about popup: what the style explorer is for, with links to Graft and to this style guide
+// on GitHub and to the YouTube channel where the series about building Graft is published.
 //
 
 import type { ReactNode } from "react";
@@ -57,6 +57,12 @@ export function AboutDialog({ open, onClose }: IAboutDialogProps): ReactNode {
                     Graft on GitHub:{" "}
                     <Link href="https://github.com/ashleydavis/Graft" target="_blank" rel="noreferrer">
                         github.com/ashleydavis/Graft
+                    </Link>
+                </p>
+                <p>
+                    This style guide on GitHub:{" "}
+                    <Link href="https://github.com/ashleydavis/graft-style-guide" target="_blank" rel="noreferrer">
+                        github.com/ashleydavis/graft-style-guide
                     </Link>
                 </p>
                 <p>
