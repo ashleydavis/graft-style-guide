@@ -1301,6 +1301,7 @@ export function FileDiffCard({
                             lineIndexes={shown?.lineIndexes}
                             lineSelection={isSelectingLines ? { selected: selectedLines, onPick: pickLine, actionsLine: selectableIds.find(id => selectedLines.has(id)), actions: lineActions } : undefined}
                             hideHunkActions={isSelectingLines}
+                            isStagedLine={stageable ? id => section === "staged" || (section === undefined && stagedIds.has(id)) : undefined}
                             discardedHunks={discards ? (discards.isFile ? new Set(hunks.map((_hunk, index) => index)) : discards.hunks) : undefined}
                             discardedLines={discards?.lines}
                             search={search}

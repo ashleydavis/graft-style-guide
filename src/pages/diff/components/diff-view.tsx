@@ -102,6 +102,12 @@ export interface IDiffViewProps {
     discardedLines?: ReadonlySet<string>;
 
     //
+    // Returns true when the changed line `id`, "hunk:line", is staged, which a slight green bar at
+    // the line's left shows. Absent for a diff with no staging.
+    //
+    isStagedLine?: (id: string) => boolean;
+
+    //
     // For each hunk of `diff`, the position each of its lines has in that hunk's lines in the
     // whole file's diff, for a diff that shows one side of a change staged in part. Absent when
     // the lines are the whole file's.
@@ -298,6 +304,16 @@ function FloatingPanel({ side, top, transform, children }: { side: "left" | "rig
 // discarded hunk draws through its hunk instead.
 //
 export const DiscardedLineContext = createContext<(line: IDiffLine) => boolean>(() => false);
+
+//
+// Returns true for a changed line that is staged, which a slight green bar at its left marks.
+//
+export const StagedLineContext = createContext<(line: IDiffLine) => boolean>(() => false);
+
+//
+// The bar at the left of a staged line: a slight tinge of the success green.
+//
+const STAGED_BAR = "inset 3px 0 0 color-mix(in srgb, var(--color-success) 55%, transparent)";
 
 //
 // Holds the diff view's line selection for the lines it draws.
@@ -515,6 +531,7 @@ export function Marker({ line }: { line: IDiffLine }): ReactNode {
 export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: IDiffLine | undefined; wrap: boolean }): ReactNode {
     const pick = useLinePick(line);
     const isDiscarded = useContext(DiscardedLineContext)(line);
+    const isStaged = useContext(StagedLineContext)(line);
     return (
         <div
             role="row"
@@ -525,7 +542,7 @@ export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: 
             onMouseDown={pick?.onMouseDown}
             data-discarded={isDiscarded || undefined}
             className={["flex", isDiscarded ? "graft-discarded" : "", pick ? "graft-hoverable" : ""].join(" ").trim()}
-            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, ...pick?.padding }}
+            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, boxShadow: isStaged ? STAGED_BAR : undefined, ...pick?.padding }}
         >
             {pick?.border}
             {pick?.actions}
@@ -544,6 +561,7 @@ export function UnifiedRow({ line, partner, wrap }: { line: IDiffLine; partner: 
 export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | undefined; side: "old" | "new"; partner: IDiffLine | undefined; wrap: boolean }): ReactNode {
     const pick = useLinePick(line);
     const isDiscardedLine = useContext(DiscardedLineContext);
+    const isStagedLine = useContext(StagedLineContext);
     if (!line) {
         return <div className="min-w-0 flex-1" data-side={side} data-empty="true" style={{ background: EMPTY_SIDE }} />;
     }
@@ -557,7 +575,7 @@ export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | und
             data-picked={pick?.isPicked}
             onClick={pick?.onClick}
             onMouseDown={pick?.onMouseDown}
-            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, ...pick?.padding }}
+            style={{ position: pick ? "relative" : undefined, cursor: pick ? "pointer" : undefined, background: lineStyles[line.kind].background, boxShadow: isStagedLine(line) ? STAGED_BAR : undefined, ...pick?.padding }}
         >
             {pick?.border}
             {pick?.actions}
@@ -762,6 +780,7 @@ export function DiffView({
     hideHunkActions = false,
     discardedHunks,
     discardedLines,
+    isStagedLine,
 }: IDiffViewProps): ReactNode {
     const hunks = useMemo(() => parseHunks(diff), [diff]);
     const gapCount = hunks.length + 1;
@@ -860,6 +879,7 @@ export function DiffView({
         <DiffSearchContext.Provider value={{ needle: search.trim(), current: currentMatch, firstMatch }}>
         <LineSelectionContext.Provider value={lineSelection ? { ...lineSelection, idOf: line => lineIds.get(line), neighbours: line => pickedNeighbours(line, layout) } : undefined}>
         <DiscardedLineContext.Provider value={isLineOnlyDiscarded}>
+        <StagedLineContext.Provider value={line => line.kind !== "context" && isStagedLine !== undefined && lineIds.has(line) && isStagedLine(lineIds.get(line) ?? "")}>
         <div
             role="table"
             aria-label={layout === "unified" ? "Unified diff" : "Side-by-side diff"}
@@ -911,6 +931,7 @@ export function DiffView({
             })}
             {gapRows(hunks.length)}
         </div>
+        </StagedLineContext.Provider>
         </DiscardedLineContext.Provider>
         </LineSelectionContext.Provider>
         </DiffSearchContext.Provider>
