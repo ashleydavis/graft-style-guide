@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { Section } from "../../components/section";
 import { CommitExplorer } from "./components/commit-explorer";
 import { graftHistory } from "./data";
-import { longBranchHistory, releaseHistory } from "./histories";
+import { longBranchHistory, nestedFoldersHistory, releaseHistory } from "./histories";
 
 //
 // The commit and file the second and third examples open: the newest commit and its first file.
@@ -84,6 +84,22 @@ export function CommitExplorerPage(): ReactNode {
                         activePaneIndex: 1,
                         selectedHash: releaseHistory.commits[2].hash,
                         openHash: releaseHistory.commits[2].hash,
+                        selectedPath: undefined,
+                        openPath: undefined,
+                    }}
+                />
+            </Section>
+
+            <Section
+                title="Directories inside directories"
+                description="A commit whose files sit three and four directories deep beside files at the top of the repo. In the tree view, lines join each directory to the directories and files inside it, the chevron collapses or expands a directory and the focus button, shown on the hovered or selected directory, shows only that directory's files."
+            >
+                <CommitExplorer
+                    history={nestedFoldersHistory}
+                    initialState={{
+                        activePaneIndex: 1,
+                        selectedHash: nestedFoldersHistory.commits[0].hash,
+                        openHash: nestedFoldersHistory.commits[0].hash,
                         selectedPath: undefined,
                         openPath: undefined,
                     }}

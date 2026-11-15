@@ -431,3 +431,32 @@ export const longBranchHistory: IHistory = buildHistory("graft-settings", "main"
     { id: "open-repo", title: "Open a repo from the File menu", author: ash, date: "2026-10-19T12:00:00Z", parents: ["initial"], files: [addLine("backend/src/lib/actions.zig", 28, ".name = \"open-repo\",", "    .shortcut = \"CmdOrCtrl+O\",")] },
     { id: "initial", title: "Initial commit", author: ash, date: "2026-10-18T09:00:00Z", refs: ["tag: v0.1.0"], parents: [], files: [change("README.md", "A", 1, ["+# Graft", "+", "+A desktop Git client with a simple, intuitive UI."])] },
 ]);
+
+//
+// A settings feature whose files sit three and four folders deep beside files at the top of the
+// repo, so the commit's file list shows folders inside folders in the tree view.
+//
+export const nestedFoldersHistory: IHistory = buildHistory("graft-nested", "main", [
+    {
+        id: "settings",
+        title: "Add the settings page",
+        author: sam,
+        date: "2026-11-02T15:00:00Z",
+        refs: ["HEAD -> main"],
+        parents: ["initial"],
+        files: [
+            change("backend/src/lib/config/read.zig", "A", 1, ["+pub fn read(path: []const u8) !Config {", "+    return toml.parse(Config, path);", "+}"]),
+            change("backend/src/lib/config/write.zig", "A", 1, ["+pub fn write(path: []const u8, config: Config) !void {", "+    try toml.write(path, config);", "+}"]),
+            change("backend/src/tasks/settings-task.zig", "A", 1, ["+pub fn run(args: Args) !Result {", "+    return .{ .config = try config.read(args.path) };", "+}"]),
+            change("frontend/src/components/settings/font-size-field.tsx", "A", 1, ["+export function FontSizeField(): JSX.Element {", "+    return <TextField type=\"number\" />;", "+}"]),
+            change("frontend/src/components/settings/theme-menu.tsx", "A", 1, ["+export function ThemeMenu(): JSX.Element {", "+    return <Menu />;", "+}"]),
+            addLine("frontend/src/lib/settings.ts", 3, "export const defaultSettings = {", "    fontSize: 14,"),
+            change("frontend/src/pages/settings/index.tsx", "A", 1, ["+export function SettingsPage(): JSX.Element {", "+    return <SettingsForm />;", "+}"]),
+            change("frontend/src/pages/settings/sections/appearance.tsx", "A", 1, ["+export function Appearance(): JSX.Element {", "+    return <ThemeMenu />;", "+}"]),
+            change("frontend/src/pages/settings/sections/editor.tsx", "A", 1, ["+export function Editor(): JSX.Element {", "+    return <FontSizeField />;", "+}"]),
+            change("docs/user-guide/settings.md", "A", 1, ["+# Settings", "+", "+Graft keeps its settings in config.toml."]),
+            addLine("CHANGELOG.md", 1, "## Unreleased", "- A settings page."),
+        ],
+    },
+    { id: "initial", title: "Initial commit", author: ash, date: "2026-11-01T09:00:00Z", parents: [], files: [change("README.md", "A", 1, ["+# Graft"])] },
+]);

@@ -24,7 +24,7 @@ import { FilePathMenu } from "../../../components/file-path-menu";
 import { StatusLetter } from "../../tree";
 import type { IChangedFile, ICommit } from "../data";
 import { treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../file-views";
-import { FolderToggle, TreeGuides } from "../../../components/tree-guides";
+import { DIRECTORY_KEYS, FolderToggle, TreeGuides } from "../../../components/tree-guides";
 import { FilePath } from "./file-path";
 import { LineCounts } from "./line-counts";
 import { Pane } from "./pane";
@@ -49,7 +49,7 @@ export function longDate(date: Date): string {
 //
 const fileViews: { value: FileListView; label: string; icon: IconDefinition }[] = [
     { value: "paths", label: "Full paths", icon: faList },
-    { value: "columns", label: "File name and folder", icon: faTableColumns },
+    { value: "columns", label: "File name and directory", icon: faTableColumns },
     { value: "tree", label: "Tree", icon: faFolderTree },
 ];
 
@@ -379,8 +379,8 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                                 className="flex items-center"
                                 style={{ gap: "var(--space-2)", padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border)" }}
                             >
-                                <Tooltip title={<Tip title="Back to the folder above" detail="Key: Escape" />}>
-                                    <IconButton size="small" aria-label="Back to the folder above" onClick={onDrillOut}>
+                                <Tooltip title={<Tip title="Back to the directory above" detail={`Key: ${DIRECTORY_KEYS.up.toUpperCase()} or Escape`} />}>
+                                    <IconButton size="small" aria-label="Back to the directory above" onClick={onDrillOut}>
                                         <FontAwesomeIcon icon={faArrowLeft} />
                                     </IconButton>
                                 </Tooltip>
@@ -396,7 +396,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                             <ListItemButton
                                 key={`folder-${row.path}`}
                                 component="li"
-                                aria-label={`Folder ${row.path}`}
+                                aria-label={`Directory ${row.path}`}
                                 ref={selectedPath === `${FOLDER_PREFIX}${row.path}` ? selectedRef : undefined}
                                 selected={selectedPath === `${FOLDER_PREFIX}${row.path}`}
                                 onClick={() => onSelectFile(`${FOLDER_PREFIX}${row.path}`)}
@@ -407,6 +407,8 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                                     color: "var(--color-text-muted)",
                                     "& .file-path-menu": { opacity: 0 },
                                     "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
+                                    "& .folder-open": { display: "none" },
+                                    "&:hover .folder-open, &.Mui-selected .folder-open, &:focus-within .folder-open": { display: "inline-flex" },
                                 }}
                             >
                                 <TreeGuides guides={guides} />
@@ -414,10 +416,10 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                                 <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: "var(--icon-sm)", flex: "none" }} />
                                 <span className="min-w-0 flex-1 truncate">{row.name}</span>
                                 <span className="folder-open">
-                                    <Tooltip title={<Tip title="Show only this folder" detail="Key: Enter, or a double click. Escape goes back." />}>
+                                    <Tooltip title={<Tip title="Focus on this directory" detail={`Key: ${DIRECTORY_KEYS.focus.toUpperCase()}, Enter or a double click. ${DIRECTORY_KEYS.up.toUpperCase()} goes back up.`} />}>
                                         <IconButton
                                             size="small"
-                                            aria-label={`Show only ${row.path}`}
+                                            aria-label={`Focus on ${row.path}`}
                                             onClick={event => {
                                                 event.stopPropagation();
                                                 onDrillIn(row.path);

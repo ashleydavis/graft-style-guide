@@ -5,20 +5,21 @@
 //
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { diffStops, stopAfterMove, type DiffStop } from "../../diff/stops";
+import { diffStops, stackStopAfterMove, stackStops, stopAfterMove, type DiffStop, type IStackStop } from "../../diff/stops";
 import { exampleOldFile } from "../../diff/example-old-file";
-import type { IFileDiffCardHandle } from "../../diff/components/file-diff-card";
+import { FOLD_DIFF_KEY, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCodeBranch } from "@fortawesome/free-solid-svg-icons";
 import { KeyCaps } from "../../../components/shortcut";
 import { changedFile, commitByHash, graftHistory, type ICommit, type IHistory } from "../data";
 import { closeCommitDetailsPane, closeFilePane, COMMIT_SUMMARY_PATH, explorerKeys, FOLDER_PREFIX, initialExplorerState, selectCommit, selectFile, stateAfterKey, type IExplorerState } from "../explorer-state";
-import { filePathsInViewOrder, parentFolder, rowPathsInViewOrder, type FileListView } from "../file-views";
+import { filePathsInViewOrder, isUnder, parentFolder, rowPathsInViewOrder, type FileListView } from "../file-views";
 import { scrollLastChildIntoView, scrollSelectionIntoView } from "../scroll";
 import { parseHunks } from "../../diff/model";
 import { CommitDetailsPane, CommitInfoPane } from "./commit-details-pane";
 import { CommitPane } from "./commit-pane";
-import { FilePane } from "./file-pane";
+import { DirectoryPane, FilePane } from "./file-pane";
+import { directoryKeyAction } from "../../../components/tree-guides";
 import { ResizeHandle } from "./resize-handle";
 import { COLLAPSE_KEY } from "../../../components/collapse";
 import { withViewTransition } from "../../../lib/view-transition";
@@ -36,9 +37,13 @@ const DETAILS_PANE_WIDTH = 380;
 const keyHints = [
     { keys: ["↑", "↓"], action: "Move, or change to change in a diff" },
     { keys: ["Shift", "↑", "↓"], action: "File to file in a diff" },
+    { keys: ["Ctrl", "↑", "↓"], action: "File to file in a directory's diffs" },
+    { keys: [FOLD_DIFF_KEY], action: "Fold away or show the diff, or expand or collapse the directory" },
     { keys: ["←", "→"], action: "Switch pane" },
     { keys: ["Enter"], action: "Open" },
     { keys: ["Esc"], action: "Close" },
+    { keys: ["F"], action: "Focus on the directory" },
+    { keys: ["U"], action: "Up to the directory above" },
     { keys: ["M"], action: "Maximise or restore the pane" },
     { keys: [COLLAPSE_KEY], action: "Collapse or restore the pane" },
 ];
@@ -163,7 +168,23 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     const currentHunk = currentStop?.kind === "hunk" ? currentStop.hunk : undefined;
     const currentGap = currentStop?.kind === "gap" ? currentStop.gap : undefined;
     const fileCardRef = useRef<IFileDiffCardHandle>(null);
-    const openPaneCount = openFile || (openCommit && isCommitOpen) ? 3 : openCommit ? 2 : 1;
+    const openFolder = openCommit && isFolderOpen ? (state.openPath as string).slice(FOLDER_PREFIX.length) : undefined;
+    const openFolderFiles =
+        openCommit && openFolder !== undefined
+            ? filePathsInViewOrder(openCommit.files.filter(file => isUnder(file.path, openFolder)), fileView, openFolder).map(path => changedFile(history, openCommit.hash, path))
+            : [];
+
+    //
+    // The stop the keys are on in the open directory's stacked diffs, and the stops they step
+    // through. A different directory starts with no stop.
+    //
+    const [stackStop, setStackStop] = useState<IStackStop | undefined>(undefined);
+    const stackCardRefs = useRef(new Map<string, IFileDiffCardHandle | null>());
+    const directoryStops = stackStops(openFolderFiles.map(file => ({ path: file.path, diff: file.diff, oldFileLines: exampleOldFile(file.path, file.status, file.diff) })));
+    useEffect(() => {
+        setStackStop(undefined);
+    }, [openFolder]);
+    const openPaneCount = openFile || (openCommit && (isCommitOpen || openFolder !== undefined)) ? 3 : openCommit ? 2 : 1;
     const maximisedPane = maximised !== undefined && maximised < openPaneCount ? maximised : undefined;
 
     //
@@ -261,6 +282,45 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     }
 
     function onKeyDown(event: KeyboardEvent): void {
+        if (state.activePaneIndex === 2 && openFolder !== undefined && !event.altKey && !event.metaKey && !event.shiftKey && !isOwnKeyTarget(event.target, event.key)) {
+            //
+            // In a directory's stacked diffs, Up and Down step through every file's hunks and runs
+            // of unchanged lines, Ctrl with Up or Down jumps from file to file, and Space opens or
+            // folds the run the keys are on.
+            //
+            if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+                event.preventDefault();
+                event.stopPropagation();
+                setStackStop(current => stackStopAfterMove(directoryStops, current, event.key === "ArrowUp" ? -1 : 1, event.ctrlKey));
+                return;
+            }
+            if (event.key === " " && !event.ctrlKey && stackStop?.stop?.kind === "gap") {
+                event.preventDefault();
+                event.stopPropagation();
+                stackCardRefs.current.get(stackStop.path)?.toggleGap(stackStop.stop.gap);
+                return;
+            }
+        }
+        if (state.activePaneIndex === 1 && event.key === "ArrowRight" && openFolder !== undefined && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
+            setStackStop(stackStopAfterMove(directoryStops, undefined, 1, false));
+        }
+        if (state.activePaneIndex === 2 && event.key.toUpperCase() === FOLD_DIFF_KEY && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
+            //
+            // Folds away or shows the diff the keys are on: the current file of a directory's
+            // stacked diffs, or the open file's diff.
+            //
+            event.preventDefault();
+            event.stopPropagation();
+            if (openFolder !== undefined) {
+                if (stackStop) {
+                    stackCardRefs.current.get(stackStop.path)?.toggleOpen();
+                }
+            }
+            else {
+                fileCardRef.current?.toggleOpen();
+            }
+            return;
+        }
         if ((event.key === "m" || event.key === "M") && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
             event.preventDefault();
             event.stopPropagation();
@@ -285,23 +345,26 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             return;
         }
         if (state.activePaneIndex === 1 && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
+            const directory = state.selectedPath?.startsWith(FOLDER_PREFIX) ? state.selectedPath.slice(FOLDER_PREFIX.length) : undefined;
+            const directoryAction = fileView === "tree" ? directoryKeyAction(event) : undefined;
+            if (directoryAction) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (directoryAction === "up") {
+                    drillOut();
+                }
+                else if (directory !== undefined && directoryAction === "focus") {
+                    drillInto(directory);
+                }
+                else if (directory !== undefined && directoryAction === "toggle") {
+                    toggleCollapsedFolder(directory);
+                }
+                return;
+            }
             if (event.key === "Enter" && state.selectedPath?.startsWith(FOLDER_PREFIX)) {
                 event.preventDefault();
                 event.stopPropagation();
                 drillInto(state.selectedPath.slice(FOLDER_PREFIX.length));
-                return;
-            }
-            const folder = state.selectedPath?.startsWith(FOLDER_PREFIX) ? state.selectedPath.slice(FOLDER_PREFIX.length) : undefined;
-            if (folder !== undefined && event.key === "ArrowLeft" && !collapsedFolders.has(folder)) {
-                event.preventDefault();
-                event.stopPropagation();
-                toggleCollapsedFolder(folder, true);
-                return;
-            }
-            if (folder !== undefined && event.key === "ArrowRight" && collapsedFolders.has(folder)) {
-                event.preventDefault();
-                event.stopPropagation();
-                toggleCollapsedFolder(folder, false);
                 return;
             }
             if (event.key === "Escape" && shownRoot !== "") {
@@ -467,6 +530,27 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                             setCurrentStop({ kind: "gap", gap });
                             setState(current => ({ ...current, activePaneIndex: 2 }));
                         }}
+                        onClose={() => setState(closeFilePane)}
+                    />
+                ) : undefined}
+                {openCommit && openFolder !== undefined && shows(2) ? (
+                    <DirectoryPane
+                        key={openFolder}
+                        path={openFolder}
+                        files={openFolderFiles}
+                        currentStop={stackStop}
+                        cardRef={path => handle => {
+                            stackCardRefs.current.set(path, handle);
+                        }}
+                        onSelectStop={stop => {
+                            setStackStop(stop);
+                            setState(current => ({ ...current, activePaneIndex: 2 }));
+                        }}
+                        isActive={state.activePaneIndex === 2}
+                        isMaximised={maximisedPane === 2}
+                        onToggleMaximise={() => toggleMaximise(2)}
+                        isCollapsed={collapsed.has(2)}
+                        onToggleCollapse={() => toggleCollapse(2)}
                         onClose={() => setState(closeFilePane)}
                     />
                 ) : undefined}

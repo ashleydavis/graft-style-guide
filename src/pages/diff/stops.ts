@@ -65,3 +65,62 @@ export function stopAfterMove(stops: DiffStop[], current: DiffStop | undefined, 
     }
     return stops[Math.min(Math.max(index + step, 0), stops.length - 1)];
 }
+
+//
+// One stop in a stack of diff cards, a selected directory's files shown one under another: the
+// file's path and the stop in its diff, or undefined for a file with no stops, such as a binary
+// file, which the keys still land on.
+//
+export interface IStackStop {
+    //
+    // The path of the file the stop is in.
+    //
+    path: string;
+
+    //
+    // The hunk or run of unchanged lines, or undefined for a file with none.
+    //
+    stop: DiffStop | undefined;
+}
+
+//
+// Returns the name of the stacked card for the file at `path`, which its runs of unchanged lines
+// carry as their card.
+//
+export function stackCardName(path: string): string {
+    return `stack:${path}`;
+}
+
+//
+// Returns the stops of a stack of diff cards in the order Up and Down step through them: each
+// file's hunks and runs of unchanged lines, file after file, and one stop for a file with none.
+//
+export function stackStops(files: { path: string; diff?: string; oldFileLines?: string[] }[]): IStackStop[] {
+    return files.flatMap((file): IStackStop[] => {
+        const stops = file.diff ? diffStops(file.diff, file.oldFileLines, undefined, stackCardName(file.path)) : [];
+        return stops.length > 0 ? stops.map(stop => ({ path: file.path, stop })) : [{ path: file.path, stop: undefined }];
+    });
+}
+
+//
+// Returns the stop `step` stops from `current` in a stack, crossing from one file into the next
+// at its ends, or with `isByFile` the first stop of the file `step` files away. Both stay on the
+// first or last at the ends of the stack. With no stop current, a step forward goes to the first
+// stop and a step back to the last.
+//
+export function stackStopAfterMove(stops: IStackStop[], current: IStackStop | undefined, step: number, isByFile: boolean): IStackStop | undefined {
+    if (stops.length === 0) {
+        return undefined;
+    }
+    if (isByFile) {
+        const paths = [...new Set(stops.map(stop => stop.path))];
+        const index = current === undefined ? -1 : paths.indexOf(current.path);
+        const path = index < 0 ? (step > 0 ? paths[0] : paths[paths.length - 1]) : paths[Math.min(Math.max(index + step, 0), paths.length - 1)];
+        return stops.find(stop => stop.path === path);
+    }
+    const index = current === undefined ? -1 : stops.findIndex(stop => stop.path === current.path && isSameStop(stop.stop, current.stop));
+    if (index < 0) {
+        return step > 0 ? stops[0] : stops[stops.length - 1];
+    }
+    return stops[Math.min(Math.max(index + step, 0), stops.length - 1)];
+}

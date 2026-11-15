@@ -344,7 +344,7 @@ export function DiffOptions({ layout, onLayout, wrap, onWrap, showAllLines, onSh
                                 sx={groupStyle}
                             >
                                 <Tooltip title="Only the changes">
-                                    <ToggleButton value="changes" aria-label="Show only the changes">
+                                    <ToggleButton value="changes" aria-label="Focus on the changes">
                                         <FontAwesomeIcon icon={faCompress} />
                                     </ToggleButton>
                                 </Tooltip>
@@ -454,7 +454,7 @@ export function StageButton({
             title={
                 <Tip
                     title={label}
-                    detail={isStaged ? `Takes the ${what}'s changes out of the next commit. They stay in the working tree.` : `Adds the ${what}'s changes for the next commit.`}
+                    detail={isStaged ? `Takes the ${what}'s changes out of the next commit. They stay in the working tree. Key: Space` : `Adds the ${what}'s changes for the next commit. Key: Space`}
                 />
             }
         >
@@ -576,7 +576,17 @@ export interface IFileDiffCardHandle {
     // discarded, and returns true. Returns false when no changed line is picked.
     //
     discardPicked: () => boolean;
+
+    //
+    // Folds the diff away under its header when it shows, and shows it when it is folded.
+    //
+    toggleOpen: () => void;
 }
+
+//
+// The key that folds away or shows the diff the keys are on.
+//
+export const FOLD_DIFF_KEY = "E";
 
 //
 // What a file diff card shows and how.
@@ -822,7 +832,7 @@ export function FileDiffCard({
         return true;
     }
 
-    useImperativeHandle(ref, () => ({ toggleGap, handleOptionKey, handleLineKey, discardPicked }));
+    useImperativeHandle(ref, () => ({ toggleGap, handleOptionKey, handleLineKey, discardPicked, toggleOpen: () => setIsOpen(current => !current) }));
     const id = useId();
     const [search, setSearch] = useState("");
     const [currentMatch, setCurrentMatch] = useState(0);
@@ -1199,7 +1209,7 @@ export function FileDiffCard({
                     borderBottom: isOpen ? "1px solid var(--color-border)" : "none",
                 }}
             >
-                <Tooltip title={isOpen ? "Fold the diff away" : "Show the diff"}>
+                <Tooltip title={<Tip title={isOpen ? "Fold the diff away" : "Show the diff"} detail={`Key: ${FOLD_DIFF_KEY}`} />}>
                     <IconButton size="small" aria-label={isOpen ? "Fold the diff away" : "Show the diff"} aria-expanded={isOpen} onClick={() => setIsOpen(!isOpen)}>
                         <FontAwesomeIcon icon={isOpen ? faChevronDown : faChevronRight} />
                     </IconButton>

@@ -312,7 +312,7 @@ export function TreePage(): ReactNode {
 
             <Section
                 title="Tree"
-                description="Changed files by folder. Click a folder to open or close it. Each file shows its status letter: modified in the warning colour, added in the success colour and deleted in the danger colour, struck through."
+                description="Changed files by directory. Click a directory to open or close it. Each file shows its status letter: modified in the warning colour, added in the success colour and deleted in the danger colour, struck through."
             >
                 <FileTree />
             </Section>

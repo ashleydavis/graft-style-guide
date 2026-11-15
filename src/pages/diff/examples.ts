@@ -171,3 +171,28 @@ const commitFileList: IFileDiff[] = [
 // The commit's files, each with its old file built so its unchanged lines can show.
 //
 export const commitFiles: IFileDiff[] = commitFileList.map(file => (file.diff && !file.oldFileLines ? { ...file, oldFileLines: exampleOldFile(file.path, file.status, file.diff) } : file));
+
+//
+// Returns a file that adds `count` lines to the file at `path`, for an example with many files.
+//
+function addedFile(path: string, ...lines: string[]): IFileDiff {
+    return { path, status: "A", diff: [`@@ -0,0 +1,${lines.length} @@`, ...lines.map(line => `+${line}`)].join("\n") };
+}
+
+//
+// The changes of a settings feature spread over folders inside folders, three and four levels deep,
+// beside files at the top of the repo, so the tree view shows folders nested in folders.
+//
+export const nestedFolderFiles: IFileDiff[] = [
+    addedFile("backend/src/lib/config/read.zig", "pub fn read(path: []const u8) !Config {", "    return toml.parse(Config, path);", "}"),
+    addedFile("backend/src/lib/config/write.zig", "pub fn write(path: []const u8, config: Config) !void {", "    try toml.write(path, config);", "}"),
+    addedFile("backend/src/tasks/settings-task.zig", "pub fn run(args: Args) !Result {", "    return .{ .config = try config.read(args.path) };", "}"),
+    addedFile("frontend/src/components/settings/font-size-field.tsx", "export function FontSizeField(): JSX.Element {", "    return <TextField type=\"number\" />;", "}"),
+    addedFile("frontend/src/components/settings/theme-menu.tsx", "export function ThemeMenu(): JSX.Element {", "    return <Menu />;", "}"),
+    addedFile("frontend/src/lib/settings.ts", "export const defaultSettings = { theme: \"system\", fontSize: 14 };"),
+    addedFile("frontend/src/pages/settings/index.tsx", "export function SettingsPage(): JSX.Element {", "    return <SettingsForm />;", "}"),
+    addedFile("frontend/src/pages/settings/sections/appearance.tsx", "export function Appearance(): JSX.Element {", "    return <ThemeMenu />;", "}"),
+    addedFile("frontend/src/pages/settings/sections/editor.tsx", "export function Editor(): JSX.Element {", "    return <FontSizeField />;", "}"),
+    addedFile("docs/user-guide/settings.md", "# Settings", "", "Graft keeps its settings in config.toml."),
+    addedFile("CHANGELOG.md", "## Unreleased", "", "- A settings page."),
+];

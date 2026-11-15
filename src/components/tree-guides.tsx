@@ -44,12 +44,31 @@ export function TreeGuides({ guides }: { guides: TreeGuide[] }): ReactNode {
 }
 
 //
+// The keys for a directory in a tree of files while the file list has the keys: E expands or
+// collapses the selected directory, F focuses the list on it and U goes back up to the directory
+// above.
+//
+export const DIRECTORY_KEYS = { toggle: "e", focus: "f", up: "u" };
+
+//
+// Returns the directory action `key` asks for, or undefined when it names none. A key with Ctrl,
+// Alt or Meta held names none.
+//
+export function directoryKeyAction(event: { key: string; ctrlKey: boolean; altKey: boolean; metaKey: boolean; shiftKey: boolean }): keyof typeof DIRECTORY_KEYS | undefined {
+    if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+        return undefined;
+    }
+    const lower = event.key.toLowerCase();
+    return (Object.keys(DIRECTORY_KEYS) as (keyof typeof DIRECTORY_KEYS)[]).find(action => DIRECTORY_KEYS[action] === lower);
+}
+
+//
 // Renders the button at the start of a folder's row that collapses the folder, hiding the rows
 // inside it, or expands it again: a chevron pointing down while open and right while collapsed.
 //
 export function FolderToggle({ path, isCollapsed, onToggle }: { path: string; isCollapsed: boolean; onToggle: () => void }): ReactNode {
     return (
-        <Tooltip title={<Tip title={isCollapsed ? "Expand the folder" : "Collapse the folder"} detail={isCollapsed ? "Key: Right" : "Key: Left"} />}>
+        <Tooltip title={<Tip title={isCollapsed ? "Expand the directory" : "Collapse the directory"} detail={`Key: ${DIRECTORY_KEYS.toggle.toUpperCase()}`} />}>
             <IconButton
                 size="small"
                 aria-label={isCollapsed ? `Expand ${path}` : `Collapse ${path}`}

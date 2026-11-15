@@ -24,6 +24,7 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 ## Text
 
 - Don't use uppercase for titles. Use proper case, eg "STAGED" => "Staged". For multi word titles only capitalize the first character of the first word.
+- No to "Folder". Yes to "Directory".
 
 ## Toolbars
 

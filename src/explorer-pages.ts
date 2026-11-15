@@ -163,7 +163,7 @@ export const explorerPages: IExplorerPage[] = [
     {
         id: "list-and-tree",
         title: "List and tree",
-        keywords: ["file tree", "folders", "rows", "branches"],
+        keywords: ["file tree", "directories", "rows", "branches"],
         component: TreePage,
     },
     {

@@ -87,7 +87,7 @@ export function openPaneCount(state: IExplorerState): number {
     if (state.openHash === undefined) {
         return 1;
     }
-    if (state.openPath === undefined || state.openPath.startsWith(FOLDER_PREFIX)) {
+    if (state.openPath === undefined) {
         return 2;
     }
     return 3;

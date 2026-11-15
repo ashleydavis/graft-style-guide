@@ -31,7 +31,7 @@ export function GitCommandsPanelPage(): ReactNode {
                 <PanelFrame commands={[]} />
             </Section>
 
-            <Section title="One command" description="The commit list, read by one git log. The folder the command runs in sits above it, with a button that copies the cd into it.">
+            <Section title="One command" description="The commit list, read by one git log. The directory the command runs in sits above it, with a button that copies the cd into it.">
                 <PanelFrame commands={["git log --max-count=50"]} />
             </Section>
 

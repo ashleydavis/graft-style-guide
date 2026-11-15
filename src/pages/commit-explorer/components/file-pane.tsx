@@ -4,11 +4,13 @@
 // and the Diff page draw a diff the same way.
 //
 
-import type { ReactNode, Ref } from "react";
+import { useEffect, useRef, type ReactNode, type Ref } from "react";
+import { stackCardName, type IStackStop } from "../../diff/stops";
 import { exampleOldFile } from "../../diff/example-old-file";
 import { FileDiffCard, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import type { IChangedFile } from "../data";
 import { CollapsedRail } from "../../../components/collapse";
+import { Pane } from "./pane";
 
 //
 // What the file pane shows and reports.
@@ -105,6 +107,129 @@ export function FilePane({ file, isActive, currentHunk, currentGap, cardRef, isM
                 onCollapse={onToggleCollapse}
                 onClose={onClose}
             />
+        </div>
+    );
+}
+
+//
+// What the directory pane shows.
+//
+export interface IDirectoryPaneProps {
+    //
+    // The directory's path.
+    //
+    path: string;
+
+    //
+    // The commit's changed files inside the directory, in the order the file list shows them.
+    //
+    files: IChangedFile[];
+
+    //
+    // True while the pane is the one the keys act on.
+    //
+    isActive: boolean;
+
+    //
+    // True while the pane fills the explorer.
+    //
+    isMaximised: boolean;
+
+    //
+    // Called by the maximise button.
+    //
+    onToggleMaximise: () => void;
+
+    //
+    // True while the pane is folded into a strip.
+    //
+    isCollapsed: boolean;
+
+    //
+    // Called by the collapse button and the strip's restore button.
+    //
+    onToggleCollapse: () => void;
+
+    //
+    // Called by the close button.
+    //
+    onClose: () => void;
+
+    //
+    // The stop the keys are on, in one of the files.
+    //
+    currentStop: IStackStop | undefined;
+
+    //
+    // Returns the ref that holds the card of the file at a path, so the explorer can open or fold
+    // a run of unchanged lines in it.
+    //
+    cardRef: (path: string) => Ref<IFileDiffCardHandle>;
+
+    //
+    // Called with the stop a click on a hunk or a run of unchanged lines lands on.
+    //
+    onSelectStop: (stop: IStackStop) => void;
+}
+
+//
+// Renders the diffs of every file in a selected directory stacked in one scrolling pane, each card
+// with its own button that collapses or expands it. A commit is history, so the cards have no
+// Stage or Unstage buttons.
+//
+export function DirectoryPane({ path, files, isActive, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, onClose, currentStop, cardRef, onSelectStop }: IDirectoryPaneProps): ReactNode {
+    const stackRef = useRef<HTMLDivElement>(null);
+
+    //
+    // Keeps the current stop in view as the keys move it.
+    //
+    useEffect(() => {
+        if (!currentStop) {
+            return;
+        }
+        const card = [...(stackRef.current?.querySelectorAll<HTMLElement>("[data-stack-path]") ?? [])].find(element => element.dataset.stackPath === currentStop.path);
+        const selector = currentStop.stop?.kind === "hunk" ? `[data-hunk-index="${currentStop.stop.hunk}"]` : currentStop.stop?.kind === "gap" ? `[data-gap-index="${currentStop.stop.gap}"]` : undefined;
+        const target = (selector ? card?.querySelector<HTMLElement>(selector) : undefined) ?? card;
+        target?.scrollIntoView({ block: "nearest" });
+    }, [currentStop]);
+    return (
+        <div style={isCollapsed ? { flex: "none", height: "100%" } : { flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
+            <Pane
+                label="Directory diffs"
+                width="100%"
+                fillsHeight
+                isActive={isActive}
+                isMaximised={isMaximised}
+                onToggleMaximise={onToggleMaximise}
+                isCollapsed={isCollapsed}
+                onToggleCollapse={onToggleCollapse}
+                railTitle={path}
+                title={path}
+                onClose={onClose}
+            >
+                <div ref={stackRef} className="flex flex-col" style={{ gap: "var(--space-3)", padding: "var(--space-3)" }}>
+                    {files.map(file => (
+                        //
+                        // Each card keeps its full height, so the pane scrolls through them.
+                        //
+                        <div key={file.path} className="flex-none" data-stack-path={file.path}>
+                        <FileDiffCard
+                            file={{ path: file.path, status: file.status, diff: file.diff, oldFileLines: exampleOldFile(file.path, file.status, file.diff) }}
+                            label={`File diff ${file.path}`}
+                            initialWrap
+                            stageable={false}
+                            answersKeys={false}
+                            ref={cardRef(file.path)}
+                            isCurrent={isActive && currentStop?.path === file.path}
+                            currentHunk={currentStop?.path === file.path && currentStop.stop?.kind === "hunk" ? currentStop.stop.hunk : undefined}
+                            currentGap={currentStop?.path === file.path && currentStop.stop?.kind === "gap" ? currentStop.stop.gap : undefined}
+                            onSelectHunk={hunk => onSelectStop({ path: file.path, stop: { kind: "hunk", hunk } })}
+                            onSelectGap={gap => onSelectStop({ path: file.path, stop: { kind: "gap", gap, card: stackCardName(file.path) } })}
+                        />
+                        </div>
+                    ))}
+                </div>
+            </Pane>
         </div>
     );
 }
