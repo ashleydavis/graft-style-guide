@@ -14,7 +14,11 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 - A dangerous button's tooltip says what it does, how to undo it and its key.
 - Discarding takes effect straight away and asks nothing. The discarded file, hunk or lines play a short animation, stay in view faded and struck through, and their Discard button turns into an Undo button that brings them back.
 - Discard has a key, Delete, that acts on what is selected: the file in the file list, and in the diff the selected lines, else the current hunk, else the file. Pressing it on a discarded part brings it back.
-- A dangerous button sits before the safe action beside it, such as Discard before Stage, so the safe action keeps the end of the row.
+
+## Placing actions
+
+- Stage/unstage and non-destructive tools stick to the left. Destructive tools stick to the right.
+- In a row, a header or over a hunk or picked lines, the stage button sits at the left end and Discard, or Undo once discarded, at the right end, so the width of the row lies between them.
 
 ## Spacing around controls
 

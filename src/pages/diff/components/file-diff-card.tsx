@@ -28,7 +28,7 @@ import { statusColour } from "../../tree";
 import { gapBefore, parseHunks, sectionDiff } from "../model";
 import { emptyStaging, hunkStagedState, initialStaging, isFileStaged, stagedLinesOf, withFileToggled, withHunkStaged, withLinesStaged, type IStaging } from "../staging";
 import { scrollSelectionIntoView } from "../../commit-explorer/scroll";
-import { DiffView, type DiffLayout, type LinePick } from "./diff-view";
+import { DiffView, type DiffLayout, type ISidedActions, type LinePick } from "./diff-view";
 import { isHunkDiscarded, isLineDiscarded, withFileDiscarded, withHunkMarked, withLinesMarked, type IDiscards } from "../discards";
 import { ImageDiff, type IImageVersion } from "./image-diff";
 
@@ -650,11 +650,11 @@ function isOwnKeyTarget(target: EventTarget): boolean {
 }
 
 //
-// Renders the card. The header holds a button that folds the diff away and back, the status
-// letter, the path (the old path, an arrow and the new path for a renamed file) with its menu of
-// ways to copy the path or open the file, the line counts, the diff options button and, at the far
-// right for a stageable change, a button that stages or unstages the whole file, then a close
-// button when the card can close. The options keys work while the keys are on the card. In the
+// Renders the card. The header holds a button that folds the diff away and back, then for a
+// stageable change the button that stages or unstages the whole file, the path (the old path, an
+// arrow and the new path for a renamed file) with its menu of ways to copy the path or open the
+// file, the change details and diff options buttons, the collapse, maximise and close buttons
+// where the card has them, and Discard at the far right. The options keys work while the keys are on the card. In the
 // line selection mode lines are picked as hunks are: a click picks a line, Shift a run and Ctrl or
 // Cmd adds a line, Up and Down move the pick, and a bar above the diff stages, unstages or discards
 // the picked lines. Each hunk of a stageable change has its own Stage or Unstage button at its top right. A
@@ -1044,7 +1044,8 @@ export function FileDiffCard({
     const pickedName = selectedLines.size === 1 ? "line" : "selection";
 
     //
-    // The picked lines' buttons: Discard, then Stage, or Unstage when every picked line is staged.
+    // The picked lines' buttons: the stage button at the left, a minus when every picked line is
+    // staged, and Discard, or Undo once they are discarded, at the right.
     //
     const pickedChangedIds = [...selectedLines].filter(id => changedIds.has(id));
     const arePickedDiscarded = discards !== undefined && pickedChangedIds.length > 0 && pickedChangedIds.every(id => isLineDiscarded(discards, id));
@@ -1061,13 +1062,13 @@ export function FileDiffCard({
         return true;
     }
 
-    const lineActions =
-        selectedChangedCount > 0 ? (
-            <>
-                {canDiscard ? arePickedDiscarded ? <UndoButton what={pickedName} onClick={discardPicked} /> : <DiscardButton what={pickedName} onClick={discardPicked} /> : undefined}
-                {stageable && !arePickedDiscarded ? <StageButton isStaged={selectedUnstagedCount === 0} what={pickedName} onClick={() => stageSelectedLines(selectedUnstagedCount > 0)} /> : undefined}
-            </>
-        ) : undefined;
+    const lineActions: ISidedActions =
+        selectedChangedCount > 0
+            ? {
+                  left: stageable && !arePickedDiscarded ? <StageButton isStaged={selectedUnstagedCount === 0} what={pickedName} onClick={() => stageSelectedLines(selectedUnstagedCount > 0)} /> : undefined,
+                  right: canDiscard ? arePickedDiscarded ? <UndoButton what={pickedName} onClick={discardPicked} /> : <DiscardButton what={pickedName} onClick={discardPicked} /> : undefined,
+              }
+            : {};
 
     function onKeyDown(event: KeyboardEvent): void {
         if (!answersKeys || event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target)) {
@@ -1138,6 +1139,7 @@ export function FileDiffCard({
                         <FontAwesomeIcon icon={isOpen ? faChevronDown : faChevronRight} />
                     </IconButton>
                 </Tooltip>
+                {stageable && discards?.isFile !== true ? <StageButton isStaged={section === undefined ? fileStaged : section === "staged"} what="file" onClick={toggleFile} /> : undefined}
                 <span
                     className="flex flex-1 items-center"
                     //
@@ -1173,14 +1175,6 @@ export function FileDiffCard({
                         onSelectingLines={canSelectLines ? changeSelectingLines : undefined}
                     />
                 ) : undefined}
-                {canDiscard ? (
-                    discards.isFile ? (
-                        <UndoButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, false))} />
-                    ) : (
-                        <DiscardButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, true))} />
-                    )
-                ) : undefined}
-                {stageable && discards?.isFile !== true ? <StageButton isStaged={section === undefined ? fileStaged : section === "staged"} what="file" onClick={toggleFile} /> : undefined}
                 {onCollapse && !isMaximised ? <CollapseButton side="left" onClick={onCollapse} /> : undefined}
                 {onToggleMaximise ? <MaximiseButton isMaximised={isMaximised} onClick={onToggleMaximise} /> : undefined}
                 {onClose ? (
@@ -1189,6 +1183,18 @@ export function FileDiffCard({
                             <FontAwesomeIcon icon={faXmark} />
                         </IconButton>
                     </Tooltip>
+                ) : undefined}
+                {canDiscard ? (
+                    //
+                    // Discard keeps the right end of the header, apart from the window buttons.
+                    //
+                    <span className="flex flex-none" style={{ marginLeft: "var(--space-4)" }}>
+                        {discards.isFile ? (
+                            <UndoButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, false))} />
+                        ) : (
+                            <DiscardButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, true))} />
+                        )}
+                    </span>
                 ) : undefined}
             </div>
             {isOpen && hasLines ? (
@@ -1311,20 +1317,18 @@ export function FileDiffCard({
                             showAllLines={showAllLines}
                             hunkAction={
                                 stageable || canDiscard
-                                    ? index => {
+                                    ? (index: number): ISidedActions => {
                                           const isDiscarded = discards !== undefined && isHunkDiscarded(discards, index);
-                                          return (
-                                              <>
-                                                  {canDiscard ? (
-                                                      isDiscarded ? (
-                                                          <UndoButton what={discards.isFile ? "file" : "hunk"} onClick={() => onDiscardsChange(discards.isFile ? withFileDiscarded(discards, false) : withHunkMarked(discards, index, false))} />
-                                                      ) : (
-                                                          <DiscardButton what="hunk" onClick={() => onDiscardsChange(withHunkMarked(discards, index, true))} />
-                                                      )
-                                                  ) : undefined}
-                                                  {stageable && !isDiscarded ? <StageButton isStaged={isHunkButtonStaged(index)} what="hunk" onClick={() => toggleHunk(index)} /> : undefined}
-                                              </>
-                                          );
+                                          return {
+                                              left: stageable && !isDiscarded ? <StageButton isStaged={isHunkButtonStaged(index)} what="hunk" onClick={() => toggleHunk(index)} /> : undefined,
+                                              right: canDiscard ? (
+                                                  isDiscarded ? (
+                                                      <UndoButton what={discards.isFile ? "file" : "hunk"} onClick={() => onDiscardsChange(discards.isFile ? withFileDiscarded(discards, false) : withHunkMarked(discards, index, false))} />
+                                                  ) : (
+                                                      <DiscardButton what="hunk" onClick={() => onDiscardsChange(withHunkMarked(discards, index, true))} />
+                                                  )
+                                              ) : undefined,
+                                          };
                                       }
                                     : undefined
                             }

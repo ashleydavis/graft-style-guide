@@ -565,8 +565,9 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Renders one file's row in the Staged or the Unstaged panel: its path, its path menu, then
-    // Discard, or Undo once it is discarded, and the button that stages or unstages it.
+    // Renders one file's row in the Staged or the Unstaged panel: the button that stages or unstages
+    // it at the left, its path and its path menu, and Discard, or Undo once it is discarded, at the
+    // right.
     //
     function fileRow(entry: IListEntry): ReactNode {
         const { file, section } = entry;
@@ -588,17 +589,19 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
                 }}
             >
+                <span data-floating-actions className="flex flex-none items-center" style={{ width: "calc(var(--space-6) + var(--space-1))" }}>
+                    {discardsOf(file.path).isFile ? undefined : <StageButton isStaged={isChecked} what="file" onClick={() => toggleEntry(entry)} />}
+                </span>
                 <span className="min-w-0 flex-1">
                     <FilePath path={file.path} />
                 </span>
                 <FilePathMenu path={file.path} />
-                <span data-floating-actions className="flex flex-none items-center" style={{ gap: "var(--space-2)" }}>
+                <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
                     {discardsOf(file.path).isFile ? (
                         <UndoButton what="file" onClick={() => setDiscards(file.path, noDiscards())} />
                     ) : (
                         <DiscardButton what="file" onClick={() => setDiscards(file.path, withFileDiscarded(discardsOf(file.path), true))} />
                     )}
-                    {discardsOf(file.path).isFile ? undefined : <StageButton isStaged={isChecked} what="file" onClick={() => toggleEntry(entry)} />}
                 </span>
             </ListItemButton>
         );

@@ -48,7 +48,7 @@ export interface IDiffViewProps {
     // Returns what a hunk's bar shows at its right edge, such as a button that stages the hunk,
     // given the hunk's position from 0. Absent for a diff with nothing to do to a hunk.
     //
-    hunkAction?: (hunkIndex: number) => ReactNode;
+    hunkAction?: (hunkIndex: number) => ISidedActions;
 
     //
     // The position of the hunk the keys are on, from 0, drawn with a border all the way round it in
@@ -242,10 +242,51 @@ export interface ILineSelection {
 
     //
     // The id of the line that carries the picked lines' buttons, the first picked line the diff
-    // draws, and the buttons: Discard and Stage or Unstage for the picked lines.
+    // draws, and the buttons: the stage button at the left and Discard or Undo at the right.
     //
     actionsLine: string | undefined;
-    actions: ReactNode;
+    actions: ISidedActions;
+}
+
+//
+// The buttons of a hunk or of picked lines, split by the UX rule on placing actions: the
+// non-destructive ones, such as the stage button, at the left, and the destructive ones, such as
+// Discard, at the right.
+//
+export interface ISidedActions {
+    left?: ReactNode;
+    right?: ReactNode;
+}
+
+//
+// Renders one floating panel of buttons at the top `side` of a hunk or a run of picked lines, on a
+// small raised panel, so it adds nothing to their height. `top` and `transform` place it across
+// or inside the top edge.
+//
+function FloatingPanel({ side, top, transform, children }: { side: "left" | "right"; top: string; transform: string | undefined; children: ReactNode }): ReactNode {
+    return (
+        <div
+            data-floating-actions
+            className="flex"
+            onClick={event => event.stopPropagation()}
+            style={{
+                position: "absolute",
+                top,
+                [side]: "var(--space-4)",
+                transform,
+                zIndex: 2,
+                gap: "var(--space-2)",
+                padding: "var(--space-1)",
+                background: "var(--color-panel)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                boxShadow: "var(--shadow-raised)",
+                fontFamily: "var(--font-sans)",
+            }}
+        >
+            {children}
+        </div>
+    );
 }
 
 //
@@ -277,36 +318,23 @@ function useLinePick(line: IDiffLine | undefined): { id: string; isPicked: boole
         id,
         isPicked,
         //
-        // The picked lines' buttons float on the top edge of the first picked line, at its right,
-        // on a raised panel, so they add nothing to the line's height.
+        // The picked lines' buttons float across the top border of the run, the stage button at the
+        // left and Discard at the right, adding nothing to the lines' height.
         //
         actions:
-            id === selection.actionsLine && selection.actions ? (
-                <div
-                    data-floating-actions
-                    className="flex"
-                    onClick={event => event.stopPropagation()}
-                    style={{
-                        position: "absolute",
-                        //
-                        // Centred on the run's padding above its first line, so the panel sits on
-                        // the border instead of above it.
-                        //
-                        top: "var(--space-2)",
-                        right: "var(--space-4)",
-                        transform: "translateY(-50%)",
-                        zIndex: 2,
-                        gap: "var(--space-2)",
-                        padding: "var(--space-1)",
-                        background: "var(--color-panel)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: "var(--radius-md)",
-                        boxShadow: "var(--shadow-raised)",
-                        fontFamily: "var(--font-sans)",
-                    }}
-                >
-                    {selection.actions}
-                </div>
+            id === selection.actionsLine ? (
+                <>
+                    {selection.actions.left ? (
+                        <FloatingPanel side="left" top="0px" transform="translateY(-50%)">
+                            {selection.actions.left}
+                        </FloatingPanel>
+                    ) : undefined}
+                    {selection.actions.right ? (
+                        <FloatingPanel side="right" top="0px" transform="translateY(-50%)">
+                            {selection.actions.right}
+                        </FloatingPanel>
+                    ) : undefined}
+                </>
             ) : undefined,
         //
         // A run of picked lines has room inside its border above its first line and below its
@@ -628,15 +656,16 @@ export function GapRows({
             <div
                 role="row"
                 data-line="gap"
-                className={lines && onSelect ? "graft-hoverable flex items-center" : "flex items-center"}
+                className={[lines && onSelect ? "graft-hoverable" : "", "flex items-center", reservesActions ? "justify-center" : ""].join(" ").trim()}
                 style={{
                     gap: "var(--space-3)",
                     //
-                    // A bar before a hunk with buttons keeps its right end clear for the hunk's
-                    // floating buttons.
+                    // A bar before a hunk with buttons keeps both ends clear for the hunk's floating
+                    // buttons, with its count and its button in the middle.
                     //
                     minHeight: "calc(var(--space-6) + var(--space-1))",
-                    paddingRight: reservesActions ? "calc(var(--space-8) * 3)" : undefined,
+                    paddingLeft: reservesActions ? "calc(var(--space-8) * 2)" : undefined,
+                    paddingRight: reservesActions ? "calc(var(--space-8) * 2)" : undefined,
                     background: "var(--color-raised)",
                     color: "var(--color-text-muted)",
                 }}
@@ -668,34 +697,26 @@ export function GapRows({
     );
 }
 //
-// Renders a hunk's buttons, such as Discard and Stage, on a small raised panel that floats at the
-// hunk's top right, so they add nothing to the hunk's height. The panel sits across the hunk's top
-// edge, over the right end of the bar of unchanged lines before it, which keeps that end clear, or
-// just inside the hunk for a hunk at the very top of the diff.
+// Renders a hunk's buttons on two small raised panels that float at its top edge, the stage button
+// at the left and Discard at the right, so they add nothing to the hunk's height. The panels sit
+// across the hunk's top edge, over the ends of the bar of unchanged lines before it, which keeps
+// both ends clear, or just inside the hunk for a hunk at the very top of the diff.
 //
-export function HunkActions({ isAtTop, children }: { isAtTop: boolean; children: ReactNode }): ReactNode {
+export function HunkActions({ isAtTop, actions }: { isAtTop: boolean; actions: ISidedActions }): ReactNode {
+    const top = isAtTop ? "var(--space-2)" : "0px";
+    const transform = isAtTop ? undefined : "translateY(-50%)";
     return (
-        <div data-floating-actions className="relative" style={{ height: 0 }}>
-            <div
-                className="flex"
-                onClick={event => event.stopPropagation()}
-                style={{
-                    position: "absolute",
-                    top: isAtTop ? "var(--space-2)" : 0,
-                    right: "var(--space-4)",
-                    transform: isAtTop ? undefined : "translateY(-50%)",
-                    zIndex: 2,
-                    gap: "var(--space-2)",
-                    padding: "var(--space-1)",
-                    background: "var(--color-panel)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: "var(--radius-md)",
-                    boxShadow: "var(--shadow-raised)",
-                    fontFamily: "var(--font-sans)",
-                }}
-            >
-                {children}
-            </div>
+        <div data-floating-actions style={{ position: "absolute", top: 0, left: 0, right: 0, height: 0 }}>
+            {actions.left ? (
+                <FloatingPanel side="left" top={top} transform={transform}>
+                    {actions.left}
+                </FloatingPanel>
+            ) : undefined}
+            {actions.right ? (
+                <FloatingPanel side="right" top={top} transform={transform}>
+                    {actions.right}
+                </FloatingPanel>
+            ) : undefined}
         </div>
     );
 }
@@ -808,7 +829,7 @@ export function DiffView({
     function gapRows(position: number): ReactNode {
         return (
             <GapRows
-                reservesActions={!hideHunkActions && hunkAction !== undefined && position < hunks.length}
+                reservesActions={hunkAction !== undefined}
                 key={`gap-${position}`}
                 gap={gaps[position]}
                 position={position}
@@ -854,15 +875,16 @@ export function DiffView({
                                 position: "relative",
                                 cursor: onSelectHunk ? "pointer" : undefined,
                                 //
-                                // The current hunk has room inside its border above its first line
-                                // and below its last.
+                                // A hunk with floating buttons keeps room above its first line for
+                                // their lower half, so they hide no line number or text, and the
+                                // current hunk has room inside its border above and below.
                                 //
-                                paddingTop: currentHunk === index ? "var(--space-2)" : undefined,
+                                paddingTop: !hideHunkActions && hunkAction ? "calc(var(--space-4) + var(--space-1))" : currentHunk === index ? "var(--space-2)" : undefined,
                                 paddingBottom: currentHunk === index ? "var(--space-2)" : undefined,
                             }}
                         >
                             {currentHunk === index ? <CurrentBorder /> : undefined}
-                            {!hideHunkActions && hunkAction ? <HunkActions isAtTop={position === 0 && gaps[0].count === 0}>{hunkAction(index)}</HunkActions> : undefined}
+                            {!hideHunkActions && hunkAction ? <HunkActions isAtTop={position === 0 && gaps[0].count === 0} actions={hunkAction(index)} /> : undefined}
                             {layout === "unified"
                                 ? hunk.lines.map((line, lineIndex) => <UnifiedRow key={lineIndex} line={line} partner={partners.get(line)} wrap={wrap} />)
                                 : splitRows(hunk.lines).map((row, rowIndex) => (
