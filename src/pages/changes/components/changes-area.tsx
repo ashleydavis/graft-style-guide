@@ -162,7 +162,7 @@ export function SplitDiff({
         <div className="flex min-h-0 flex-1 flex-col" style={{ gap: "var(--space-2)" }}>
             {sections.map(section => (
                 <section key={section.title} aria-label={`${section.title} changes`} className="flex min-h-0 flex-1 flex-col" style={{ gap: "var(--space-1)" }}>
-                    <h3 style={{ fontSize: "var(--text-xs)", fontWeight: "var(--weight-bold)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)" }}>
+                    <h3 style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)", color: "var(--color-text-muted)" }}>
                         {section.title} ({section.hunks.length} {section.hunks.length === 1 ? "change" : "changes"})
                     </h3>
                     {section.hunks.length === 0 ? (
@@ -295,7 +295,18 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const selectedFile = files.find(file => file.path === selectedPath);
     const hunkCountOf = (file: IFileDiff): number => parseHunks(file.diff ?? "").length;
     const stagingOf = (file: IFileDiff): IStaging => stagings.get(file.path) ?? initialStaging(undefined);
-    const stagedFiles = files.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none");
+
+    //
+    // Returns true when nothing of `file` is left to commit: the whole file is discarded, or every
+    // one of its hunks is.
+    //
+    const isWhollyDiscarded = (file: IFileDiff): boolean => {
+        const discards = discardsOf(file.path);
+        const count = hunkCountOf(file);
+        return discards.isFile || (count > 0 && Array.from({ length: count }, (_unused, index) => index).every(index => discards.hunks.has(index)));
+    };
+    const liveFiles = files.filter(file => !isWhollyDiscarded(file));
+    const stagedFiles = liveFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none");
     const canCommit = summary.trim() !== "" && (stagedFiles.length > 0 || amend);
 
     function setStaging(path: string, staging: IStaging): void {
@@ -568,8 +579,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
 
     //
     // Renders one file's row in the Staged or the Unstaged panel: the button that stages or unstages
-    // it at the left, its path and its path menu, and Discard, or Undo once it is discarded, at the
-    // right.
+    // it at the left, its path and its path menu, and at the right Discard on the selected row and
+    // the row under the pointer, or Undo on a discarded one.
     //
     function fileRow(entry: IListEntry): ReactNode {
         const { file, section } = entry;
@@ -589,6 +600,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     paddingRight: "var(--space-2)",
                     "& .file-path-menu": { opacity: 0 },
                     "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
+                    //
+                    // Discard shows on the selected row and the row under the pointer, and is out of
+                    // reach on the rest, so a click on another row cannot hit it.
+                    //
+                    "& .file-discard": { visibility: "hidden" },
+                    "&:hover .file-discard, &.Mui-selected .file-discard, &:focus-within .file-discard": { visibility: "visible" },
                 }}
             >
                 <span data-floating-actions className="flex flex-none items-center" style={{ width: "calc(var(--space-6) + var(--space-1))" }}>
@@ -602,7 +619,9 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     {discardsOf(file.path).isFile ? (
                         <UndoButton what="file" onClick={() => setDiscards(file.path, noDiscards())} />
                     ) : (
-                        <DiscardButton what="file" onClick={() => setDiscards(file.path, withFileDiscarded(discardsOf(file.path), true))} />
+                        <span className="file-discard inline-flex">
+                            <DiscardButton what="file" onClick={() => setDiscards(file.path, withFileDiscarded(discardsOf(file.path), true))} />
+                        </span>
                     )}
                 </span>
             </ListItemButton>
@@ -713,7 +732,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 <span className="flex items-baseline" style={{ gap: "var(--space-2)" }}>
                                     Changes
                                     <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-normal)", color: "var(--color-text-muted)" }}>
-                                        {files.length === 0 ? "none" : `${files.length} ${files.length === 1 ? "file" : "files"}, ${stagedFiles.length} staged`}
+                                        {files.length === 0 ? "none" : `${liveFiles.length} ${liveFiles.length === 1 ? "file" : "files"}, ${stagedFiles.length} staged`}
                                     </span>
                                 </span>
                             }
@@ -756,14 +775,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                                         <h3
                                                             className="min-w-0 flex-1 truncate"
                                                             style={{
-                                                                fontSize: "var(--text-xs)",
+                                                                fontSize: "var(--text-sm)",
                                                                 fontWeight: "var(--weight-bold)",
-                                                                textTransform: "uppercase",
-                                                                letterSpacing: "0.05em",
                                                                 color: "var(--color-text-muted)",
                                                             }}
                                                         >
-                                                            {title} ({sectionEntries.length})
+                                                            {title} ({sectionEntries.filter(entry => !isWhollyDiscarded(entry.file)).length})
                                                         </h3>
                                                         {panelMaximised === section ? undefined : (
                                                             <Tooltip title={isPanelCollapsed ? `Restore the ${title.toLowerCase()} files` : `Collapse the ${title.toLowerCase()} files`}>

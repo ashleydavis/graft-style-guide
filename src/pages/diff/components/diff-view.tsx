@@ -564,30 +564,34 @@ export function SplitSide({ line, side, partner, wrap }: { line: IDiffLine | und
     );
 }
 //
-// Renders the button in a gap bar's line number gutter that shows or hides a run of unchanged
-// lines, with a tooltip that says which.
+// Renders the button in the first line number column of a gap bar that shows or hides a run of
+// unchanged lines, with a tooltip that says which: a small bordered button in the middle of the
+// column, its border firming and the hover wash showing under the pointer.
 //
-function GapButton({ layout, label, detail, icon, onClick }: { layout: DiffLayout; label: string; detail: string; icon: IconDefinition; onClick: () => void }): ReactNode {
+function GapButton({ label, detail, icon, onClick }: { label: string; detail: string; icon: IconDefinition; onClick: () => void }): ReactNode {
     return (
-        <Tooltip title={<Tip title={label} detail={detail} />}>
-            <ButtonBase
-                aria-label={label}
-                onClick={event => {
-                    event.stopPropagation();
-                    onClick();
-                }}
-                className="flex-none self-stretch"
-                sx={{
-                    width: `calc(${GUTTER_WIDTH} * ${layout === "unified" ? 2 : 1})`,
-                    color: "var(--color-accent)",
-                    fontSize: "var(--icon-sm)",
-                    "&:hover": { backgroundColor: "var(--color-hover)" },
-                    "&.Mui-focusVisible": { outline: "var(--focus-ring-width) solid var(--color-focus)", outlineOffset: "calc(var(--focus-ring-width) * -1)" },
-                }}
-            >
-                <FontAwesomeIcon icon={icon} />
-            </ButtonBase>
-        </Tooltip>
+        <span className="flex flex-none items-center justify-center" style={{ width: GUTTER_WIDTH }}>
+            <Tooltip title={<Tip title={label} detail={detail} />}>
+                <ButtonBase
+                    aria-label={label}
+                    onClick={event => {
+                        event.stopPropagation();
+                        onClick();
+                    }}
+                    sx={{
+                        padding: "var(--space-1)",
+                        color: "var(--color-accent)",
+                        fontSize: "var(--icon-sm)",
+                        borderRadius: "var(--radius-sm)",
+                        boxShadow: "inset 0 0 0 1px var(--color-border)",
+                        "&:hover": { backgroundColor: "var(--color-hover)", boxShadow: "inset 0 0 0 1px var(--color-border-control)" },
+                        "&.Mui-focusVisible": { outline: "var(--focus-ring-width) solid var(--color-focus)", outlineOffset: "var(--focus-ring-offset)" },
+                    }}
+                >
+                    <FontAwesomeIcon icon={icon} />
+                </ButtonBase>
+            </Tooltip>
+        </span>
     );
 }
 
@@ -662,21 +666,27 @@ export function GapRows({
                 data-line="gap"
                 className={lines && onSelect ? "graft-hoverable flex items-center" : "flex items-center"}
                 style={{
-                    gap: "var(--space-3)",
                     minHeight: "calc(var(--space-6) + var(--space-1))",
+                    paddingTop: "var(--space-1)",
                     background: "var(--color-raised)",
                     color: "var(--color-text-muted)",
                 }}
             >
                 {lines ? (
                     isShown ? (
-                        <GapButton layout={layout} label={`Hide ${count}`} detail="Folds these lines away again." icon={faCompress} onClick={onToggle} />
+                        <GapButton label={`Hide ${count}`} detail="Folds these lines away again." icon={faCompress} onClick={onToggle} />
                     ) : (
-                        <GapButton layout={layout} label={`Show ${count}`} detail="Lines the change left as they were." icon={faArrowsUpDown} onClick={onToggle} />
+                        <GapButton label={`Show ${count}`} detail="Lines the change left as they were." icon={faArrowsUpDown} onClick={onToggle} />
                     )
                 ) : (
-                    <span className="flex-none" style={{ width: `calc(${GUTTER_WIDTH} * ${layout === "unified" ? 2 : 1})` }} />
+                    <span className="flex-none" style={{ width: GUTTER_WIDTH }} />
                 )}
+                {/*
+                 * The new line number gutter in the unified layout and the marker column, so the
+                 * count starts where the lines' text starts.
+                 */}
+                {layout === "unified" ? <span className="flex-none" style={{ width: GUTTER_WIDTH }} /> : undefined}
+                <span className="flex-none" style={{ width: "var(--space-4)" }} />
                 <span className="min-w-0 truncate">{count}</span>
             </div>
             {lines && isShown

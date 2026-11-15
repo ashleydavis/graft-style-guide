@@ -50,7 +50,7 @@ export const exampleImageVersions: { before: IImageVersion; after: IImageVersion
 export function ImageSide({ label, version, colour }: { label: string; version: IImageVersion; colour: string }): ReactNode {
     return (
         <figure className="flex min-w-0 flex-1 flex-col" style={{ gap: "var(--space-2)" }}>
-            <figcaption style={{ fontSize: "var(--text-xs)", fontWeight: "var(--weight-bold)", letterSpacing: "0.05em", textTransform: "uppercase", color: colour }}>{label}</figcaption>
+            <figcaption style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)", color: colour }}>{label}</figcaption>
             <div
                 role="img"
                 aria-label={`${label}: ${version.width} by ${version.height} image`}

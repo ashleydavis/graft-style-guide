@@ -957,10 +957,7 @@ test.describe("Changes and commit", () => {
         const area = page.getByRole("application", { name: "Changes" }).first();
         await area.focus();
         await page.keyboard.press("ArrowDown");
-        await expect(area.getByRole("region", { name: "File diff" })).toContainText("theme-names.ts");
-        for (let step = 0; step < 3; step++) {
-            await page.keyboard.press("ArrowDown");
-        }
+        await expect(area.getByRole("region", { name: "File diff" })).toContainText("old-theme.ts");
         await page.keyboard.press("Space");
         await expect(area.getByRole("region", { name: "Staged files" }).getByRole("button", { name: "frontend/src/lib/old-theme.ts", exact: true }).getByRole("button", { name: "Unstage this file" })).toBeVisible();
         await expect(area.getByRole("button", { name: "Commit 4 files" })).toBeDisabled();
@@ -1103,19 +1100,21 @@ test.describe("Discarding changes", () => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
-        await card.getByRole("button", { name: "Discard this hunk" }).last().click();
+        await expect(card.getByRole("button", { name: "Discard this hunk" })).toHaveCount(0);
+        await card.locator('[data-hunk-index="1"]').click();
+        await card.getByRole("button", { name: "Discard this hunk" }).click();
         await expect(card.locator('[data-hunk-index="1"]')).toHaveAttribute("data-discarded", "true");
         await expect(card.locator("[data-hunk-index]")).toHaveCount(2);
         await card.getByRole("button", { name: "Undo the discard of this hunk" }).click();
         await expect(card.locator('[data-hunk-index="1"]')).not.toHaveAttribute("data-discarded", "true");
-        await expect(card.getByRole("button", { name: "Discard this hunk" })).toHaveCount(2);
+        await expect(card.getByRole("button", { name: "Discard this hunk" })).toHaveCount(1);
     });
 
     test("discarding a file fades its row and its diff, and Undo brings it back", async ({ page }) => {
         await page.goto("/page/changes?components=light");
         const area = page.getByRole("application", { name: "Changes" }).first();
         const card = area.getByRole("region", { name: "File diff" });
-        await card.getByRole("button", { name: "Discard this file" }).click();
+        await area.getByRole("region", { name: "Changed files" }).getByRole("button", { name: "Discard this file" }).click();
         const row = area.getByRole("region", { name: "Unstaged files" }).getByRole("button", { name: "frontend/src/lib/zoom.ts", exact: true });
         await expect(row).toHaveAttribute("data-discarded", "true");
         await expect(card.locator('[data-discarded="true"][data-hunk-index]')).toHaveCount(2);
@@ -1477,9 +1476,43 @@ test.describe("Commit toast and tooltips", () => {
     test("a floating button's tooltip is wider than the button group", async ({ page }) => {
         await page.goto("/page/changes?components=light");
         const diff = page.getByRole("application", { name: "Changes" }).first().getByRole("region", { name: "File diff" });
-        await diff.getByRole("button", { name: "Discard this hunk" }).first().hover();
+        await diff.locator('[data-hunk-index="0"]').click();
+        await diff.getByRole("button", { name: "Discard this hunk" }).hover();
         const tooltip = page.getByRole("tooltip").filter({ hasText: "Discard this hunk" });
         await expect(tooltip).toBeVisible();
         expect((await tooltip.boundingBox())!.width).toBeGreaterThan(160);
+    });
+});
+
+test.describe("Discard only on the selection", () => {
+    test("only the selected file row and the row under the pointer show Discard, and a discarded row keeps Undo", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const list = area.getByRole("region", { name: "Changed files" });
+        const visibleDiscards = list.getByRole("button", { name: "Discard this file" }).filter({ visible: true });
+        await expect(visibleDiscards).toHaveCount(1);
+        await list.getByRole("button", { name: "docs/README.md", exact: true }).hover();
+        await expect(visibleDiscards).toHaveCount(2);
+        await list.getByRole("button", { name: "Discard this file" }).filter({ visible: true }).first().click();
+        await list.getByRole("button", { name: "docs/README.md", exact: true }).getByText("README.md").click();
+        await expect(list.getByRole("button", { name: "Undo the discard of this file" })).toHaveCount(2);
+        await expect(list.getByRole("button", { name: "Discard this file" }).filter({ visible: true })).toHaveCount(1);
+    });
+});
+
+test.describe("Counts leave out discarded files", () => {
+    test("discarding a file takes it out of its panel's count and the header's, and Undo puts it back", async ({ page }) => {
+        await page.goto("/page/changes?components=light");
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const list = area.getByRole("region", { name: "Changed files" });
+        await expect(list).toContainText("Unstaged (7)");
+        await expect(list).toContainText("9 files, 3 staged");
+        const readme = list.getByRole("button", { name: "docs/README.md", exact: true });
+        await readme.getByText("README.md").click();
+        await readme.getByRole("button", { name: "Discard this file" }).click();
+        await expect(list).toContainText("Unstaged (6)");
+        await expect(list).toContainText("8 files, 3 staged");
+        await readme.getByRole("button", { name: "Undo the discard of this file" }).click();
+        await expect(list).toContainText("Unstaged (7)");
     });
 });

@@ -15,10 +15,20 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 - Discarding takes effect straight away and asks nothing. The discarded file, hunk or lines play a short animation, stay in view faded and struck through, and their Discard button turns into an Undo button that brings them back.
 - Discard has a key, Delete, that acts on what is selected: the file in the file list, and in the diff the selected lines, else the current hunk, else the file. Pressing it on a discarded part brings it back.
 
+## Buttons
+
+- Buttons should look like buttons, meaning they should all have visible borders and hover effects.
+- The rows of a list, a tree, a sidebar or a menu are rows to pick, not buttons: they show the hover and selected colours instead of a border.
+
+## Text
+
+- Don't use uppercase for titles. Use proper case, eg "STAGED" => "Staged". For multi word titles only capitalize the first character of the first word.
+
 ## Placing actions
 
 - Stage/unstage and non-destructive tools stick to the left. Destructive tools stick to the right.
 - In a row, a header or over a hunk or picked lines, the stage button sits at the left end and Discard, or Undo once discarded, at the right end, so the width of the row lies between them.
+- Discard shows only on the selected file, the current hunk or the picked lines, and on a file row under the pointer. Undo shows on every discarded part.
 
 ## Spacing around controls
 

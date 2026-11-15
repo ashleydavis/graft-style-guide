@@ -40,9 +40,8 @@ export function SettingSwitch({
     return (
         <div className="flex flex-col gap-1">
             <div
-                className="uppercase tracking-wider"
                 style={{
-                    fontSize: "var(--text-xs)",
+                    fontSize: "var(--text-sm)",
                     fontWeight: "var(--weight-bold)",
                     color: "var(--color-text-muted)",
                 }}

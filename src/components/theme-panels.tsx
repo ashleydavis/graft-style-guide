@@ -45,14 +45,14 @@ export function ThemePanel({ theme, children }: { theme: string; children: React
             }}
         >
             <div
-                className="mb-3 uppercase tracking-wider"
+                className="mb-3"
                 style={{
-                    fontSize: "var(--text-xs)",
+                    fontSize: "var(--text-sm)",
                     fontWeight: "var(--weight-bold)",
                     color: "var(--color-text-muted)",
                 }}
             >
-                {theme}
+                {theme.charAt(0).toUpperCase() + theme.slice(1)}
             </div>
             <PanelThemeContext.Provider value={theme}>{children}</PanelThemeContext.Provider>
         </div>

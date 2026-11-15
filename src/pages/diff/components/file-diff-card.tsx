@@ -666,8 +666,8 @@ function isOwnKeyTarget(target: EventTarget): boolean {
 // Renders the card. The header holds a button that folds the diff away and back, then for a
 // stageable change the button that stages or unstages the whole file, the path (the old path, an
 // arrow and the new path for a renamed file) with its menu of ways to copy the path or open the
-// file, the change details and diff options buttons, the collapse, maximise and close buttons
-// where the card has them, and Discard at the far right. The options keys work while the keys are on the card. In the
+// file, the change details and diff options buttons, and the collapse, maximise and close buttons
+// where the card has them. The options keys work while the keys are on the card. In the
 // line selection mode lines are picked as hunks are: a click picks a line, Shift a run and Ctrl or
 // Cmd adds a line, Up and Down move the pick, and a bar above the diff stages, unstages or discards
 // the picked lines. Each hunk of a stageable change has its own Stage or Unstage button at its top right. A
@@ -1197,18 +1197,6 @@ export function FileDiffCard({
                         </IconButton>
                     </Tooltip>
                 ) : undefined}
-                {canDiscard ? (
-                    //
-                    // Discard keeps the right end of the header, apart from the window buttons.
-                    //
-                    <span className="flex flex-none" style={{ marginLeft: "var(--space-4)" }}>
-                        {discards.isFile ? (
-                            <UndoButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, false))} isCompact={false} />
-                        ) : (
-                            <DiscardButton what="file" onClick={() => onDiscardsChange(withFileDiscarded(discards, true))} isCompact={false} />
-                        )}
-                    </span>
-                ) : undefined}
             </div>
             {isOpen && hasLines ? (
                 <div className="flex flex-none items-center" style={{ gap: "var(--space-2)", padding: "var(--space-2)", background: "var(--color-panel)", borderBottom: "1px solid var(--color-border)" }}>
@@ -1337,9 +1325,9 @@ export function FileDiffCard({
                                               right: canDiscard ? (
                                                   isDiscarded ? (
                                                       <UndoButton what={discards.isFile ? "file" : "hunk"} onClick={() => onDiscardsChange(discards.isFile ? withFileDiscarded(discards, false) : withHunkMarked(discards, index, false))} />
-                                                  ) : (
+                                                  ) : index === shownHunk ? (
                                                       <DiscardButton what="hunk" onClick={() => onDiscardsChange(withHunkMarked(discards, index, true))} />
-                                                  )
+                                                  ) : undefined
                                               ) : undefined,
                                           };
                                       }
