@@ -19,7 +19,8 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faChevronDown, faChevronUp, faDownLeftAndUpRightToCenter, faFileLines, faFolderTree, faGripLines, faGripLinesVertical, faLayerGroup, faList, faMagnifyingGlass, faSliders, faTableColumns, type IconDefinition, faUpRightAndDownLeftFromCenter, faXmark } from "@fortawesome/free-solid-svg-icons";
-import { FilePathMenu } from "../../../components/file-path-menu";
+import { exampleRepoRoot, FilePathMenu } from "../../../components/file-path-menu";
+import { scrollSelectionIntoView } from "../../commit-explorer/scroll";
 import { Tip } from "../../../components/tip";
 import { FilePath } from "../../commit-explorer/components/file-path";
 import { Pane } from "../../commit-explorer/components/pane";
@@ -562,6 +563,15 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                   ...orderedFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
               ];
     const selectedEntry = selectedDirectory ? undefined : (entries.find(entry => entry.file.path === selectedPath && entry.section === selectedSection) ?? entries.find(entry => entry.file.path === selectedPath));
+
+    //
+    // Holds the selected row of the file list, so the list scrolls it into view when the keys move
+    // the selection past the top or bottom of the pane.
+    //
+    const selectedRowRef = useRef<HTMLLIElement>(null);
+    useEffect(() => {
+        scrollSelectionIntoView(selectedRowRef.current);
+    }, [selectedPath, selectedSection, selectedDirectory]);
 
     //
     // The rows the file list shows, in order, which Up and Down move through: in the tree, each
@@ -1126,7 +1136,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         {isDiscarded ? undefined : <StageButton isStaged={isStaged} what="directory" onClick={() => toggleDirectoryStaged(item)} isProminent />}
                     </span>
                 }
-                menu={<FilePathMenu path={item.path} kind="directory" />}
+                menu={<FilePathMenu path={item.path} repoRoot={exampleRepoRoot} kind="directory" />}
                 trail={
                     <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
                         {isDiscarded ? (
@@ -1138,7 +1148,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         )}
                     </span>
                 }
-                rowRef={undefined}
+                rowRef={isItemSelected(item) ? selectedRowRef : undefined}
                 onSelect={() => selectDirectory(item.path, item.section)}
                 onToggle={() => toggleCollapsedDirectory(item.path)}
                 onFocus={() => drillInto(item.path)}
@@ -1184,7 +1194,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 icon={<FileIcon path={file.path} />}
                 guides={guides}
                 isSelected={entry === selectedEntry}
-                isOpen={false}
+                isOpen={entry === selectedEntry}
                 isDiscarded={isDiscarded}
                 lead={
                     <span data-floating-actions className="flex flex-none items-center" style={{ width: "calc(var(--space-6) + var(--space-1))" }}>
@@ -1197,7 +1207,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         {label}
                     </PinnableTooltip>
                 )}
-                menu={<FilePathMenu path={file.path} />}
+                menu={<FilePathMenu path={file.path} repoRoot={exampleRepoRoot} kind="file" />}
                 trail={
                     <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
                         {isDiscarded ? (
@@ -1209,7 +1219,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         )}
                     </span>
                 }
-                rowRef={undefined}
+                rowRef={entry === selectedEntry ? selectedRowRef : undefined}
                 onSelect={() => selectFile(file.path, section, 0)}
             />
         );
@@ -1222,7 +1232,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             aria-label="Changes"
             tabIndex={0}
             onKeyDown={onKeyDown}
-            className={`flex flex-col ${diffMode === "split" ? "lg:h-[900px]" : "lg:h-[680px]"} focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--color-focus)]`}
+            //
+            // On a desktop screen the area fills the window's height less room for the section
+            // heading above it, keeping 480 pixels, or 720 for the split view's two panels, on a
+            // short screen.
+            //
+            className={`flex flex-col ${diffMode === "split" ? "lg:h-[max(720px,calc(100dvh_-_var(--space-8)_*_4))]" : "lg:h-[max(480px,calc(100dvh_-_var(--space-8)_*_4))]"} focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--color-focus)]`}
             style={{
                 background: "var(--color-bg)",
                 borderRadius: "var(--radius-lg)",
@@ -1241,7 +1256,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 ? "flex flex-none flex-col lg:min-h-0"
                                 : diffMode === "split" && panelStack === "horizontal"
                                   ? "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[480px] lg:flex-none 2xl:w-[600px]"
-                                  : "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[280px] lg:flex-none 2xl:w-[360px]"
+                                  : "flex min-h-[420px] flex-col lg:min-h-0 lg:min-w-[320px] lg:flex-[0_1_510px]"
                     }
                     style={{ gap: "var(--space-3)" }}
                 >
@@ -1249,6 +1264,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                         <Pane
                             label="Changed files"
                             width="100%"
+                            fillsWidth
                             fillsHeight
                             isCollapsed={collapsed.has(0)}
                             onToggleCollapse={() => toggleCollapse(0)}
@@ -1444,6 +1460,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 />
                                 </div>
                             ))}
+                        </div>
+                    ) : selectedFile && !selectedFile.diff && !selectedFile.binary && !selectedFile.oldPath && !selectedFile.modeChange ? (
+                        <div className="flex flex-1 items-center justify-center" style={{ color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
+                            The file has no changes to show.
                         </div>
                     ) : selectedFile ? (
                         diffMode === "split" && hunkCountOf(selectedFile) > 0 ? (

@@ -45,7 +45,7 @@ An operation is dangerous when it loses work that Git cannot bring back: discard
 
 ## Search
 
-- Tables, trees, lists, text blocks and other potentially large content controls should all come with a search input. In some cases where there whould be too much visual clutter the search input should only be displayed when we enter search mode (ctrl+f). Enter should apply the search. Escape exits search mode and hides the search input. The search should filter for tables, trees and lists. For text content it should highlight the matches and have up/down buttons (and possibly hotkeys) to navigate the matches.
+- Tables, trees, lists, text blocks and other potentially large content controls should all come with a search input. In some cases where there whould be too much visual clutter the search input should only be displayed when we enter search mode (ctrl+f). If searching is expensive the user must hit Enter or a button to start the search. If searching is cheap it is started automatically by debounced typing in the search input. Escape exits search mode and hides the search input. The search should filter for tables, trees and lists. For text content it should highlight the matches and have up/down buttons (and possibly hotkeys) to navigate the matches.
 
 ## Screens
 

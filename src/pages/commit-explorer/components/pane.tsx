@@ -167,7 +167,7 @@ export function Pane({
                 flex: isMaximised || fillsWidth ? "1 1 0%" : shrinksTo ? `0 1 ${width}` : "none",
                 width: isMaximised ? "100%" : fillsWidth ? "auto" : width,
                 minWidth: isMaximised ? 0 : shrinksTo,
-                maxWidth: isMaximised || fillsWidth ? "100%" : "calc(100vw - var(--space-8) * 2)",
+                maxWidth: isMaximised || fillsWidth ? "100%" : "calc(100% - var(--space-8) * 1.5)",
                 maxHeight: "100%",
                 height: fillsHeight ? "100%" : undefined,
                 overflow: "hidden",

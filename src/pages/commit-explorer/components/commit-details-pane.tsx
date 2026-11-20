@@ -15,20 +15,19 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCodeCommit, faFolderTree, faHardDrive, faList, faMessage, faSliders, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { faCodeCommit, faFolderTree, faHardDrive, faList, faMagnifyingGlass, faMessage, faSliders, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { RefBadge } from "../../badges";
 import { COMMIT_SUMMARY_PATH, DIRECTORY_PREFIX } from "../explorer-state";
 import { refBadge } from "./commit-pane";
 import { CopyButton } from "../../../components/copy-button";
 import { FilePathMenu } from "../../../components/file-path-menu";
-import { StatusLetter } from "../../tree";
-import type { CommitDiffKind, IChangedFile, ICommit } from "../data";
+import { repoRoot, type CommitDiffKind, type IChangedFile, type ICommit } from "../data";
 import { treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../file-views";
 import { FileIcon } from "../../../components/file-icon";
-import { matchesSearch, SearchModeBox, SearchModeButton, type ISearchMode } from "../../../components/search-box";
+import { matchesSearch, type ISearchMode } from "../../../components/search-box";
+import { ExplorerSearchBox } from "./explorer-search";
 import { TreeBar, TreeDirectoryRow, TreeFileRow } from "../../../components/tree-rows";
 import { FilePath } from "./file-path";
-import { LineCounts } from "./line-counts";
 import { Pane } from "./pane";
 import { DIFF_PANE_WIDTH_MIN } from "./file-pane";
 import { OptionRow } from "../../diff/components/file-diff-card";
@@ -36,20 +35,7 @@ import { Tip } from "../../../components/tip";
 import { scrollSelectionIntoView } from "../scroll";
 import { PinnableTooltip } from "../../../components/pinnable-tooltip";
 import { FileTip } from "../../../components/file-tip";
-
-//
-// Formats a date with its time for the details, as in "14 Nov 2026, 16:42", in the browser's own
-// locale.
-//
-export function longDate(date: Date): string {
-    return date.toLocaleString(undefined, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-    });
-}
+import { longDate } from "../dates";
 
 //
 // The ways of listing the changed files, with the icon and name of each on the switch.
@@ -147,17 +133,12 @@ export function FileRow({ file, guides = [], label, isSelected, isOpen, selected
             lead={undefined}
             extra={file.isUntracked ? <span style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)" }}>untracked</span> : undefined}
             wrapLabel={label => (
-                <PinnableTooltip enterDelayMs={500} maxWidth="calc(var(--space-8) * 12)" tip={pinButton => <FileTip file={file} pinButton={pinButton} />}>
+                <PinnableTooltip enterDelayMs={500} maxWidth="calc(var(--space-8) * 12)" tip={pinButton => <FileTip file={{ ...file, isBinary: file.binary !== undefined }} pinButton={pinButton} />}>
                     {label}
                 </PinnableTooltip>
             )}
-            menu={<FilePathMenu path={file.path} />}
-            trail={
-                <>
-                    <StatusLetter status={file.status} />
-                    <LineCounts added={file.linesAdded} deleted={file.linesDeleted} />
-                </>
-            }
+            menu={<FilePathMenu path={file.path} repoRoot={repoRoot} kind="file" />}
+            trail={undefined}
             rowRef={isSelected ? selectedRef : undefined}
             onSelect={() => onSelectFile(file.path)}
         />
@@ -384,8 +365,6 @@ export function FileListOptions({ fileView, onChangeFileView, diffKind, onChange
 export function CommitDetailsPane({ commit, files: allFiles, diffKind, onChangeDiffKind, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, fileView, onChangeFileView, onSelectFile, treeRoot, onDrillIn, onDrillOut, collapsedDirectories, onToggleDirectory, onExpandAll, onCollapseAll, fileSearch, onClose }: ICommitDetailsPaneProps): ReactNode {
     const files = allFiles.filter(file => matchesSearch(file.path, fileSearch.query));
     const selectedRef = useRef<HTMLLIElement>(null);
-    const totalAdded = allFiles.reduce((total, file) => total + file.linesAdded, 0);
-    const totalDeleted = allFiles.reduce((total, file) => total + file.linesDeleted, 0);
 
     useEffect(() => {
         scrollSelectionIntoView(selectedRef.current);
@@ -423,21 +402,17 @@ export function CommitDetailsPane({ commit, files: allFiles, diffKind, onChangeD
             }
             headerExtra={
                 <>
-                    {allFiles.length > 0 ? <SearchModeButton mode={fileSearch} what="the files" /> : undefined}
+                    <Tooltip title={<Tip title="Search the files" detail="Keys: Ctrl+F" />}>
+                        <IconButton size="small" aria-label="Search the files" aria-pressed={fileSearch.isOpen} onClick={() => (fileSearch.isOpen ? fileSearch.close() : fileSearch.open())}>
+                            <FontAwesomeIcon icon={faMagnifyingGlass} />
+                        </IconButton>
+                    </Tooltip>
                     <FileListOptions fileView={fileView} onChangeFileView={onChangeFileView} diffKind={diffKind} onChangeDiffKind={onChangeDiffKind} />
                 </>
             }
+            toolbar={fileSearch.isOpen ? <ExplorerSearchBox search={fileSearch} label="Search the files" placeholder="Search the files" closeLabel="Close the file search" result={undefined} /> : undefined}
             onClose={onClose}
         >
-            {fileSearch.isOpen ? (
-                //
-                // The file search box sits under the header and stays there while the files
-                // scroll under it.
-                //
-                <div className="sticky top-0" style={{ zIndex: 1 }}>
-                    <SearchModeBox mode={fileSearch} label="Search the files" placeholder="Search the file paths, then Enter" result={`${files.length} of ${allFiles.length}`} />
-                </div>
-            ) : undefined}
             <List aria-label="Commit" sx={{ padding: "var(--space-1) var(--space-1) 0" }}>
                 <ListItemButton
                     component="li"
@@ -463,18 +438,13 @@ export function CommitDetailsPane({ commit, files: allFiles, diffKind, onChangeD
                 sx={{ padding: "0 var(--space-1) var(--space-2)" }}
                 subheader={
                     <ListSubheader component="div" className="flex items-center" sx={{ gap: "var(--space-2)", paddingTop: "var(--space-3)", paddingBottom: "var(--space-2)" }}>
-                        <span className="flex-1">Files changed ({allFiles.length})</span>
-                        {allFiles.length > 0 ? <LineCounts added={totalAdded} deleted={totalDeleted} /> : undefined}
+                        <span className="flex-1">Files changed ({files.length})</span>
                     </ListSubheader>
                 }
             >
-                {allFiles.length === 0 ? (
+                {files.length === 0 ? (
                     <li style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
-                        {diffKind === "commit" ? "No files changed. A merge commit's changes are in its parents." : "The files on disk are the same as in this commit."}
-                    </li>
-                ) : files.length === 0 ? (
-                    <li style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
-                        No files match the search.
+                        {fileSearch.query.trim() !== "" ? "No changed file matches the search." : diffKind === "commit" ? "No files changed. A merge commit's changes are in its parents." : "The files on disk are the same as in this commit."}
                     </li>
                 ) : fileView === "tree" ? (
                     [
@@ -497,7 +467,7 @@ export function CommitDetailsPane({ commit, files: allFiles, diffKind, onChangeD
                                         tint={undefined}
                                         isDiscarded={false}
                                         lead={undefined}
-                                        menu={<FilePathMenu path={row.path} kind="directory" />}
+                                        menu={<FilePathMenu path={row.path} repoRoot={repoRoot} kind="directory" />}
                                         trail={undefined}
                                         rowRef={selectedPath === rowPath ? selectedRef : undefined}
                                         onSelect={() => onSelectFile(rowPath)}

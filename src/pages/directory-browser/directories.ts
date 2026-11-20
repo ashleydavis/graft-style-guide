@@ -239,12 +239,28 @@ export function searchDirectories(path: string, text: string): IDirectorySearch 
 }
 
 //
-// Returns the path of every directory under `path`, at any depth, for expand all.
+// The directories expand all opens, and whether it stopped before opening them all.
 //
-export function allDirectoriesUnder(path: string): string[] {
+export interface IExpandedDirectories {
+    //
+    // The paths of the directories opened, nearest first.
+    //
+    paths: string[];
+
+    //
+    // True when more directories were left unopened because the limit was reached.
+    //
+    isCut: boolean;
+}
+
+//
+// Returns the paths of the directories under `path`, at any depth and nearest first, for expand
+// all, stopping after `limit` so expanding a large tree such as a home directory never runs on.
+//
+export function allDirectoriesUnder(path: string, limit: number): IExpandedDirectories {
     const paths: string[] = [];
     const pending = directoryEntries(path);
-    while (pending.length > 0) {
+    while (pending.length > 0 && paths.length < limit) {
         const next = pending.shift();
         if (!next) {
             break;
@@ -252,5 +268,8 @@ export function allDirectoriesUnder(path: string): string[] {
         paths.push(next.path);
         pending.push(...directoryEntries(next.path));
     }
-    return paths;
+    return {
+        paths,
+        isCut: pending.length > 0,
+    };
 }

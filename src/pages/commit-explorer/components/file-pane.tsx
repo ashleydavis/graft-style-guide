@@ -7,7 +7,7 @@
 import { useEffect, useRef, type ReactNode, type Ref } from "react";
 import { stackCardName, type IStackStop } from "../../diff/stops";
 import { exampleOldFile } from "../../diff/example-old-file";
-import { FileDiffCard, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
+import { FileDiffCard, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import type { IChangedFile } from "../data";
 import { CollapsedRail } from "../../../components/collapse";
 import { Pane } from "./pane";
@@ -18,6 +18,36 @@ import { Pane } from "./pane";
 // where 840 pixels would not fit.
 //
 export const DIFF_PANE_WIDTH_MIN = "min(840px, calc(100vw - var(--space-8) * 2))";
+
+//
+// Returns the status the diff card draws for a commit's file. The card knows added, modified,
+// deleted and renamed: a copy draws as a new file with the path it came from, and a type change
+// or a conflict draws as a modified file.
+//
+export function cardStatus(status: IChangedFile["status"]): IFileDiff["status"] {
+    if (status === "C") {
+        return "A";
+    }
+    if (status === "T" || status === "U") {
+        return "M";
+    }
+    return status;
+}
+
+//
+// Returns the diff card's file for a commit's file, with its old path, its binary sizes and the
+// example old file the card shows unchanged lines from.
+//
+export function cardFileOf(file: IChangedFile): IFileDiff {
+    return {
+        path: file.path,
+        oldPath: file.oldPath,
+        status: cardStatus(file.status),
+        diff: file.diff,
+        binary: file.binary,
+        oldFileLines: exampleOldFile(file.path, file.status, file.diff),
+    };
+}
 
 //
 // What the file pane shows and reports.
@@ -99,7 +129,7 @@ export function FilePane({ file, isActive, currentHunk, currentGap, cardRef, isM
         <div style={{ flex: "1 1 0%", minWidth: DIFF_PANE_WIDTH_MIN, height: "100%" }}>
             <FileDiffCard
                 isFoldable={false}
-                file={{ path: file.path, status: file.status, diff: file.diff, oldFileLines: exampleOldFile(file.path, file.status, file.diff) }}
+                file={cardFileOf(file)}
                 label="File diff"
                 initialWrap
                 stageable={false}
@@ -223,7 +253,7 @@ export function DirectoryPane({ path, files, isActive, isMaximised, onToggleMaxi
                         //
                         <div key={file.path} className="flex-none" data-stack-path={file.path}>
                         <FileDiffCard
-                            file={{ path: file.path, status: file.status, diff: file.diff, oldFileLines: exampleOldFile(file.path, file.status, file.diff) }}
+                            file={cardFileOf(file)}
                             label={`File diff ${file.path}`}
                             initialWrap
                             stageable={false}

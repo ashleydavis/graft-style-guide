@@ -34,30 +34,64 @@ export interface IFileTipFile {
     linesDeleted?: number;
 
     //
-    // The path a renamed file had before, absent for a file that kept its path.
+    // The path a renamed or copied file had before, absent for a file that kept its path.
     //
     oldPath?: string;
+
+    //
+    // How much of a renamed or copied file is the same as before, as a percentage, absent where
+    // Git did not measure it.
+    //
+    similarity?: number;
+
+    //
+    // True for a file Git does not track yet.
+    //
+    isUntracked?: boolean;
+
+    //
+    // True for a binary file, whose lines Git does not count.
+    //
+    isBinary?: boolean;
 }
 
 //
-// Renders the tip's body: the status letter, its name and the line counts, when counted, on the
-// first line with `pinButton` at its end, what the status means under it, then the path, and the
-// old path of a renamed file, each with a copy button.
+// Returns the change counts of a file as the tip shows them: its lines added and deleted, that it
+// is binary, whose lines Git does not count, or nothing where the lines were not counted.
+//
+export function changeCounts(file: IFileTipFile): string {
+    if (file.isBinary) {
+        return "Binary file";
+    }
+    if (file.linesAdded === undefined || file.linesDeleted === undefined) {
+        return "";
+    }
+    return `+${file.linesAdded} −${file.linesDeleted}`;
+}
+
+//
+// Renders the tip's body: the status letter, its name, or "Untracked" for an untracked file, and
+// the change counts on the first line with `pinButton` at its end, what the status means and how
+// much of a renamed or copied file is the same under it, then the path, and the old path of a
+// renamed or copied file, each with a copy button.
 //
 export function FileTip({ file, pinButton }: { file: IFileTipFile; pinButton: ReactNode }): ReactNode {
     const status = statusTips[file.status];
-    const fields = file.oldPath ? [codeField("Path", file.path), codeField("Renamed from", file.oldPath)] : [codeField("Path", file.path)];
+    const fields = file.oldPath ? [codeField("Path", file.path), codeField(file.status === "C" ? "Copied from" : "Renamed from", file.oldPath)] : [codeField("Path", file.path)];
     return (
         <span className="flex flex-col" style={{ gap: "var(--space-1)" }}>
             <span className="flex items-center" style={{ gap: "var(--space-2)" }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontWeight: "var(--weight-bold)", color: statusColour(file.status) }}>{file.status}</span>
-                <span style={{ fontWeight: "var(--weight-bold)" }}>{status.title}</span>
+                <span style={{ fontWeight: "var(--weight-bold)" }}>{file.isUntracked ? "Untracked" : status.title}</span>
                 <span className="flex-1" style={{ fontFamily: "var(--font-mono)" }}>
-                    {file.linesAdded !== undefined && file.linesDeleted !== undefined ? `+${file.linesAdded} −${file.linesDeleted}` : undefined}
+                    {changeCounts(file)}
                 </span>
                 {pinButton}
             </span>
-            <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--weight-normal)", color: "var(--color-tooltip-muted)" }}>{status.detail}</span>
+            <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--weight-normal)", opacity: 0.8 }}>
+                {file.isUntracked ? "Git does not track the file yet." : status.detail}
+                {file.similarity !== undefined && file.oldPath ? ` ${file.similarity}% the same as before.` : ""}
+            </span>
             <CopyTip fields={fields} action={undefined} />
         </span>
     );

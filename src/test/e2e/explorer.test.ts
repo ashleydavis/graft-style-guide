@@ -796,7 +796,7 @@ test.describe("Commit explorer search and file views", () => {
         await expect(rows).toHaveCount(5);
         await expect(commitPane).toContainText("5 of 7");
         await expect(commitPane.locator("line[data-lane]")).toHaveCount(0);
-        await explorer.getByRole("button", { name: "Close the search box" }).click();
+        await explorer.getByRole("button", { name: "Close the commit search" }).click();
         await expect(rows).toHaveCount(7);
         await expect(commitPane.locator("line[data-lane]")).toHaveCount(lanesBefore);
     });
@@ -897,7 +897,7 @@ test.describe("File paths, staging and tooltips", () => {
         await expect(explorer).toContainText("File 2 of 9");
     });
 
-    test("the commit explorer's file pane scrolls with Up and Down and Shift moves between files", async ({ page }) => {
+    test("the commit explorer's file pane scrolls with Up and Down and Shift moves between rows", async ({ page }) => {
         await page.setViewportSize({ width: 1600, height: 500 });
         await openPage(page, "/page/commit-explorer", { components: "light" });
         const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(3);
@@ -909,9 +909,15 @@ test.describe("File paths, staging and tooltips", () => {
         await page.keyboard.press("ArrowUp");
         await expect.poll(() => scroller.evaluate(element => element.scrollTop)).toBe(0);
         await expect(file).toContainText("frontend/src/lib/git-commands.ts");
+        //
+        // Shift steps through the rows in view order, so the directory row above the file opens
+        // the directory's stacked diffs, and the row above that opens the file there.
+        //
         await page.keyboard.press("Shift+ArrowUp");
-        await expect(file).not.toContainText("frontend/src/lib/git-commands.ts");
-        await expect(file).toHaveAttribute("data-active", "true");
+        await expect(explorer.getByRole("region", { name: "Directory diffs", exact: true })).toBeVisible();
+        await page.keyboard.press("Shift+ArrowUp");
+        await expect(explorer.getByRole("region", { name: "File diff", exact: true })).toContainText("git-commands-panel.tsx");
+        await expect(explorer.getByRole("region", { name: "File diff", exact: true })).toHaveAttribute("data-active", "true");
     });
 
     test("Space stages and unstages the current change in the diff explorer", async ({ page }) => {
@@ -1627,7 +1633,12 @@ test.describe("Directories in the commit's file list", () => {
         await page.keyboard.press("ArrowLeft");
         await page.keyboard.press("f");
         await expect(details.getByRole("button", { name: "Back to the directory above" })).toBeVisible();
-        await page.keyboard.press("Escape");
+        //
+        // Escape goes up one directory at a time, so it takes one press per directory above.
+        //
+        for (let press = 0; press < 3 && (await details.getByRole("button", { name: "Back to the directory above" }).count()) > 0; press++) {
+            await page.keyboard.press("Escape");
+        }
         await expect(details.getByRole("button", { name: "Back to the directory above" })).toHaveCount(0);
         await expect(details.getByRole("region", { name: "Commit details" })).toHaveCount(0);
         await expect(explorer.getByRole("region", { name: "Commit details" })).toBeVisible();
@@ -1715,6 +1726,11 @@ test.describe("Directory keys", () => {
         await page.keyboard.press("e");
         await page.keyboard.press("f");
         await expect(details.getByRole("button", { name: "Directory docs/user-guide", exact: true })).toHaveCount(0);
+        //
+        // U goes up one directory at a time: backend/src to backend, then to the top.
+        //
+        await page.keyboard.press("u");
+        await expect(details.getByRole("button", { name: "Back to the directory above" })).toBeVisible();
         await page.keyboard.press("u");
         await expect(details.getByRole("button", { name: "Directory docs/user-guide", exact: true })).toHaveCount(1);
     });
@@ -1924,7 +1940,7 @@ test.describe("Search in large content", () => {
         await expect(details.getByRole("button", { name: "Directory docs/user-guide", exact: true })).toHaveCount(1);
         await page.keyboard.press("Enter");
         await expect(details.getByRole("button", { name: "Directory docs/user-guide", exact: true })).toHaveCount(0);
-        await expect(details).toContainText("3 of 11");
+        await expect(details).toContainText("Files changed (3)");
         await page.keyboard.press("Escape");
         await expect(box).toHaveCount(0);
         await expect(details.getByRole("button", { name: "Directory docs/user-guide", exact: true })).toHaveCount(1);
@@ -2371,5 +2387,80 @@ test.describe("Commit explorer behaviour", () => {
         const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(1);
         await explorer.getByRole("region", { name: "Commit details" }).getByRole("button", { name: "frontend/src/components/git-commands-panel.tsx" }).first().click();
         await expect(explorer.getByRole("region", { name: "File diff" })).toHaveAttribute("data-active", "true");
+    });
+});
+
+test.describe("Commit explorer details", () => {
+    test("the commit search box closes from inside the field and a ref's raw log text does not match", async ({ page }) => {
+        await openPage(page, "/page/commit-explorer", { components: "light" });
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).first();
+        const commitPane = explorer.getByRole("region", { name: "Commits" });
+        await page.keyboard.press("Tab");
+        await commitPane.getByRole("button", { name: "Search commits" }).click();
+        const box = explorer.getByRole("textbox", { name: "Search commits" });
+        await expect(box).toBeFocused();
+        await expect(box).toHaveAttribute("placeholder", "Search commits");
+        await box.fill("HEAD ->");
+        await page.keyboard.press("Enter");
+        await expect(commitPane).toContainText("There are no commits.");
+        await explorer.getByRole("button", { name: "Close the commit search" }).click();
+        await expect(box).toHaveCount(0);
+        await expect(explorer).toBeFocused();
+    });
+
+    test("file rows carry no status letter or line counts, and the tooltip names the change", async ({ page }) => {
+        await openPage(page, "/page/commit-explorer", { components: "light" });
+        const section = page.locator("section", { hasText: "Several branches at once" }).first();
+        const details = section.getByRole("region", { name: "Commit details" });
+        await expect(details.getByRole("button", { name: "frontend/src/lib/diff-colours.ts" }).first()).toBeVisible();
+        await expect(details.locator('[aria-label="Modified"], [aria-label="Renamed"]')).toHaveCount(0);
+        await details.getByText("diff-colours.ts", { exact: true }).hover();
+        const tip = page.getByRole("tooltip");
+        await expect(tip).toContainText("Renamed");
+        await expect(tip).toContainText("94% the same as before.");
+        await page.mouse.move(0, 0);
+        await details.getByText("split-diff-view.tsx", { exact: true }).hover();
+        await expect(page.getByRole("tooltip")).toContainText("Copied from");
+        await page.mouse.move(0, 0);
+        await details.getByText("diff-colours.png", { exact: true }).hover();
+        await expect(page.getByRole("tooltip")).toContainText("Binary file");
+    });
+
+    test("an untracked file's tooltip says Git does not track it", async ({ page }) => {
+        await openPage(page, "/page/commit-explorer", { components: "light" });
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(1);
+        const details = explorer.getByRole("region", { name: "Commit details" });
+        await details.getByRole("button", { name: "Commit options" }).click();
+        await page.getByRole("dialog", { name: "Commit options" }).getByRole("button", { name: "Changes from this commit to the files on disk" }).click();
+        await page.keyboard.press("Escape");
+        await details.getByText("ideas.md", { exact: true }).hover();
+        await expect(page.getByRole("tooltip").filter({ hasText: "Untracked" })).toContainText("Git does not track the file yet.");
+    });
+
+    test("focusing on a directory keeps the open diff, and a new commit clears the file search", async ({ page }) => {
+        await openPage(page, "/page/commit-explorer", { components: "light" });
+        const explorer = page.getByRole("application", { name: "Commit explorer" }).nth(2);
+        const details = explorer.getByRole("region", { name: "Commit details" });
+        await details.getByRole("button", { name: /^Directory / }).first().click();
+        await page.keyboard.press("f");
+        await expect(details.getByRole("button", { name: "Back to the directory above" })).toBeVisible();
+        await expect(explorer.getByRole("region", { name: "File diff", exact: true })).toBeVisible();
+        await details.getByRole("button", { name: "Search the files" }).click();
+        await expect(details.getByRole("textbox", { name: "Search the files" })).toBeVisible();
+        await explorer.getByRole("region", { name: "Commits" }).getByText("Initial commit").click();
+        await expect(explorer.getByRole("region", { name: "Commit details" }).getByRole("textbox", { name: "Search the files" })).toHaveCount(0);
+    });
+
+    test("the date tooltip copies the local time with its offset", async ({ page }) => {
+        await openPage(page, "/page/commit-explorer", { components: "light" });
+        const commitPane = page.getByRole("application", { name: "Commit explorer" }).first().getByRole("region", { name: "Commits" });
+        await commitPane.locator("li").first().locator("span.text-right").hover();
+        await expect(page.getByRole("tooltip")).toContainText(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/);
+    });
+
+    test("the Tree page's file rows carry no status letter", async ({ page }) => {
+        await openPage(page, "/page/tree", { components: "light" });
+        const tree = page.locator("main section").filter({ hasText: "Changed files by directory" }).first();
+        await expect(tree.locator('[aria-label="Modified"], [aria-label="Added"], [aria-label="Deleted"], [aria-label="Renamed"]')).toHaveCount(0);
     });
 });

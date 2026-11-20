@@ -26,7 +26,7 @@ import { FileTip } from "../../components/file-tip";
 //
 // How a file differs from the last commit, as Git's one-letter status.
 //
-export type FileStatus = "M" | "A" | "D" | "R";
+export type FileStatus = "M" | "A" | "D" | "R" | "C" | "T" | "U";
 
 //
 // One file or directory in the tree.
@@ -85,17 +85,17 @@ export const fileTree: ITreeNode[] = [
 ];
 
 //
-// Returns the colour token of a file status: success for added, danger for deleted, info for
-// renamed and warning for modified.
+// Returns the colour token of a file status: success for added, danger for deleted and for a
+// conflict, info for renamed and copied and warning for the rest.
 //
 export function statusColour(status: FileStatus): string {
     if (status === "A") {
         return "var(--color-success)";
     }
-    if (status === "D") {
+    if (status === "D" || status === "U") {
         return "var(--color-danger)";
     }
-    if (status === "R") {
+    if (status === "R" || status === "C") {
         return "var(--color-info)";
     }
     return "var(--color-warning)";
@@ -109,6 +109,9 @@ export const statusTips: Record<FileStatus, { title: string; detail: string }> =
     A: { title: "Added", detail: "The file is new." },
     D: { title: "Deleted", detail: "The file was removed." },
     R: { title: "Renamed", detail: "The file moved to a new path." },
+    C: { title: "Copied", detail: "The file is a copy of another file." },
+    T: { title: "Type changed", detail: "The file changed kind, such as to a symbolic link." },
+    U: { title: "Conflict", detail: "The file has a merge conflict." },
 };
 
 //
@@ -119,7 +122,7 @@ export function StatusLetter({ status }: { status: FileStatus }): ReactNode {
     return (
         <Tooltip title={<Tip title={statusTips[status].title} detail={statusTips[status].detail} />}>
             <span
-                aria-label={{ M: "modified", A: "added", D: "deleted", R: "renamed" }[status]}
+                aria-label={statusTips[status].title}
                 className="inline-flex flex-none items-center justify-center"
                 style={{
                     minWidth: "calc(var(--space-4) + var(--space-2))",
@@ -339,7 +342,7 @@ export function FileTree(): ReactNode {
                                     : undefined
                             }
                             menu={<FilePathMenu path={row.file.path} />}
-                            trail={status ? <StatusLetter status={status} /> : undefined}
+                            trail={undefined}
                             rowRef={undefined}
                             onSelect={() => setSelectedPath(row.file.path)}
                         />

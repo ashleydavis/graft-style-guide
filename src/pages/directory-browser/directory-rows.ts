@@ -23,22 +23,42 @@ export interface ICrumb {
 }
 
 //
-// Returns the breadcrumbs of `path`, from the top of the file system down to the directory itself.
+// Returns the breadcrumbs of `path`, from the top of the file system down to the directory itself,
+// so each can be clicked to go back to it. "/home/you/projects" gives "/", "home", "you" and
+// "projects". A Windows path such as "C:\\Users\\you" gives "C:", "Users" and "you", with the
+// drive's crumb going to "C:\\".
 //
 export function crumbsOf(path: string): ICrumb[] {
-    const crumbs: ICrumb[] = [
-        {
-            name: "/",
-            path: "/",
-        },
-    ];
+    const separator = path.includes("\\") ? "\\" : "/";
+    const parts = path.split(separator).filter(part => part !== "");
+    const crumbs: ICrumb[] = [];
     let prefix = "";
-    for (const part of path.split("/").filter(name => name !== "")) {
-        prefix = `${prefix}/${part}`;
+    if (path.startsWith(separator)) {
+        prefix = separator;
         crumbs.push({
-            name: part,
-            path: prefix,
+            name: separator,
+            path: separator,
         });
+    }
+    for (const part of parts) {
+        if (prefix === "" || prefix.endsWith(separator)) {
+            prefix = `${prefix}${part}`;
+        }
+        else {
+            prefix = `${prefix}${separator}${part}`;
+        }
+        if (crumbs.length === 0 && separator === "\\") {
+            crumbs.push({
+                name: part,
+                path: `${prefix}${separator}`,
+            });
+        }
+        else {
+            crumbs.push({
+                name: part,
+                path: prefix,
+            });
+        }
     }
     return crumbs;
 }

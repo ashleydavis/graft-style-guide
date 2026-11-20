@@ -32,6 +32,7 @@ import { scrollSelectionIntoView } from "../../commit-explorer/scroll";
 import { DiffView, type DiffLayout, type ISidedActions, type LinePick } from "./diff-view";
 import { isHunkDiscarded, isLineDiscarded, withFileDiscarded, withHunkMarked, withLinesMarked, type IDiscards } from "../discards";
 import { ImageDiff, type IImageVersion } from "./image-diff";
+import { SEARCH_DEBOUNCE_MS } from "../../../components/search-box";
 
 //
 // One changed file as the diff card shows it.
@@ -935,6 +936,18 @@ export function FileDiffCard({
         }
     }
 
+    //
+    // Finds what is typed once typing pauses, starting from the first match. Enter finds it at
+    // once, then steps to the next match.
+    //
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setSearch(draft);
+            setCurrentMatch(0);
+        }, SEARCH_DEBOUNCE_MS);
+        return () => window.clearTimeout(timer);
+    }, [draft]);
+
     function onSearchKey(event: KeyboardEvent<HTMLInputElement>): void {
         if (event.key === "Enter") {
             event.preventDefault();
@@ -1359,7 +1372,7 @@ export function FileDiffCard({
                     <TextField
                         size="small"
                         fullWidth
-                        placeholder="Find in this diff, then Enter"
+                        placeholder="Find in this diff"
                         value={draft}
                         onChange={event => setDraft(event.target.value)}
                         onKeyDown={onSearchKey}

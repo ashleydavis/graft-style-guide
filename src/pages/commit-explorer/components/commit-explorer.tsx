@@ -17,10 +17,11 @@ import { collapsedAfterAllKey } from "../../../components/tree-rows";
 import { scrollLastChildIntoView, scrollPaneIntoView, scrollSelectionIntoView } from "../scroll";
 import { parseHunks } from "../../diff/model";
 import { CommitDetailsPane, CommitInfoPane } from "./commit-details-pane";
-import { CommitPane } from "./commit-pane";
+import { CommitPane, refBadge } from "./commit-pane";
+import { useExplorerSearch } from "./explorer-search";
 import { DirectoryPane, FilePane } from "./file-pane";
 import { directoryKeyAction } from "../../../components/tree-guides";
-import { isSearchKey, matchesSearch, useSearchMode } from "../../../components/search-box";
+import { isSearchKey, matchesSearch } from "../../../components/search-box";
 import { ResizeHandle } from "./resize-handle";
 import { COLLAPSE_KEY } from "../../../components/collapse";
 import { withViewTransition } from "../../../lib/view-transition";
@@ -108,7 +109,7 @@ export function matchingCommits(commits: ICommit[], search: string): ICommit[] {
     if (needle === "") {
         return commits;
     }
-    return commits.filter(commit => [commit.title, commit.description, commit.authorName, commit.hash, ...commit.refs].some(text => text.toLowerCase().includes(needle)));
+    return commits.filter(commit => [commit.title, commit.description, commit.authorName, commit.hash, ...commit.refs.map(gitRef => refBadge(gitRef).name)].some(text => text.toLowerCase().includes(needle)));
 }
 
 //
@@ -125,16 +126,18 @@ export function matchingCommits(commits: ICommit[], search: string): ICommit[] {
 //
 export function CommitExplorer({ history = graftHistory, initialState }: { history?: IHistory; initialState?: IExplorerState }): ReactNode {
     const [state, setState] = useState<IExplorerState>(initialState ?? { ...initialExplorerState, selectedHash: history.commits[0].hash });
-    const commitSearch = useSearchMode();
+    //
+    // The commit search and the file search. Closing either gives the keys back to the explorer.
+    //
+    const commitSearch = useExplorerSearch(() => explorerRef.current?.focus());
     const [diffKind, setDiffKind] = useState<CommitDiffKind>("commit");
     const [readCount, setReadCount] = useState(COMMIT_PAGE_SIZE);
     const [isReading, setIsReading] = useState(false);
     const readTimer = useRef<number | undefined>(undefined);
     const [fileView, setFileView] = useState<FileListView>("tree");
     const [treeRoot, setTreeRoot] = useState("");
-    const [rootHistory, setRootHistory] = useState<string[]>([]);
     const [collapsedDirectories, setCollapsedDirectories] = useState<ReadonlySet<string>>(new Set());
-    const fileSearch = useSearchMode();
+    const fileSearch = useExplorerSearch(() => explorerRef.current?.focus());
 
     //
     // Returns the files of a commit the file list's search keeps.
@@ -173,28 +176,26 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     }
 
     //
-    // Shows only the open commit's files inside the directory `path`, with its first row selected.
+    // Shows only the open commit's files inside the directory `path`. The pane to the right stays
+    // open. The keyboard focus moves to the explorer, as the directory's row no longer shows.
     //
     function drillInto(path: string): void {
         explorerRef.current?.focus();
-        setRootHistory(current => [...current, treeRoot]);
         setTreeRoot(path);
-        setState(current => ({ ...current, activePaneIndex: 1, selectedPath: undefined, openPath: undefined }));
+        setState(current => ({ ...current, activePaneIndex: 1, selectedPath: undefined }));
     }
 
     //
-    // Goes back from a directory the file list shows to the view it was opened from, with the
-    // directory selected.
+    // Focuses the tree on the directory above the one it is focused on, leaving the selection as
+    // it is. The keyboard focus moves to the explorer, as the row or button that held it may no
+    // longer show.
     //
     function drillOut(): void {
         if (treeRoot === "") {
             return;
         }
         explorerRef.current?.focus();
-        const directory = `${DIRECTORY_PREFIX}${treeRoot}`;
-        setTreeRoot(rootHistory[rootHistory.length - 1] ?? parentDirectory(treeRoot));
-        setRootHistory(current => current.slice(0, -1));
-        setState(current => ({ ...current, activePaneIndex: 1, selectedPath: directory }));
+        setTreeRoot(parentDirectory(treeRoot));
     }
     const [commitPaneWidth, setCommitPaneWidth] = useState<number | undefined>(undefined);
     const [detailsPaneWidth, setDetailsPaneWidth] = useState(DETAILS_PANE_WIDTH);
@@ -336,9 +337,16 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         return maximisedPane === undefined || maximisedPane === index;
     }
 
+    //
+    // A newly opened commit starts with its tree at the top of the repository, every directory
+    // open and no file search.
+    //
     useEffect(() => {
         setTreeRoot("");
-        setRootHistory([]);
+        setCollapsedDirectories(new Set());
+        if (fileSearch.isOpen) {
+            fileSearch.close();
+        }
     }, [state.openHash]);
 
     useEffect(() => {
@@ -383,14 +391,15 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
     }
 
     //
-    // Opens the file `step` files from the open one in the commit's file list, in the order the
-    // list shows them, and keeps the keys in the file pane.
+    // Opens the row `step` rows from the open one in the commit's file list, in the order the list
+    // shows them, a directory's row opening its stacked diffs, and keeps the keys in the pane to
+    // the right.
     //
     function moveFile(step: number): void {
         if (!openCommit) {
             return;
         }
-        const paths = [COMMIT_SUMMARY_PATH, ...filePathsInViewOrder(searchedFiles(openFiles), fileView, shownRoot, collapsedDirectories)];
+        const paths = [COMMIT_SUMMARY_PATH, ...rowPathsInViewOrder(searchedFiles(openFiles), fileView, shownRoot, DIRECTORY_PREFIX, collapsedDirectories)];
         const index = state.openPath === undefined ? -1 : paths.indexOf(state.openPath);
         const next = paths[Math.min(Math.max(index + step, 0), paths.length - 1)];
         if (next !== undefined) {
@@ -408,7 +417,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             commitSearch.open();
             return;
         }
-        if (isSearchKey(event) && state.activePaneIndex === 1 && openCommit && openFiles.length > 0) {
+        if (isSearchKey(event) && state.activePaneIndex === 1 && openCommit) {
             event.preventDefault();
             event.stopPropagation();
             fileSearch.open();
@@ -456,13 +465,13 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
             }
             return;
         }
-        if ((event.key === "m" || event.key === "M") && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
+        if ((event.key === "m" || event.key === "M") && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
             event.preventDefault();
             event.stopPropagation();
             toggleMaximise(state.activePaneIndex);
             return;
         }
-        if (event.key.toUpperCase() === COLLAPSE_KEY && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
+        if (event.key.toUpperCase() === COLLAPSE_KEY && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
             event.preventDefault();
             event.stopPropagation();
             toggleCollapse(state.activePaneIndex);
@@ -482,21 +491,33 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
         if (state.activePaneIndex === 1 && !event.ctrlKey && !event.altKey && !event.metaKey && !isOwnKeyTarget(event.target, event.key)) {
             const directory = state.selectedPath?.startsWith(DIRECTORY_PREFIX) ? state.selectedPath.slice(DIRECTORY_PREFIX.length) : undefined;
             const directoryAction = fileView === "tree" ? directoryKeyAction(event) : undefined;
-            if (directoryAction) {
+            //
+            // A directory key acts only when there is something for it to act on: a selected
+            // directory to focus on or toggle, or a focused directory to go up from. Otherwise the
+            // key goes on, as Space on a file row goes on to the browser.
+            //
+            if (directory !== undefined && directoryAction === "focus") {
                 event.preventDefault();
                 event.stopPropagation();
-                if (directoryAction === "up") {
-                    drillOut();
-                }
-                else if (directory !== undefined && directoryAction === "focus") {
-                    drillInto(directory);
-                }
-                else if (directory !== undefined && directoryAction === "toggle") {
-                    toggleCollapsedDirectory(directory);
-                }
-                else if (directoryAction === "all") {
-                    setCollapsedDirectories(collapsedAfterAllKey(treeDirectories(), collapsedDirectories));
-                }
+                drillInto(directory);
+                return;
+            }
+            if (directoryAction === "up" && treeRoot !== "") {
+                event.preventDefault();
+                event.stopPropagation();
+                drillOut();
+                return;
+            }
+            if (directory !== undefined && directoryAction === "toggle") {
+                event.preventDefault();
+                event.stopPropagation();
+                toggleCollapsedDirectory(directory);
+                return;
+            }
+            if (directoryAction === "all") {
+                event.preventDefault();
+                event.stopPropagation();
+                setCollapsedDirectories(collapsedAfterAllKey(treeDirectories(), collapsedDirectories));
                 return;
             }
             if (event.key === "Escape" && shownRoot !== "") {
@@ -574,7 +595,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                     // beside the one in view always shows a strip to tap.
                     //
                     className="flex min-h-0 flex-1 items-stretch overflow-x-auto [&>*]:max-w-[calc(100%-var(--space-8)*1.5)]"
-                    style={{ paddingTop: "var(--space-3)" }}
+                    style={{ padding: "var(--space-3) var(--space-3) var(--space-3) 0" }}
                     //
                     // A press anywhere in a pane makes it the active pane, found by the pane's
                     // label, and scrolls the whole pane into view. A press on a pane less than half
@@ -646,14 +667,7 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                             commit={openCommit}
                             files={openFiles}
                             diffKind={diffKind}
-                            onChangeDiffKind={kind => {
-                                //
-                                // The other comparison has other files, so the pane to the right
-                                // closes.
-                                //
-                                setDiffKind(kind);
-                                setState(closeFilePane);
-                            }}
+                            onChangeDiffKind={setDiffKind}
                             selectedPath={state.selectedPath}
                             openPath={state.openPath}
                             isActive={state.activePaneIndex === 1}

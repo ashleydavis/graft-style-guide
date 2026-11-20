@@ -128,7 +128,7 @@ export function GitCommandsPanel({ repoPath, commands }: IGitCommandsPanelProps)
                     </div>
                     {search.isOpen ? (
                         <div style={{ margin: "0 calc(var(--space-2) * -1)" }}>
-                            <SearchModeBox mode={search} label="Search the commands" placeholder="Search the commands, then Enter" result={`${shown.length} of ${commands.length}`} />
+                            <SearchModeBox mode={search} label="Search the commands" placeholder="Search the commands" result={`${shown.length} of ${commands.length}`} />
                         </div>
                     ) : undefined}
                     {shown.length === 0 ? <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>No commands match the search.</p> : undefined}

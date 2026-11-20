@@ -1,10 +1,11 @@
 //
-// The browser for finding a repository by walking the directories. It starts in the home
-// directory. The directories show as a tree drawn with the same rows as the file trees, closed at
-// first, with the Git icon on each repository: a click selects a directory, its +/- button opens or
-// closes it in place, and its focus button, a double click or Enter goes into it. The search looks
-// through every directory under the one being looked at when Enter is pressed and shows its
-// matches as a tree, each under the directories above it. The Open repository button opens the
+// The browser for finding a repository by walking the directories. It starts in the directory
+// browsed to last, or the home directory. The directories show as a tree drawn with the same rows
+// as the file trees, closed at first, with the Git icon on each repository: a click selects a
+// directory, its +/- button opens or closes it in place, and its focus button, a double click or
+// Enter goes into it. Searching walks every directory under the one being looked at, which is slow
+// on a real disk, so it runs only on Enter or the search button, and shows its matches as a tree,
+// each under the directories above it. The Open repository button opens the
 // selected repository or the one being looked at. The directories are the made-up ones in
 // directories.ts.
 //
@@ -20,21 +21,79 @@ import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGitAlt } from "@fortawesome/free-brands-svg-icons";
 import { faArrowUp, faChevronRight, faHouse, faMagnifyingGlass, faXmark } from "@fortawesome/free-solid-svg-icons";
-import { allDirectoriesUnder, directoryEntries, HOME_DIRECTORY, listDirectory, searchDirectories, type IDirectoryEntry } from "../directories";
+import { allDirectoriesUnder, directoryEntries, HOME_DIRECTORY, listDirectory, searchDirectories, type IDirectoryEntry, type IDirectorySearch } from "../directories";
 import { crumbsOf, searchTreeRows, visibleRows, type IVisibleRow } from "../directory-rows";
 import { directoryKeyAction } from "../../../components/tree-guides";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { TreeBar, TreeDirectoryRow } from "../../../components/tree-rows";
+import { Tip } from "../../../components/tip";
 
 //
-// Returns true for a key that types a character, which starts a search when the list has the keys.
+// Returns true for a key that types a character, which starts a search when no text box has the
+// keys.
 //
 export function isTypingKey(event: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean }): boolean {
     return event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
 }
 
 //
-// Renders a muted line, for a tree that has nothing to show.
+// The key the directory browsed to last is kept under in the browser's storage, named for the
+// style guide so it never meets another page's key.
+//
+const DIRECTORY_KEY = "graft-style-guide-browse-directory";
+
+//
+// The most directories expand all opens, so expanding a large tree such as a home directory stops
+// rather than running on.
+//
+const EXPAND_ALL_MAX = 300;
+
+//
+// How long reading a directory of the example file system takes, in milliseconds, long enough to
+// see "Reading…" in place of the breadcrumbs, as Graft waits on the disk.
+//
+const LISTING_READ_DELAY_MS = 200;
+
+//
+// How long the example search takes, in milliseconds, long enough to see "Searching…".
+//
+const SEARCH_DELAY_MS = 400;
+
+//
+// Reads the directory browsed to last, or the home directory when none was kept or the kept one is
+// gone. Storage can be missing in a private window, which starts in the home directory and logs
+// why.
+//
+export function readStoredDirectory(): string {
+    let stored: string | null;
+    try {
+        stored = localStorage.getItem(DIRECTORY_KEY);
+    }
+    catch (error) {
+        console.warn("The directory browsed to last could not be read from the browser's storage, so the browser starts in the home directory.", error);
+        return HOME_DIRECTORY;
+    }
+    if (stored && listDirectory(stored)) {
+        return stored;
+    }
+    return HOME_DIRECTORY;
+}
+
+//
+// Keeps the directory browsed to, so the browser starts there next time. Storage can be missing in
+// a private window, which logs why and keeps the directory for this visit only.
+//
+export function storeDirectory(path: string): void {
+    try {
+        localStorage.setItem(DIRECTORY_KEY, path);
+    }
+    catch (error) {
+        console.warn("The directory browsed to could not be kept in the browser's storage, so the next visit starts in the home directory.", error);
+    }
+}
+
+//
+// Renders a muted line, for a tree that has nothing to show or is still being read.
 //
 export function QuietNote({ children }: { children: ReactNode }): ReactNode {
     return <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>{children}</p>;
@@ -46,7 +105,10 @@ export function QuietNote({ children }: { children: ReactNode }): ReactNode {
 // inside it. `onPick` is called with the repository to open.
 //
 export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void }): ReactNode {
-    const [path, setPath] = useState(HOME_DIRECTORY);
+    const [path, setPath] = useState(readStoredDirectory);
+    const [readPath, setReadPath] = useState<string | undefined>(undefined);
+    const [found, setFound] = useState<IDirectorySearch | undefined>(undefined);
+    const [isExpandCut, setIsExpandCut] = useState(false);
     const [selected, setSelected] = useState<IDirectoryEntry | undefined>(undefined);
     const [draft, setDraft] = useState("");
     const [query, setQuery] = useState("");
@@ -55,7 +117,10 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     const searchRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
     const selectedRef = useRef<HTMLLIElement>(null);
-    const listing = listDirectory(path);
+    //
+    // The directory being looked at, once its example listing has been read after a short wait.
+    //
+    const listing = readPath === path ? listDirectory(path) : undefined;
 
     useEffect(() => {
         selectedRef.current?.scrollIntoView({ block: "nearest" });
@@ -71,11 +136,49 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
         setQuery("");
         setExpanded(new Set());
         setSearchCollapsed(new Set());
+        setIsExpandCut(false);
+        storeDirectory(path);
+        const timer = window.setTimeout(() => setReadPath(path), LISTING_READ_DELAY_MS);
+        return () => window.clearTimeout(timer);
     }, [path]);
+
+    //
+    // Runs the search Enter or the search button started after a short wait, so "Searching…" shows
+    // meanwhile.
+    //
+    useEffect(() => {
+        setFound(undefined);
+        if (query.trim() === "") {
+            return undefined;
+        }
+        const timer = window.setTimeout(() => setFound(searchDirectories(path, query)), SEARCH_DELAY_MS);
+        return () => window.clearTimeout(timer);
+    }, [path, query]);
+
+    //
+    // Typing anywhere on the page, outside another text box, goes into the search box. A key a
+    // handler on the page has already acted on is left alone.
+    //
+    useEffect(() => {
+        function startSearch(event: globalThis.KeyboardEvent): void {
+            if (event.defaultPrevented) {
+                return;
+            }
+            const target = event.target;
+            const isInTextBox = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+            if (isInTextBox || !isTypingKey(event) || !searchRef.current) {
+                return;
+            }
+            event.preventDefault();
+            searchRef.current.focus();
+            setDraft(text => text + event.key);
+        }
+        window.addEventListener("keydown", startSearch);
+        return () => window.removeEventListener("keydown", startSearch);
+    }, []);
 
     const repositoryPath = selected?.isRepository ? selected.path : listing?.isRepository ? listing.path : undefined;
     const isSearching = query.trim() !== "";
-    const found = isSearching ? searchDirectories(path, query) : undefined;
     const searchRows = found ? searchTreeRows(found.path, found.matches, searchCollapsed) : [];
     const rows: IVisibleRow[] = isSearching ? searchRows : visibleRows(listing?.entries ?? [], expanded, directoryEntries);
     const matchedPaths = new Set(searchRows.filter(row => row.isMatch).map(row => row.entry.path));
@@ -122,10 +225,13 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     }
 
     //
-    // Opens every directory under the one being looked at.
+    // Opens every directory under the one being looked at, stopping after EXPAND_ALL_MAX and saying
+    // so.
     //
     function expandAll(): void {
-        setExpanded(new Set(allDirectoriesUnder(path)));
+        const opened = allDirectoriesUnder(path, EXPAND_ALL_MAX);
+        setExpanded(new Set(opened.paths));
+        setIsExpandCut(opened.isCut);
     }
 
     //
@@ -133,6 +239,15 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     //
     function collapseAll(): void {
         setExpanded(new Set());
+        setIsExpandCut(false);
+    }
+
+    //
+    // Starts searching for what is typed, from Enter or the search button.
+    //
+    function runSearch(): void {
+        setQuery(draft);
+        setSearchCollapsed(new Set());
     }
 
     //
@@ -144,7 +259,7 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     }
 
     //
-    // Applies the search on Enter, or goes into the only match when Enter is pressed again; moves
+    // Runs the search on Enter, or goes into the only match when Enter is pressed again; moves
     // the keys to the tree on Down; and ends the search on Escape.
     //
     function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
@@ -152,8 +267,7 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
         if (event.key === "Enter") {
             event.preventDefault();
             if (draft !== query) {
-                setQuery(draft);
-                setSearchCollapsed(new Set());
+                runSearch();
             }
             else if (rows.length === 1 && first) {
                 setPath(first.entry.path);
@@ -166,7 +280,6 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
             setSelected(isShown && selected ? selected : first.entry);
         }
         else if (event.key === "Escape") {
-            event.preventDefault();
             clearSearch();
         }
     }
@@ -175,7 +288,8 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     // Moves through the tree and acts on the selected directory: Up and Down move the selection,
     // Right opens and Left closes or goes to the directory above in the tree, E or Space opens or
     // closes, F or Enter goes into it, U or Backspace goes up a directory and A expands or
-    // collapses every directory. Any other character starts a search with it.
+    // collapses every directory. Any other character goes on to the page, which starts a search
+    // with it.
     //
     function onListKeyDown(event: KeyboardEvent<HTMLUListElement>): void {
         if ((event.key === "Enter" || event.key === " ") && event.target instanceof HTMLElement && event.target.closest("button") !== null) {
@@ -183,7 +297,10 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
         }
         const index = selected ? rows.findIndex(row => row.entry.path === selected.path) : -1;
         const current = rows[index];
-        const action = directoryKeyAction(event);
+        //
+        // A directory key held with Ctrl, Meta or Alt belongs to the browser or the system.
+        //
+        const action = event.ctrlKey || event.metaKey || event.altKey ? undefined : directoryKeyAction(event);
         if (action === "toggle" && current) {
             event.preventDefault();
             if (isSearching) {
@@ -258,11 +375,6 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
             event.preventDefault();
             goTo(listing.parent);
         }
-        else if (isTypingKey(event) && searchRef.current) {
-            event.preventDefault();
-            searchRef.current.focus();
-            setDraft(text => text + event.key);
-        }
     }
 
     return (
@@ -270,43 +382,47 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
             <div className="flex flex-none flex-wrap items-center" style={{ gap: "var(--space-2)" }}>
                 <Tooltip title="Home directory">
                     <IconButton size="small" aria-label="Home directory" onClick={() => setPath(HOME_DIRECTORY)}>
-                        <FontAwesomeIcon icon={faHouse} />
+                        <FontAwesomeIcon icon={faHouse} style={{ fontSize: "var(--icon-sm)" }} />
                     </IconButton>
                 </Tooltip>
                 <Tooltip title="Up one directory">
                     <span>
                         <IconButton size="small" aria-label="Up one directory" disabled={!listing?.parent} onClick={() => setPath(listing?.parent ?? path)}>
-                            <FontAwesomeIcon icon={faArrowUp} />
+                            <FontAwesomeIcon icon={faArrowUp} style={{ fontSize: "var(--icon-sm)" }} />
                         </IconButton>
                     </span>
                 </Tooltip>
                 <div className="min-w-0 flex-1" style={{ flexBasis: "calc(var(--space-8) * 6)" }}>
-                    <Breadcrumbs
-                        aria-label="Directory path"
-                        maxItems={8}
-                        itemsBeforeCollapse={2}
-                        itemsAfterCollapse={4}
-                        separator={<FontAwesomeIcon icon={faChevronRight} style={{ fontSize: "var(--icon-sm)", color: "var(--color-text-muted)" }} />}
-                        sx={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", "& .MuiBreadcrumbs-separator": { margin: "0 var(--space-2)" }, "& .MuiBreadcrumbs-ol": { flexWrap: "wrap" } }}
-                    >
-                        {crumbsOf(path).map((crumb, index, crumbs) =>
-                            index === crumbs.length - 1 ? (
-                                <span key={crumb.path} aria-current="page" style={{ color: "var(--color-text)", fontWeight: "var(--weight-bold)" }}>
-                                    {crumb.name}
-                                </span>
-                            ) : (
-                                <button
-                                    key={crumb.path}
-                                    type="button"
-                                    onClick={() => setPath(crumb.path)}
-                                    className="cursor-pointer hover:underline"
-                                    style={{ color: "var(--color-text-muted)", background: "none", border: "none", padding: 0, font: "inherit" }}
-                                >
-                                    {crumb.name}
-                                </button>
-                            ),
-                        )}
-                    </Breadcrumbs>
+                    {listing ? (
+                        <Breadcrumbs
+                            aria-label="Directory path"
+                            maxItems={8}
+                            itemsBeforeCollapse={2}
+                            itemsAfterCollapse={4}
+                            separator={<FontAwesomeIcon icon={faChevronRight} style={{ fontSize: "var(--icon-sm)", color: "var(--color-text-muted)" }} />}
+                            sx={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", "& .MuiBreadcrumbs-separator": { margin: "0 var(--space-2)" }, "& .MuiBreadcrumbs-ol": { flexWrap: "wrap" } }}
+                        >
+                            {crumbsOf(path).map((crumb, index, crumbs) =>
+                                index === crumbs.length - 1 ? (
+                                    <span key={crumb.path} aria-current="page" style={{ color: "var(--color-text)", fontWeight: "var(--weight-bold)" }}>
+                                        {crumb.name}
+                                    </span>
+                                ) : (
+                                    <button
+                                        key={crumb.path}
+                                        type="button"
+                                        onClick={() => setPath(crumb.path)}
+                                        className="cursor-pointer hover:underline"
+                                        style={{ color: "var(--color-text-muted)", background: "none", border: "none", padding: 0, font: "inherit" }}
+                                    >
+                                        {crumb.name}
+                                    </button>
+                                ),
+                            )}
+                        </Breadcrumbs>
+                    ) : (
+                        <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Reading…</span>
+                    )}
                 </div>
                 <Button
                     variant="contained"
@@ -323,28 +439,37 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
             <TextField
                 size="small"
                 fullWidth
-                placeholder="Search the directories, then Enter"
+                placeholder="Search the directories"
                 value={draft}
                 onChange={event => setDraft(event.target.value)}
                 onKeyDown={onSearchKeyDown}
                 inputRef={searchRef}
+                autoFocus
                 slotProps={{
                     input: {
                         startAdornment: (
                             <InputAdornment position="start">
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: "var(--icon-md)" }} />
+                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: "var(--icon-sm)" }} />
                             </InputAdornment>
                         ),
-                        endAdornment:
-                            draft !== "" || isSearching ? (
-                                <InputAdornment position="end">
+                        endAdornment: (
+                            <InputAdornment position="end" sx={{ gap: "var(--space-1)" }}>
+                                <Tooltip title={<Tip title="Search" detail="Key: Enter. Searching walks every directory below, so it waits for Enter." />}>
+                                    <span>
+                                        <IconButton size="small" aria-label="Search" disabled={draft.trim() === "" || draft === query} onClick={runSearch}>
+                                            <FontAwesomeIcon icon={faMagnifyingGlass} />
+                                        </IconButton>
+                                    </span>
+                                </Tooltip>
+                                {draft !== "" || isSearching ? (
                                     <Tooltip title="Clear the search">
                                         <IconButton size="small" aria-label="Clear the search" onClick={clearSearch} edge="end">
                                             <FontAwesomeIcon icon={faXmark} />
                                         </IconButton>
                                     </Tooltip>
-                                </InputAdornment>
-                            ) : undefined,
+                                ) : undefined}
+                            </InputAdornment>
+                        ),
                     },
                     htmlInput: {
                         "aria-label": "Search the directories",
@@ -353,7 +478,9 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
                 }}
             />
             {listing && listing.entries.length === 0 ? <QuietNote>This directory has no directories inside it.</QuietNote> : undefined}
+            {isSearching && !found ? <QuietNote>Searching…</QuietNote> : undefined}
             {isSearching && found && found.matches.length === 0 ? <QuietNote>No directory under this one matches the search.</QuietNote> : undefined}
+            {isExpandCut ? <QuietNote>Expand all stopped after {EXPAND_ALL_MAX} directories. Go into a directory nearer the one you want to expand all of it.</QuietNote> : undefined}
             {rows.length > 0 ? (
                 <List
                     ref={listRef}
@@ -365,10 +492,10 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
                         // The list takes the height the browser has left under its bar and search
                         // box, and scrolls inside it.
                         //
-                        flex: "1 1 0%",
+                        flex: "1 1 auto",
                         minHeight: "calc(var(--space-8) * 4)",
                         overflowY: "auto",
-                        padding: "0 0 var(--space-2)",
+                        padding: "var(--space-2)",
                         outline: "none",
                         background: "var(--color-panel)",
                         border: "1px solid var(--color-border)",
@@ -395,7 +522,7 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
                                 isSelected={isSelected}
                                 isHighlighted={matchedPaths.has(row.entry.path)}
                                 isOpen={false}
-                                icon={row.entry.isRepository ? <FontAwesomeIcon icon={faGitAlt} aria-label="Git repository" style={{ fontSize: "var(--icon-md)", color: "var(--color-text)", flex: "none" }} /> : undefined}
+                                icon={row.entry.isRepository ? <FontAwesomeIcon icon={faGitAlt} aria-label="Git repository" style={{ fontSize: "calc(var(--icon-sm) + 2px)", color: "var(--color-text)", flex: "none" }} /> : undefined}
                                 tint={undefined}
                                 isDiscarded={false}
                                 lead={undefined}

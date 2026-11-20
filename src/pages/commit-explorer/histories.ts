@@ -298,6 +298,32 @@ export const releaseHistory: IHistory = buildHistory("graft-desktop", "main", [
         files: [
             change("frontend/src/components/diff-view.tsx", "M", 41, ["   const style = lineStyles[line.kind];", "-  const background = line.kind === \"deleted\" ? \"\" : style.background;", "+  const background = style.background;", "+  const markerColour = style.markerColour;", "   return ("]),
             change("frontend/src/components/diff-view.test.tsx", "M", 18, ["   it(\"colours added lines\", () => {", "+  it(\"colours removed lines\", () => {", "+      expect(renderLine(\"-a\").background).toBe(\"var(--color-diff-removed)\");", "+  });"]),
+            {
+                ...change("frontend/src/lib/diff-colours.ts", "M", 3, [" export const lineStyles = {", "-    added: \"green\",", "+    added: \"var(--color-diff-added)\","]),
+                status: "R",
+                oldPath: "frontend/src/lib/line-styles.ts",
+                similarity: 94,
+            },
+            {
+                path: "frontend/src/components/split-diff-view.tsx",
+                status: "C",
+                oldPath: "frontend/src/components/diff-view.tsx",
+                similarity: 100,
+                linesAdded: 0,
+                linesDeleted: 0,
+                diff: "",
+            },
+            {
+                path: "frontend/public/diff-colours.png",
+                status: "M",
+                linesAdded: 0,
+                linesDeleted: 0,
+                diff: "",
+                binary: {
+                    oldSize: "12.4 kB",
+                    newSize: "13.1 kB",
+                },
+            },
         ],
     },
     {

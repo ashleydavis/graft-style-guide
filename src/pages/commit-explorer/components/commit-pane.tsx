@@ -12,7 +12,8 @@ import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
-import { SearchModeBox, type ISearchMode } from "../../../components/search-box";
+import type { ISearchMode } from "../../../components/search-box";
+import { ExplorerSearchBox } from "./explorer-search";
 import { CommitColumnOptions, readColumns, storeColumns, type ICommitColumns } from "./commit-columns";
 import { type RefKind } from "../../badges";
 import { BADGES_COLUMN_WIDTH, RefBadges } from "../../../components/ref-badges";
@@ -21,7 +22,7 @@ import { PinnableTooltip } from "../../../components/pinnable-tooltip";
 import { GraphLanes } from "../../commit-graph/components/graph-row";
 import type { ICommit } from "../data";
 import { Tip } from "../../../components/tip";
-import { longDate } from "./commit-details-pane";
+import { localIsoDate, longDate, shortDate } from "../dates";
 import { Pane } from "./pane";
 import { scrollSelectionIntoView } from "../scroll";
 
@@ -41,16 +42,6 @@ export function refBadge(gitRef: string): { kind: RefKind; name: string } {
         return { kind: "remote", name: gitRef };
     }
     return { kind: "branch", name: gitRef };
-}
-
-//
-// Formats a commit's day for its row, as in "14 Nov", in the browser's own locale.
-//
-export function shortDate(date: Date): string {
-    return date.toLocaleDateString(undefined, {
-        day: "numeric",
-        month: "short",
-    });
 }
 
 //
@@ -111,8 +102,8 @@ export interface ICommitPaneProps {
     isActive: boolean;
 
     //
-    // The search mode of the commits: the search button and Ctrl+F show its box, Enter applies what
-    // is typed and Escape ends it.
+    // The search mode of the commits: the search button and Ctrl+F show its box, it searches once
+    // typing pauses or on Enter and Escape ends it.
     //
     search: ISearchMode;
 
@@ -122,7 +113,7 @@ export interface ICommitPaneProps {
     matchCount: number;
 
     //
-    // How many commits there are in all.
+    // How many commits have been read so far, which the search's count is out of.
     //
     totalCount: number;
 
@@ -183,7 +174,7 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
     if (isReading) {
         endText = "Reading more commits…";
     }
-    else if (totalCount === 0) {
+    else if (commits.length === 0) {
         endText = "There are no commits.";
     }
     else if (!hasMore) {
@@ -205,6 +196,18 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
             width={width === undefined ? "850px" : `${width}px`}
             isActive={isActive}
             title="Commits"
+            fillsHeight
+            toolbar={
+                search.isOpen ? (
+                    <ExplorerSearchBox
+                        search={search}
+                        label="Search commits"
+                        placeholder="Search commits"
+                        closeLabel="Close the commit search"
+                        result={isSearching ? `${matchCount} of ${totalCount}${hasMore ? " read" : ""}` : undefined}
+                    />
+                ) : undefined
+            }
             headerExtra={
                 <>
                     <Tooltip title={<Tip title="Search commits" detail="Keys: Ctrl+F" />}>
@@ -222,14 +225,6 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
                 </>
             }
         >
-            {search.isOpen ? (
-                //
-                // The search box stays at the top of the pane while the commits scroll under it.
-                //
-                <div className="sticky top-0" style={{ zIndex: 1 }}>
-                    <SearchModeBox mode={search} label="Search commits" placeholder="Search by message, author, hash or ref, then Enter" result={`${matchCount} of ${totalCount}`} />
-                </div>
-            ) : undefined}
             {isSearching && commits.length === 0 ? (
                 <p style={{ padding: "var(--space-3) var(--space-4) 0", textAlign: "center", color: "var(--color-text-muted)" }}>No commits read so far match the search.</p>
             ) : undefined}
@@ -296,7 +291,7 @@ export function CommitPane({ commits, laneCount, width, isMaximised, onToggleMax
                                 </PinnableTooltip>
                             ) : undefined}
                             {columns.date ? (
-                                <PinnableTooltip enterDelayMs={400} maxWidth="calc(var(--space-8) * 12)" tip={pinButton => <CopyTip fields={[textField("Written", longDate(commit.authorDate)), codeField("ISO 8601", commit.authorDate.toISOString())]} action={pinButton} />}>
+                                <PinnableTooltip enterDelayMs={400} maxWidth="calc(var(--space-8) * 12)" tip={pinButton => <CopyTip fields={[textField("Written", longDate(commit.authorDate)), codeField("ISO 8601", localIsoDate(commit.authorDate))]} action={pinButton} />}>
                                     <span className="hidden flex-none text-right @min-[440px]:block" style={{ width: "52px", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
                                         {shortDate(commit.authorDate)}
                                     </span>

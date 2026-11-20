@@ -5,6 +5,22 @@
 //
 
 import type { ILaneShape } from "../commit-graph/components/graph-row";
+import type { FileStatus } from "../tree";
+
+//
+// The sizes of a binary file before and after a change, as the diff card shows them.
+//
+export interface IBinarySizes {
+    //
+    // The file's size before the change, as in "12.4 kB".
+    //
+    oldSize: string;
+
+    //
+    // The file's size after the change.
+    //
+    newSize: string;
+}
 
 //
 // One file a commit changed.
@@ -16,10 +32,25 @@ export interface IChangedFile {
     path: string;
 
     //
-    // How the commit changed the file, as Git's one-letter status: A added, M modified or D
-    // deleted.
+    // How the commit changed the file, as Git's one-letter status.
     //
-    status: "A" | "M" | "D";
+    status: FileStatus;
+
+    //
+    // The path a renamed or copied file had before, absent for a file that kept its path.
+    //
+    oldPath?: string;
+
+    //
+    // How much of a renamed or copied file is the same as before, as a percentage.
+    //
+    similarity?: number;
+
+    //
+    // The sizes of a binary file before and after, absent for a text file. Git does not count a
+    // binary file's lines, so its diff is empty.
+    //
+    binary?: IBinarySizes;
 
     //
     // The lines the commit added to the file.
@@ -164,6 +195,12 @@ function onMain(options: Partial<ILaneShape> = {}): ILaneShape {
 // The path of the example repository, as the `cd` into it shows it.
 //
 export const repoPath = "~/projects/graft";
+
+//
+// The full path of the example repository's top directory, which the path menus copy full paths
+// from.
+//
+export const repoRoot = "/home/you/projects/graft";
 
 //
 // The commits of the small example history, newest first: main, with one feature branch that

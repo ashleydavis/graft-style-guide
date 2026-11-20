@@ -1,7 +1,7 @@
 //
 // The search inputs of large content: a filter box that always shows and narrows the content as
 // the person types, and a search box that shows only in search mode, which Ctrl+F or a search
-// button starts, Enter applies and Escape ends.
+// button starts, which searches once typing pauses, or at once on Enter, and which Escape ends.
 //
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
@@ -64,8 +64,8 @@ export function FilterBox({ value, onChange, label, placeholder }: { value: stri
 }
 
 //
-// The state of a search mode: whether the box shows, what is typed in it, the query Enter applied,
-// and the calls that start and end the mode.
+// The state of a search mode: whether the box shows, what is typed in it, the query it searches
+// for and the calls that start and end the mode.
 //
 export interface ISearchMode {
     //
@@ -79,7 +79,7 @@ export interface ISearchMode {
     draft: string;
 
     //
-    // The query the content is searched for, set from the draft by Enter.
+    // The query the content is searched for, set from the draft once typing pauses or on Enter.
     //
     query: string;
 
@@ -110,12 +110,54 @@ export interface ISearchMode {
 }
 
 //
+// How long typing must pause before a cheap search runs, in milliseconds: long enough that a
+// search does not run for every key of a word being typed, short enough to feel immediate.
+//
+export const SEARCH_DEBOUNCE_MS = 250;
+
+//
+// The query a search box searches for, which follows what is typed once typing pauses, and the
+// call that applies what is typed at once, for Enter.
+//
+export interface IDebouncedQuery {
+    //
+    // The query the content is searched for.
+    //
+    query: string;
+
+    //
+    // Applies what is typed straight away.
+    //
+    applyNow: () => void;
+}
+
+//
+// Returns the query for `draft`, the text typed in a cheap search's box: it follows the draft
+// SEARCH_DEBOUNCE_MS after typing pauses, and empties at once when the draft is cleared.
+//
+export function useDebouncedQuery(draft: string): IDebouncedQuery {
+    const [query, setQuery] = useState("");
+    useEffect(() => {
+        if (draft === "") {
+            setQuery("");
+            return undefined;
+        }
+        const timer = window.setTimeout(() => setQuery(draft), SEARCH_DEBOUNCE_MS);
+        return () => window.clearTimeout(timer);
+    }, [draft]);
+    return {
+        query,
+        applyNow: () => setQuery(draft),
+    };
+}
+
+//
 // Returns a search mode, closed and with no query.
 //
 export function useSearchMode(): ISearchMode {
     const [isOpen, setIsOpen] = useState(false);
     const [draft, setDraft] = useState("");
-    const [query, setQuery] = useState("");
+    const debounced = useDebouncedQuery(draft);
     const [openCount, setOpenCount] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
     const focusBefore = useRef<HTMLElement | null>(null);
@@ -130,7 +172,7 @@ export function useSearchMode(): ISearchMode {
     return {
         isOpen,
         draft,
-        query,
+        query: debounced.query,
         setDraft,
         inputRef,
         open: () => {
@@ -143,18 +185,17 @@ export function useSearchMode(): ISearchMode {
         close: () => {
             setIsOpen(false);
             setDraft("");
-            setQuery("");
             if (focusBefore.current?.isConnected) {
                 focusBefore.current.focus();
             }
         },
-        apply: () => setQuery(draft),
+        apply: debounced.applyNow,
     };
 }
 
 //
-// Renders a search mode's box while the mode is open: Enter applies what is typed, Escape or the
-// close button ends the mode, and `result` says how many matches the query found.
+// Renders a search mode's box while the mode is open: it searches once typing pauses or on Enter,
+// Escape or the close button ends the mode, and `result` says how many matches the query found.
 //
 export function SearchModeBox({ mode, label, placeholder, result }: { mode: ISearchMode; label: string; placeholder: string; result?: string }): ReactNode {
     if (!mode.isOpen) {
