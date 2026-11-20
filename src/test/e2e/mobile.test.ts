@@ -170,9 +170,9 @@ for (const orientation of orientations) {
             await page.getByRole("button", { name: "Configuration" }).tap();
             const explorerSwitch = page.getByRole("dialog", { name: "Configuration" }).getByRole("group", { name: "Explorer" });
             await explorerSwitch.getByRole("button", { name: "Light", exact: true }).tap();
-            await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+            await expect(page.locator("html")).toHaveClass(/(^|\s)light(\s|$)/);
             await page.getByRole("dialog", { name: "Configuration" }).getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).tap();
-            await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
+            await expect(page.locator('main .dark')).toHaveCount(0);
         });
 
         test("moving to a pane on the left of the commit explorer scrolls it into view", async ({ page }) => {

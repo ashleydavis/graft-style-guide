@@ -91,7 +91,7 @@ test.describe("Sidebar", () => {
     test("the sidebar stays minimised when changing a setting", async ({ page }) => {
         await openPage(page, "/page/button", { sidebar: "minimised", explorer: "dark" });
         await expect(page.getByRole("navigation").getByRole("button", { name: "Restore sidebar" })).toBeVisible();
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+        await expect(page.locator("html")).toHaveClass(/(^|\s)dark(\s|$)/);
     });
 });
 
@@ -135,16 +135,16 @@ test.describe("Themes", () => {
         expect(sectionCount).toBeGreaterThan(0);
         for (let sectionIndex = 0; sectionIndex < sectionCount; sectionIndex++) {
             const section = sections.nth(sectionIndex);
-            await expect(section.locator('[data-theme="light"]')).toHaveCount(1);
-            await expect(section.locator('[data-theme="dark"]')).toHaveCount(1);
+            await expect(section.locator('.light')).toHaveCount(1);
+            await expect(section.locator('.dark')).toHaveCount(1);
         }
     });
 
     test("a button takes different colours from the light and dark tokens", async ({ page }) => {
         await openPage(page, "/page/button", { components: "both" });
         const kinds = page.locator("main section").first();
-        const lightButton = kinds.locator('[data-theme="light"]').getByRole("button", { name: "Commit" });
-        const darkButton = kinds.locator('[data-theme="dark"]').getByRole("button", { name: "Commit" });
+        const lightButton = kinds.locator('.light').getByRole("button", { name: "Commit" });
+        const darkButton = kinds.locator('.dark').getByRole("button", { name: "Commit" });
         const lightBackground = await computedStyle(lightButton, "background-color");
         const darkBackground = await computedStyle(darkButton, "background-color");
         expect(lightBackground).not.toBe("");
@@ -156,11 +156,11 @@ test.describe("Themes", () => {
         await openPage(page, "/page/overview", { components: "both" });
         const roleColours = page.locator("main section").nth(1);
         const lightValue = roleColours
-            .locator('[data-theme="light"]')
+            .locator('.light')
             .getByText("--color-bg", { exact: true })
             .locator("xpath=following-sibling::div[1]");
         const darkValue = roleColours
-            .locator('[data-theme="dark"]')
+            .locator('.dark')
             .getByText("--color-bg", { exact: true })
             .locator("xpath=following-sibling::div[1]");
         await expect(lightValue).toHaveText(/^#[0-9a-f]{6}$/);
@@ -176,17 +176,17 @@ test.describe("Component mode and explorer theme", () => {
         const configuration = await openConfiguration(page);
         await expect(configuration.getByRole("group", { name: "Components" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
         await expect(configuration.getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-        await expect(page.locator('main [data-theme="light"]')).toHaveCount(0);
+        await expect(page.locator("html")).toHaveClass(/(^|\s)dark(\s|$)/);
+        await expect(page.locator('main .light')).toHaveCount(0);
         await expect(page).toHaveURL(/\/page\/button$/);
     });
 
     test("dark next to light draws the dark panel on the left", async ({ page }) => {
         await openPage(page, "/page/button", { components: "both" });
-        const panels = page.locator("main section").first().locator("[data-theme]");
+        const panels = page.locator("main section").first().locator(".light, .dark");
         await expect(panels).toHaveCount(2);
-        await expect(panels.nth(0)).toHaveAttribute("data-theme", "dark");
-        await expect(panels.nth(1)).toHaveAttribute("data-theme", "light");
+        await expect(panels.nth(0)).toHaveClass(/(^|\s)dark(\s|$)/);
+        await expect(panels.nth(1)).toHaveClass(/(^|\s)light(\s|$)/);
         const darkBox = await panels.nth(0).boundingBox();
         const lightBox = await panels.nth(1).boundingBox();
         expect(darkBox!.x).toBeLessThan(lightBox!.x);
@@ -196,17 +196,17 @@ test.describe("Component mode and explorer theme", () => {
         await page.goto("/page/button");
         await (await openConfiguration(page)).getByRole("group", { name: "Components" }).getByRole("button", { name: "Light", exact: true }).click();
         await expect(page).toHaveURL(/\/page\/button$/);
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-        await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
-        await expect(page.locator('main [data-theme="light"]').first()).toBeVisible();
+        await expect(page.locator("html")).toHaveClass(/(^|\s)dark(\s|$)/);
+        await expect(page.locator('main .dark')).toHaveCount(0);
+        await expect(page.locator('main .light').first()).toBeVisible();
     });
 
     test("the light explorer theme lightens the frame and leaves the component mode as it was", async ({ page }) => {
         await page.goto("/page/button");
         await (await openConfiguration(page)).getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Light", exact: true }).click();
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-        await expect(page.locator('main [data-theme="light"]')).toHaveCount(0);
-        await expect(page.locator('main [data-theme="dark"]').first()).toBeVisible();
+        await expect(page.locator("html")).toHaveClass(/(^|\s)light(\s|$)/);
+        await expect(page.locator('main .light')).toHaveCount(0);
+        await expect(page.locator('main .dark').first()).toBeVisible();
     });
 
     test("the settings are remembered on the next visit and when another page is chosen", async ({ page }) => {
@@ -216,11 +216,11 @@ test.describe("Component mode and explorer theme", () => {
         await configuration.getByRole("group", { name: "Explorer" }).getByRole("button", { name: "Light", exact: true }).click();
         await page.keyboard.press("Escape");
         await page.getByRole("navigation").getByRole("link", { name: "Text box" }).click();
-        await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
+        await expect(page.locator('main .dark')).toHaveCount(0);
         await page.goto("/");
         await expect(page).toHaveURL(/\/page\/commit-explorer$/);
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-        await expect(page.locator('main [data-theme="dark"]')).toHaveCount(0);
+        await expect(page.locator("html")).toHaveClass(/(^|\s)light(\s|$)/);
+        await expect(page.locator('main .dark')).toHaveCount(0);
     });
 
     test("the light explorer theme is in place before the app's script runs", async ({ page }) => {
@@ -233,7 +233,7 @@ test.describe("Component mode and explorer theme", () => {
         //
         await page.route("**/src/main.tsx*", route => route.abort());
         await openPage(page, "/page/button", { explorer: "light" });
-        await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+        await expect(page.locator("html")).toHaveClass(/(^|\s)light(\s|$)/);
         const lightBackground = await computedStyle(page.locator("html"), "background-color");
         expect(lightBackground).not.toBe("rgba(0, 0, 0, 0)");
         expect(lightBackground).not.toBe(darkBackground);
@@ -252,7 +252,7 @@ test.describe("Dialog", () => {
         await openPage(page, "/page/dialog", { components: "light" });
         const discard = page.getByRole("button", { name: "Discard", exact: true });
         const keep = page.getByRole("button", { name: "Keep changes" });
-        const danger = await page.locator('[data-theme="light"]').first().evaluate(element => {
+        const danger = await page.locator('.light').first().evaluate(element => {
             const probe = document.createElement("span");
             probe.style.color = "var(--color-danger)";
             element.appendChild(probe);
@@ -270,14 +270,14 @@ test.describe("Dialog", () => {
         await openPage(page, "/page/dialog", { components: "both" });
         const opened = page.locator("main section").nth(2);
 
-        await opened.locator('[data-theme="dark"]').getByRole("button", { name: "Open dialog" }).click();
+        await opened.locator('.dark').getByRole("button", { name: "Open dialog" }).click();
         const darkDialog = page.getByRole("dialog");
         await expect(darkDialog).toBeVisible();
         const darkBackground = await computedStyle(darkDialog, "background-color");
         await darkDialog.getByRole("button", { name: "Cancel" }).click();
         await expect(page.getByRole("dialog")).toHaveCount(0);
 
-        await opened.locator('[data-theme="light"]').getByRole("button", { name: "Open dialog" }).click();
+        await opened.locator('.light').getByRole("button", { name: "Open dialog" }).click();
         const lightDialog = page.getByRole("dialog");
         await expect(lightDialog).toBeVisible();
         const lightBackground = await computedStyle(lightDialog, "background-color");
@@ -352,7 +352,7 @@ test.describe("Choices", () => {
         await expect(sections).toHaveCount(choices.length);
         for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex++) {
             for (const theme of ["light", "dark"]) {
-                const panel = sections.nth(choiceIndex).locator(`[data-theme="${theme}"]`);
+                const panel = sections.nth(choiceIndex).locator(`.${theme}`);
                 await expect(panel.locator("[data-option]")).toHaveCount(choices[choiceIndex].options.length);
             }
         }
@@ -364,7 +364,7 @@ test.describe("Choices", () => {
         for (let choiceIndex = 0; choiceIndex < choices.length; choiceIndex++) {
             for (const option of choices[choiceIndex].options) {
                 for (const theme of ["light", "dark"] as const) {
-                    const card = sections.nth(choiceIndex).locator(`[data-theme="${theme}"] [data-option="${option.id}"]`);
+                    const card = sections.nth(choiceIndex).locator(`.${theme} [data-option="${option.id}"]`);
                     for (const [name, value] of Object.entries(option[theme])) {
                         expect(await computedStyle(card, name)).toBe(value);
                     }
@@ -402,7 +402,8 @@ test.describe("Tokens", () => {
                     if (!(rule instanceof CSSStyleRule)) {
                         continue;
                     }
-                    const target = rule.selectorText.includes('[data-theme="dark"]') ? dark : rule.selectorText.includes('[data-theme="light"]') ? light : undefined;
+                    const selectors = rule.selectorText.split(",").map(selector => selector.trim());
+                    const target = selectors.includes(".dark") ? dark : selectors.includes(".light") ? light : undefined;
                     for (const name of Array.from(rule.style)) {
                         target?.add(name);
                     }
@@ -421,7 +422,7 @@ test.describe("Tokens", () => {
 test.describe("Commit graph", () => {
     test("every lane runs unbroken from one commit row to the next", async ({ page }) => {
         await openPage(page, "/page/commit-graph", { components: "dark" });
-        const graph = page.locator('main [data-theme="dark"] [data-graph="Every lane colour"]');
+        const graph = page.locator('main .dark [data-graph="Every lane colour"]');
         for (const lane of [1, 2, 3, 4, 5, 6]) {
             const segments = graph.locator(`line[data-lane="${lane}"]`);
             const boxes = [];
@@ -447,7 +448,7 @@ test.describe("Commit graph", () => {
         expect(await computedStyle(lastLane, "stroke")).toBe(await page.evaluate(() => {
             const probe = document.createElement("div");
             probe.style.color = "var(--color-lane-6)";
-            document.querySelector('main [data-theme="light"]')!.appendChild(probe);
+            document.querySelector('main .light')!.appendChild(probe);
             const colour = getComputedStyle(probe).color;
             probe.remove();
             return colour;
@@ -522,11 +523,11 @@ test.describe("Component pages", () => {
     test("a menu takes the theme of the panel it opens from", async ({ page }) => {
         await openPage(page, "/page/button", { components: "both" });
         const dropDowns = page.locator("main section").filter({ hasText: "Drop-down buttons" });
-        await dropDowns.locator('[data-theme="dark"]').getByRole("button", { name: "Merge" }).click();
+        await dropDowns.locator('.dark').getByRole("button", { name: "Merge" }).click();
         const darkBackground = await computedStyle(page.getByRole("menu").locator(".."), "background-color");
         await page.keyboard.press("Escape");
         await expect(page.getByRole("menu")).toHaveCount(0);
-        await dropDowns.locator('[data-theme="light"]').getByRole("button", { name: "Merge" }).click();
+        await dropDowns.locator('.light').getByRole("button", { name: "Merge" }).click();
         const lightBackground = await computedStyle(page.getByRole("menu").locator(".."), "background-color");
         expect(lightBackground).not.toBe(darkBackground);
     });

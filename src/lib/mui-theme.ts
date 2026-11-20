@@ -1,7 +1,7 @@
 //
 // Builds the MUI theme for the explorer. Every colour, size and radius in it is a CSS variable
-// from graft.css, so a component follows the data-theme of the panel it sits in and picks up
-// edits to graft.css while the page stays open.
+// from graft.css, so a component follows the light or dark class of the panel it sits in and
+// picks up edits to graft.css while the page stays open.
 //
 
 import { createElement } from "react";

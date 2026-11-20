@@ -4,7 +4,7 @@ The visual style of Graft, the Git client: design tokens as CSS variables and th
 
 Live style explorer: https://ashleydavis.github.io/graft-style-guide/
 
-- `graft.css`: every colour, size, font, radius, shadow and timing value as a CSS variable, with light values on `:root` and dark values under `[data-theme="dark"]`.
+- `graft.css`: every colour, size, font, radius, shadow and timing value as a CSS variable, with light values on `:root` and `.light` and dark values under `.dark`.
 - `style-guide.md`: the design intent and the rules for which token to use when.
 - `areas/`: rules for one area of the app, such as the diff view, that take priority over `style-guide.md` there.
 - `src/`: the style explorer, a web app that shows every token on an overview page and each component on its own page, in both themes.
@@ -95,6 +95,6 @@ Link the stylesheet and use the variables:
 }
 ```
 
-Set `data-theme="dark"` on the `html` element for the dark theme.
+Set the `dark` class on the `html` element for the dark theme.
 
 `graft.css` names the fonts Mona Sans and Monaspace Neon. A page loads them itself, for example from the `@fontsource/mona-sans` and `@fontsource/monaspace-neon` packages, as the explorer does in `src/main.tsx`.

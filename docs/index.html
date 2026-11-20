@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" class="dark">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,10 +10,10 @@
         -->
         <script>
             try {
-                document.documentElement.dataset.theme = JSON.parse(localStorage.getItem("graft-style-guide-settings") || "{}").explorer === "light" ? "light" : "dark";
+                document.documentElement.className = JSON.parse(localStorage.getItem("graft-style-guide-settings") || "{}").explorer === "light" ? "light" : "dark";
             }
             catch {
-                document.documentElement.dataset.theme = "dark";
+                document.documentElement.className = "dark";
             }
         </script>
         <!--
@@ -25,8 +25,8 @@
                 background: var(--color-bg);
             }
         </style>
-      <script type="module" crossorigin src="/graft-style-guide/assets/index-CEJkW1mM.js"></script>
-      <link rel="stylesheet" crossorigin href="/graft-style-guide/assets/index-DWaoHilx.css">
+      <script type="module" crossorigin src="/graft-style-guide/assets/index-aTGhyu23.js"></script>
+      <link rel="stylesheet" crossorigin href="/graft-style-guide/assets/index-DuCn5MTv.css">
     </head>
     <body>
         <div id="root"></div>

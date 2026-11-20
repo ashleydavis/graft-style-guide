@@ -45,7 +45,7 @@ const FLOATING_STYLE = {
 // Renders the sidebar and the page the router has chosen. Pressing Enter in the search box
 // opens the first page that matches. The component mode, the explorer theme and whether the
 // sidebar is minimised are kept in this browser's storage and remembered between visits; the
-// explorer theme also sets data-theme on the page. The minimise button hides the sidebar and gives
+// explorer theme also sets the light or dark class on the page. The minimise button hides the sidebar and gives
 // the page the full width with a restore button floating in its top-left corner. On a narrow
 // screen the sidebar starts minimised, opens as a drawer over the page and closes when a page is
 // chosen.
@@ -67,7 +67,8 @@ export function ExplorerLayout(): ReactNode {
 
 
     useEffect(() => {
-        document.documentElement.dataset.theme = explorerTheme;
+        document.documentElement.classList.remove("light", "dark");
+        document.documentElement.classList.add(explorerTheme);
     }, [explorerTheme]);
 
 

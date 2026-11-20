@@ -1,9 +1,9 @@
 /*
  * Graft design tokens. Every value in the style guide is a CSS variable in this file.
  * Raw palette tokens hold values. Role tokens point at raw palette tokens and are what
- * components use. Role tokens have a light value (on :root and [data-theme="light"]) and a
- * dark value (under [data-theme="dark"]), so a page or a single panel switches theme by
- * setting data-theme.
+ * components use. Role tokens have a light value (on :root and .light) and a dark value
+ * (under .dark), so a page or a single panel switches theme by setting the light or dark class
+ * on it.
  *
  * The greys, accent, status colours, Git colours, fonts, type scale, spacing, corner radius,
  * shadows, animation timing, icon sizes, focus ring, muted text, hover, selected and disabled
@@ -142,7 +142,7 @@
 
 /* Role tokens, light theme. */
 :root,
-[data-theme="light"] {
+.light {
     --color-bg: var(--gray-50);
     --color-panel: var(--gray-0);
     --color-raised: var(--gray-100);
@@ -193,7 +193,7 @@
 }
 
 /* Role tokens, dark theme. */
-[data-theme="dark"] {
+.dark {
     --color-bg: var(--gray-950);
     --color-panel: var(--gray-900);
     --color-raised: var(--gray-800);

@@ -10,7 +10,7 @@ import { CreateBranchContent } from "./create-branch-content";
 
 //
 // Renders the "Open dialog" button and, while open, the dialog. The dialog mounts into a
-// wrapper inside the panel, so the panel's data-theme applies to it.
+// wrapper inside the panel, so the panel's light or dark class applies to it.
 //
 export function DialogOpener(): ReactNode {
     const wrapperRef = useRef<HTMLDivElement>(null);

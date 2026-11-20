@@ -8,8 +8,8 @@ import { modeThemes, useExplorerSettings } from "../lib/explorer-mode";
 import { PanelThemeContext } from "../lib/panel-theme";
 
 //
-// Renders `children` once per theme of the component mode in the URL. Each panel sets data-theme, so the
-// role tokens in graft.css resolve to that theme's values inside it.
+// Renders `children` once per theme of the component mode in the URL. Each panel sets the light
+// or dark class, so the role tokens in graft.css resolve to that theme's values inside it.
 //
 export function ThemePanels({ children }: { children: ReactNode }): ReactNode {
     const { components } = useExplorerSettings();
@@ -32,7 +32,7 @@ export function ThemePanels({ children }: { children: ReactNode }): ReactNode {
 export function ThemePanel({ theme, children }: { theme: string; children: ReactNode }): ReactNode {
     return (
         <div
-            data-theme={theme}
+            className={theme}
             style={{
                 background: "var(--color-bg)",
                 color: "var(--color-text)",

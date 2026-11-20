@@ -16,7 +16,7 @@ Tokens come in two layers:
 - **Raw palette tokens** hold the actual values, such as `--gray-500` or `--violet-600`.
 - **Role tokens** say what a value is for, such as `--color-panel` or `--color-text-muted`, and point at a raw palette token. Components only ever use role tokens.
 
-Every role token has a light and a dark value. A page or a single panel switches theme by setting `data-theme="light"` or `data-theme="dark"`.
+Every role token has a light and a dark value. A page or a single panel switches theme by setting the `light` or `dark` class on it.
 
 ## Setting up
 
