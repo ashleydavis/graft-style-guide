@@ -3,8 +3,9 @@
 // browsed to last, or the home directory. The directories show as a tree drawn with the same rows
 // as the file trees, closed at first, with the Git icon on each repository: a click selects a
 // directory, its +/- button opens or closes it in place, and its focus button, a double click or
-// Enter goes into it. Searching walks every directory under the one being looked at, which is slow
-// on a real disk, so it runs only on Enter or the search button, and shows its matches as a tree,
+// Enter goes into it. The search box shows when the toolbar's search button, Ctrl+F or typing
+// opens it. Searching walks every directory under the one being looked at, which is slow on a
+// real disk, so it runs only on Enter or the box's search button, and shows its matches as a tree,
 // each under the directories above it. The Open repository button opens the
 // selected repository or the one being looked at. The directories are the made-up ones in
 // directories.ts.
@@ -27,6 +28,7 @@ import { directoryKeyAction } from "../../../components/tree-guides";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { TreeBar, TreeDirectoryRow } from "../../../components/tree-rows";
 import { Tip } from "../../../components/tip";
+import { isSearchKey } from "../../../components/search-box";
 
 //
 // Returns true for a key that types a character, which starts a search when no text box has the
@@ -115,6 +117,7 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
     const [searchCollapsed, setSearchCollapsed] = useState<ReadonlySet<string>>(new Set());
     const searchRef = useRef<HTMLInputElement>(null);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
     const listRef = useRef<HTMLUListElement>(null);
     const selectedRef = useRef<HTMLLIElement>(null);
     //
@@ -156,8 +159,8 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     }, [path, query]);
 
     //
-    // Typing anywhere on the page, outside another text box, goes into the search box. A key a
-    // handler on the page has already acted on is left alone.
+    // Typing anywhere on the page, outside another text box, opens the search box and types into
+    // it. A key a handler on the page has already acted on is left alone.
     //
     useEffect(() => {
         function startSearch(event: globalThis.KeyboardEvent): void {
@@ -166,11 +169,12 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
             }
             const target = event.target;
             const isInTextBox = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
-            if (isInTextBox || !isTypingKey(event) || !searchRef.current) {
+            if (isInTextBox || !isTypingKey(event)) {
                 return;
             }
             event.preventDefault();
-            searchRef.current.focus();
+            setIsSearchOpen(true);
+            searchRef.current?.focus();
             setDraft(text => text + event.key);
         }
         window.addEventListener("keydown", startSearch);
@@ -251,11 +255,25 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     }
 
     //
-    // Ends the search, so the tree shows again.
+    // Ends the search and hides its box, so the tree shows again with the keys in it.
     //
     function clearSearch(): void {
         setDraft("");
         setQuery("");
+        setIsSearchOpen(false);
+        listRef.current?.focus();
+    }
+
+    //
+    // Shows the search box, which takes the keys as it mounts, or hides it and ends the search.
+    //
+    function toggleSearch(): void {
+        if (isSearchOpen) {
+            clearSearch();
+        }
+        else {
+            setIsSearchOpen(true);
+        }
     }
 
     //
@@ -378,7 +396,21 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
     }
 
     return (
-        <div className="flex h-full min-h-0 min-w-0 flex-col" style={{ gap: "var(--space-3)" }}>
+        <div
+            className="flex h-full min-h-0 min-w-0 flex-col"
+            style={{ gap: "var(--space-3)" }}
+            onKeyDownCapture={event => {
+                //
+                // Ctrl+F shows the search box, or puts the keys back in it when it shows.
+                //
+                if (isSearchKey(event)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setIsSearchOpen(true);
+                    searchRef.current?.focus();
+                }
+            }}
+        >
             <div className="flex flex-none flex-wrap items-center" style={{ gap: "var(--space-2)" }}>
                 <Tooltip title="Home directory">
                     <IconButton size="small" aria-label="Home directory" onClick={() => setPath(HOME_DIRECTORY)}>
@@ -424,6 +456,11 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
                         <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Reading…</span>
                     )}
                 </div>
+                <Tooltip title={<Tip title="Search the directories" detail="Keys: Ctrl+F, or start typing" />}>
+                    <IconButton size="small" aria-label="Search the directories" aria-pressed={isSearchOpen} onClick={toggleSearch}>
+                        <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: "var(--icon-sm)" }} />
+                    </IconButton>
+                </Tooltip>
                 <Button
                     variant="contained"
                     disabled={!repositoryPath}
@@ -436,47 +473,49 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
                     Open repository
                 </Button>
             </div>
-            <TextField
-                size="small"
-                fullWidth
-                placeholder="Search the directories"
-                value={draft}
-                onChange={event => setDraft(event.target.value)}
-                onKeyDown={onSearchKeyDown}
-                inputRef={searchRef}
-                autoFocus
-                slotProps={{
-                    input: {
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: "var(--icon-sm)" }} />
-                            </InputAdornment>
-                        ),
-                        endAdornment: (
-                            <InputAdornment position="end" sx={{ gap: "var(--space-1)" }}>
-                                <Tooltip title={<Tip title="Search" detail="Key: Enter. Searching walks every directory below, so it waits for Enter." />}>
-                                    <span>
-                                        <IconButton size="small" aria-label="Search" disabled={draft.trim() === "" || draft === query} onClick={runSearch}>
-                                            <FontAwesomeIcon icon={faMagnifyingGlass} />
-                                        </IconButton>
-                                    </span>
-                                </Tooltip>
-                                {draft !== "" || isSearching ? (
-                                    <Tooltip title="Clear the search">
-                                        <IconButton size="small" aria-label="Clear the search" onClick={clearSearch} edge="end">
-                                            <FontAwesomeIcon icon={faXmark} />
-                                        </IconButton>
+            {isSearchOpen ? (
+                <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search the directories"
+                    value={draft}
+                    onChange={event => setDraft(event.target.value)}
+                    onKeyDown={onSearchKeyDown}
+                    inputRef={searchRef}
+                    autoFocus
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: "var(--icon-sm)" }} />
+                                </InputAdornment>
+                            ),
+                            endAdornment: (
+                                <InputAdornment position="end" sx={{ gap: "var(--space-1)" }}>
+                                    <Tooltip title={<Tip title="Search" detail="Key: Enter. Searching walks every directory below, so it waits for Enter." />}>
+                                        <span>
+                                            <IconButton size="small" aria-label="Search" disabled={draft.trim() === "" || draft === query} onClick={runSearch}>
+                                                <FontAwesomeIcon icon={faMagnifyingGlass} />
+                                            </IconButton>
+                                        </span>
                                     </Tooltip>
-                                ) : undefined}
-                            </InputAdornment>
-                        ),
-                    },
-                    htmlInput: {
-                        "aria-label": "Search the directories",
-                        spellCheck: false,
-                    },
-                }}
-            />
+                                    {draft !== "" || isSearching ? (
+                                        <Tooltip title="Clear the search">
+                                            <IconButton size="small" aria-label="Clear the search" onClick={clearSearch} edge="end">
+                                                <FontAwesomeIcon icon={faXmark} />
+                                            </IconButton>
+                                        </Tooltip>
+                                    ) : undefined}
+                                </InputAdornment>
+                            ),
+                        },
+                        htmlInput: {
+                            "aria-label": "Search the directories",
+                            spellCheck: false,
+                        },
+                    }}
+                />
+            ) : undefined}
             {listing && listing.entries.length === 0 ? <QuietNote>This directory has no directories inside it.</QuietNote> : undefined}
             {isSearching && !found ? <QuietNote>Searching…</QuietNote> : undefined}
             {isSearching && found && found.matches.length === 0 ? <QuietNote>No directory under this one matches the search.</QuietNote> : undefined}

@@ -136,7 +136,7 @@ export interface IDebouncedQuery {
 // SEARCH_DEBOUNCE_MS after typing pauses, and empties at once when the draft is cleared.
 //
 export function useDebouncedQuery(draft: string): IDebouncedQuery {
-    const [query, setQuery] = useState("");
+    const [query, setQuery] = useState(draft);
     useEffect(() => {
         if (draft === "") {
             setQuery("");
@@ -152,11 +152,12 @@ export function useDebouncedQuery(draft: string): IDebouncedQuery {
 }
 
 //
-// Returns a search mode, closed and with no query.
+// Returns a search mode searching for `initialText`: open with that text in its box, or closed and
+// with no query when it is empty, as most searches start.
 //
-export function useSearchMode(): ISearchMode {
-    const [isOpen, setIsOpen] = useState(false);
-    const [draft, setDraft] = useState("");
+export function useSearchMode(initialText: string): ISearchMode {
+    const [isOpen, setIsOpen] = useState(initialText !== "");
+    const [draft, setDraft] = useState(initialText);
     const debounced = useDebouncedQuery(draft);
     const [openCount, setOpenCount] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -264,4 +265,37 @@ export function SearchModeButton({ mode, what }: { mode: ISearchMode; what: stri
             </IconButton>
         </Tooltip>
     );
+}
+
+//
+// Renders the toolbar of a list, a tree or a table: `title` at its left, when given, and the
+// search button at its right, then the search box under it while search mode is open. The search
+// input stays hidden until the button or Ctrl+F opens it.
+//
+export function SearchToolbar({ mode, what, title, placeholder, result }: { mode: ISearchMode; what: string; title: ReactNode; placeholder: string; result: string }): ReactNode {
+    return (
+        <>
+            <div className="flex items-center" style={{ gap: "var(--space-2)", padding: "var(--space-1) var(--space-2)", borderBottom: "1px solid var(--color-border)" }}>
+                <span className="min-w-0 flex-1 truncate" style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)" }}>
+                    {title}
+                </span>
+                <SearchModeButton mode={mode} what={what} />
+            </div>
+            <SearchModeBox mode={mode} label={`Search ${what}`} placeholder={placeholder} result={result} />
+        </>
+    );
+}
+
+//
+// Opens `mode` on Ctrl+F, for the key handler of the list, tree or table the search belongs to.
+// Returns true when the key opened it, so the handler stops there.
+//
+export function openOnSearchKey(mode: ISearchMode, event: KeyboardEvent): boolean {
+    if (!isSearchKey(event)) {
+        return false;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    mode.open();
+    return true;
 }

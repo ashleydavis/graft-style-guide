@@ -693,9 +693,10 @@ export function CommitExplorer({ history = graftHistory, initialState }: { histo
                                     }
                                     //
                                     // A click on a file or the commit's own row opens it to the
-                                    // right and gives that pane the keys.
+                                    // right and keeps the keys in the commit details pane, so the
+                                    // arrow keys go on through its rows.
                                     //
-                                    return { ...selectFile(current, path), activePaneIndex: 2 };
+                                    return { ...selectFile(current, path), activePaneIndex: 1 };
                                 })
                             }
                             onClose={() => setState(closeCommitDetailsPane)}

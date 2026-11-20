@@ -164,9 +164,10 @@ export function closeCommitDetailsPane(state: IExplorerState): IExplorerState {
 }
 
 //
-// Works out the explorer after the key: Up and Down move the selection in the active pane, and in
-// the commit details pane also open the newly selected file's diff, so stepping through the files
-// shows each one with the keys staying on the file list. A directory is only selected. Left
+// Works out the explorer after the key: Up and Down move the selection in the active pane. In the
+// commit pane they also open the newly selected commit's details, and in the commit details pane
+// the newly selected file's diff, so stepping through either list shows each item with the keys
+// staying on the list. A directory is only selected. Left
 // and Right make the pane to the left or right active when there is one, Enter opens the selected
 // item and makes its pane active, and Escape closes the rightmost pane. Any other key changes
 // nothing.
@@ -175,7 +176,11 @@ export function stateAfterKey(state: IExplorerState, key: string, items: IExplor
     if (key === "ArrowUp" || key === "ArrowDown") {
         const step = key === "ArrowUp" ? -1 : 1;
         if (state.activePaneIndex === 0) {
-            return { ...state, selectedHash: itemAfterMove(items.commitHashes, state.selectedHash, step) };
+            const hash = itemAfterMove(items.commitHashes, state.selectedHash, step);
+            if (hash === undefined) {
+                return state;
+            }
+            return selectCommit(hash);
         }
         if (state.activePaneIndex === 1) {
             const path = itemAfterMove(items.filePaths, state.selectedPath, step);

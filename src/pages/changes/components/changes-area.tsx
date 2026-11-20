@@ -38,6 +38,7 @@ import { LiveToast, ToastStack } from "../../notifications";
 import { COLLAPSE_KEY } from "../../../components/collapse";
 import { PinnableTooltip } from "../../../components/pinnable-tooltip";
 import { FileTip } from "../../../components/file-tip";
+import { ExplorerSearchBox, useExplorerSearch } from "../../commit-explorer/components/explorer-search";
 
 //
 // The message of the last commit, which ticking "Amend the last commit" brings into an empty
@@ -514,7 +515,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             }),
         );
     }
-    const [fileSearch, setFileSearch] = useState("");
+    //
+    // The search of the changed files, hidden until its button or Ctrl+F shows it. Closing it
+    // gives the keys back to the area.
+    //
+    const fileSearchMode = useExplorerSearch(() => areaRef.current?.focus());
+    const fileSearch = fileSearchMode.query;
     const [discardsByPath, setDiscardsByPath] = useState<ReadonlyMap<string, IDiscards>>(new Map());
     const discardsOf = (path: string): IDiscards => discardsByPath.get(path) ?? noDiscards();
 
@@ -850,10 +856,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     function onKeyDown(event: KeyboardEvent): void {
         if (isFindKey(event) && activePane === 0) {
             //
-            // Ctrl+F in the file list puts the keys in its search box.
+            // Ctrl+F in the file list shows its search box, which takes the keys.
             //
             event.preventDefault();
-            areaRef.current?.querySelector<HTMLInputElement>('input[placeholder="Search changed files"]')?.focus();
+            fileSearchMode.open();
             return;
         }
         if (isFindKey(event) && activePane === 1) {
@@ -1275,47 +1281,26 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                             isMaximised={maximised === 0}
                             onToggleMaximise={() => toggleMaximise(0)}
                             toolbar={
-                                <TextField
-                                    size="small"
-                                    fullWidth
-                                    placeholder="Search changed files"
-                                    value={fileSearch}
-                                    onChange={event => setFileSearch(event.target.value)}
-                                    slotProps={{
-                                        htmlInput: {
-                                            "aria-label": "Search changed files",
-                                        },
-                                        input: {
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <FontAwesomeIcon icon={faMagnifyingGlass} style={{ fontSize: "var(--icon-md)" }} />
-                                                </InputAdornment>
-                                            ),
-                                            endAdornment: fileSearch.trim() !== "" ? (
-                                                <InputAdornment position="end" sx={{ gap: "var(--space-2)" }}>
-                                                    <span aria-live="polite" style={{ fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
-                                                        {shownFiles.length} of {files.length}
-                                                    </span>
-                                                    <Tooltip title="Clear the search">
-                                                        <IconButton size="small" aria-label="Clear search" onClick={() => setFileSearch("")} edge="end">
-                                                            <FontAwesomeIcon icon={faXmark} />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </InputAdornment>
-                                            ) : undefined,
-                                        },
-                                    }}
-                                />
+                                fileSearchMode.isOpen ? (
+                                    <ExplorerSearchBox search={fileSearchMode} label="Search changed files" placeholder="Search changed files" closeLabel="Close the file search" result={fileSearch.trim() !== "" ? `${shownFiles.length} of ${files.length}` : undefined} />
+                                ) : undefined
                             }
                             headerExtra={
-                                <ChangesOptions
-                                    diffMode={diffMode}
-                                    onDiffMode={setDiffMode}
-                                    panelStack={panelStack}
-                                    onPanelStack={value => withViewTransition(() => setPanelStack(value))}
-                                    fileView={fileView}
-                                    onFileView={setFileView}
-                                />
+                                <>
+                                    <Tooltip title={<Tip title="Search the changed files" detail="Keys: Ctrl+F" />}>
+                                        <IconButton size="small" aria-label="Search the changed files" aria-pressed={fileSearchMode.isOpen} onClick={() => (fileSearchMode.isOpen ? fileSearchMode.close() : fileSearchMode.open())}>
+                                            <FontAwesomeIcon icon={faMagnifyingGlass} />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <ChangesOptions
+                                        diffMode={diffMode}
+                                        onDiffMode={setDiffMode}
+                                        panelStack={panelStack}
+                                        onPanelStack={value => withViewTransition(() => setPanelStack(value))}
+                                        fileView={fileView}
+                                        onFileView={setFileView}
+                                    />
+                                </>
                             }
                             title={
                                 <span className="flex items-baseline" style={{ gap: "var(--space-2)" }}>

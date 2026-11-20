@@ -76,7 +76,7 @@ export function CommandBlock({ command }: { command: string }): ReactNode {
 // none.
 //
 export function GitCommandsPanel({ repoPath, commands }: IGitCommandsPanelProps): ReactNode {
-    const search = useSearchMode();
+    const search = useSearchMode("");
     const shown = commands.filter(command => matchesSearch(command, search.query));
     return (
         <section

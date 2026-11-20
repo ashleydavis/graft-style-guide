@@ -16,7 +16,7 @@ import { FilePathMenu } from "../../components/file-path-menu";
 import { FileIcon } from "../../components/file-icon";
 import { Tip } from "../../components/tip";
 import { Section } from "../../components/section";
-import { FilterBox, matchesSearch } from "../../components/search-box";
+import { matchesSearch, openOnSearchKey, SearchToolbar, useSearchMode } from "../../components/search-box";
 import { directoryKeyAction } from "../../components/tree-guides";
 import { collapsedAfterAllKey, TreeBar, TreeDirectoryRow, TreeFileRow } from "../../components/tree-rows";
 import { parentDirectory, treeGuides, treeRows, withoutCollapsed } from "../commit-explorer/file-views";
@@ -192,19 +192,21 @@ export function rowAfterMove(paths: string[], selected: string, step: number): s
 }
 
 //
-// Renders the file tree with the shared tree rows under a filter box, with every directory open
+// Renders the file tree with the shared tree rows under a search toolbar, with every directory open
 // and one file selected. The bar above the tree expands or collapses every directory, and goes
 // back up from a directory the tree is focused on. A click selects a row, and a directory opens
 // and closes with its +/- button. With the keys in the tree, Up and Down move the selection, E or
 // Space opens or closes the selected directory, F focuses the tree on it, U goes back up and A
-// expands or collapses every directory. Typing in the filter box keeps only the files whose path
-// holds the text and the directories that hold them, every one of them open.
+// expands or collapses every directory. The search button or Ctrl+F shows the search box, which
+// keeps only the files whose path holds the text and the directories that hold them, every one of
+// them open.
 //
 export function FileTree(): ReactNode {
+    const search = useSearchMode("");
+    const filter = search.query;
     const [collapsedDirectories, setCollapsedDirectories] = useState<ReadonlySet<string>>(new Set());
     const [selectedPath, setSelectedPath] = useState("src/graph/lanes.ts");
     const [treeRoot, setTreeRoot] = useState("");
-    const [filter, setFilter] = useState("");
     const listRef = useRef<HTMLUListElement>(null);
     const isFiltering = filter.trim() !== "";
     const shownFiles = treeFiles(fileTree, "").filter(file => matchesSearch(file.path, filter));
@@ -287,11 +289,9 @@ export function FileTree(): ReactNode {
     }
 
     return (
-        <Paper variant="outlined" sx={{ maxWidth: "360px" }}>
-            <div style={{ padding: "var(--space-2)", borderBottom: "1px solid var(--color-border)" }}>
-                <FilterBox value={filter} onChange={setFilter} label="Filter the files" placeholder="Filter by path" />
-            </div>
-            {rows.length === 0 ? <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No files match the filter.</p> : undefined}
+        <Paper variant="outlined" sx={{ maxWidth: "360px" }} onKeyDownCapture={event => openOnSearchKey(search, event)}>
+            <SearchToolbar mode={search} what="the files" title="Changed files" placeholder="Search by path" result={`${shownFiles.length} of ${treeFiles(fileTree, "").length}`} />
+            {rows.length === 0 ? <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No files match the search.</p> : undefined}
             <List ref={listRef} aria-label="Changed files" tabIndex={0} onKeyDown={onKeyDown} sx={{ padding: "0 0 var(--space-1)", outline: "none", "&:focus-visible": { boxShadow: "inset 0 0 0 var(--focus-ring-width) var(--color-focus)" } }}>
                 <TreeBar focusedPath={treeRoot} onBack={focusParent} onExpandAll={() => setCollapsedDirectories(new Set())} onCollapseAll={() => setCollapsedDirectories(new Set(directories))} />
                 {rows.map((row, index) => {
@@ -372,20 +372,19 @@ const branches = [
 ];
 
 //
-// Renders the flat list of branches with the checked-out branch selected, under a filter box that
-// keeps only the branches whose name or detail holds the typed text.
+// Renders the flat list of branches with the checked-out branch selected, under a search toolbar.
+// The search button or Ctrl+F shows the search box, which keeps only the branches whose name or
+// detail holds the typed text.
 //
 export function BranchList(): ReactNode {
     const [selected, setSelected] = useState("main");
-    const [filter, setFilter] = useState("");
-    const shown = branches.filter(branch => matchesSearch(branch.name, filter) || matchesSearch(branch.detail, filter));
+    const search = useSearchMode("");
+    const shown = branches.filter(branch => matchesSearch(branch.name, search.query) || matchesSearch(branch.detail, search.query));
 
     return (
-        <Paper variant="outlined" sx={{ maxWidth: "360px" }}>
-            <div style={{ padding: "var(--space-2)", borderBottom: "1px solid var(--color-border)" }}>
-                <FilterBox value={filter} onChange={setFilter} label="Filter the branches" placeholder="Filter by name" />
-            </div>
-            {shown.length === 0 ? <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No branches match the filter.</p> : undefined}
+        <Paper variant="outlined" tabIndex={0} aria-label="Branch list" onKeyDownCapture={event => openOnSearchKey(search, event)} sx={{ maxWidth: "360px", outline: "none", "&:focus-visible": { boxShadow: "0 0 0 var(--focus-ring-width) var(--color-focus)" } }}>
+            <SearchToolbar mode={search} what="the branches" title="Branches" placeholder="Search by name" result={`${shown.length} of ${branches.length}`} />
+            {shown.length === 0 ? <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No branches match the search.</p> : undefined}
             <List aria-label="Branches" sx={{ padding: "var(--space-1)" }}>
                 {shown.map(branch => (
                     <ListItemButton key={branch.name} selected={branch.name === selected} onClick={() => setSelected(branch.name)}>
@@ -417,7 +416,7 @@ export function BranchList(): ReactNode {
 export function ListPage(): ReactNode {
     return (
         <div>
-            <Section title="List" description="Rows with a second line of detail, under a filter box.">
+            <Section title="List" description="Rows with a second line of detail, with a search button in the toolbar.">
                 <BranchList />
             </Section>
         </div>
@@ -432,7 +431,7 @@ export function TreePage(): ReactNode {
         <div>
             <Section
                 title="Tree"
-                description="Changed files by directory, under a filter box."
+                description="Changed files by directory, with a search button in the toolbar."
             >
                 <FileTree />
             </Section>

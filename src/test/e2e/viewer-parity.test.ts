@@ -67,9 +67,12 @@ test.describe("Directory browser behaviour", () => {
         await expect(page.getByText("Searching…")).toHaveCount(0);
     });
 
-    test("the search box has the keys when the page opens", async ({ page }) => {
+    test("the search box is hidden until its button opens it, with the keys in it", async ({ page }) => {
         await openPage(page, "/page/directory-browser", { components: "light" });
-        await expect(page.getByRole("textbox", { name: "Search the directories" }).first()).toBeFocused();
+        const section = page.locator("main section.mb-10").first();
+        await expect(section.getByRole("textbox", { name: "Search the directories" })).toHaveCount(0);
+        await section.getByRole("button", { name: "Search the directories" }).click();
+        await expect(section.getByRole("textbox", { name: "Search the directories" })).toBeFocused();
     });
 
     test("Reading shows in place of the breadcrumbs while a directory is read", async ({ page }) => {
@@ -97,11 +100,13 @@ test.describe("Cheap and expensive searches", () => {
 
     test("the directory search waits for Enter or the search button", async ({ page }) => {
         await openPage(page, "/page/directory-browser", { components: "light" });
-        const box = page.getByRole("textbox", { name: "Search the directories" }).first();
+        const section = page.locator("main section.mb-10").first();
+        await section.getByRole("button", { name: "Search the directories" }).click();
+        const box = section.getByRole("textbox", { name: "Search the directories" });
         await box.fill("graft");
         await page.waitForTimeout(800);
         await expect(page.getByText("Searching…")).toHaveCount(0);
-        await page.getByRole("button", { name: "Search", exact: true }).first().click();
+        await section.getByRole("button", { name: "Search", exact: true }).click();
         await expect(page.getByText("Searching…").first()).toBeVisible();
     });
 });

@@ -5,7 +5,7 @@
 
 import { useState, type ReactNode } from "react";
 import Paper from "@mui/material/Paper";
-import { FilterBox, matchesSearch } from "../../components/search-box";
+import { matchesSearch, openOnSearchKey, SearchToolbar, useSearchMode } from "../../components/search-box";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -45,21 +45,20 @@ const commits = [
 ];
 
 //
-// Renders the commit table with the second commit selected, under a filter box that starts with
-// `initialFilter`. The table shows only the commits whose message, author or hash holds the
-// filter's text, ignoring case, and says so when none does. Clicking a row selects it. On a narrow
+// Renders the commit table with the second commit selected, under a toolbar whose search button or
+// Ctrl+F shows the search box, open with `initialFilter` when that is given. The table shows only
+// the commits whose message, author or hash holds the search, ignoring case, and says so when none
+// does. Clicking a row selects it. On a narrow
 // screen the table scrolls sideways inside its frame.
 //
 export function CommitTable({ initialFilter = "" }: { initialFilter?: string }): ReactNode {
     const [selectedHash, setSelectedHash] = useState("e4f5a6b");
-    const [filter, setFilter] = useState(initialFilter);
-    const shown = commits.filter(commit => [commit.message, commit.author, commit.hash].some(field => matchesSearch(field, filter)));
+    const search = useSearchMode(initialFilter);
+    const shown = commits.filter(commit => [commit.message, commit.author, commit.hash].some(field => matchesSearch(field, search.query)));
 
     return (
-        <TableContainer component={Paper} variant="outlined">
-            <div style={{ padding: "var(--space-2)", borderBottom: "1px solid var(--color-border)" }}>
-                <FilterBox value={filter} onChange={setFilter} label="Filter the commits" placeholder="Filter by message, author or hash" />
-            </div>
+        <TableContainer component={Paper} variant="outlined" tabIndex={0} aria-label="Commit table" onKeyDownCapture={event => openOnSearchKey(search, event)} sx={{ outline: "none", "&:focus-visible": { boxShadow: "0 0 0 var(--focus-ring-width) var(--color-focus)" } }}>
+            <SearchToolbar mode={search} what="the commits" title="Commits" placeholder="Search by message, author or hash" result={`${shown.length} of ${commits.length}`} />
             <Table size="small" aria-label="Commits">
                 <TableHead>
                     <TableRow>
@@ -73,7 +72,7 @@ export function CommitTable({ initialFilter = "" }: { initialFilter?: string }):
                     {shown.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={4} sx={{ color: "var(--color-text-muted)", textAlign: "center", padding: "var(--space-6)" }}>
-                                No commits match the filter.
+                                No commits match the search.
                             </TableCell>
                         </TableRow>
                     ) : (
