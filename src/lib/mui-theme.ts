@@ -451,12 +451,14 @@ export const graftTheme: Theme = createTheme({
             },
         },
         //
-        // Popups mount next to the control that opens them instead of at the end of the page,
-        // so they sit inside the same themed panel and take its light or dark tokens.
+        // Popups mount at the end of the page, so a pane or column that cuts off what overflows
+        // it never cuts off a popup, and a pane to the right never paints over one. A themed
+        // panel gives its popups its own light or dark class (see theme-panels.tsx), so they keep
+        // the panel's tokens.
         //
         MuiPopover: {
             defaultProps: {
-                disablePortal: true,
+                disablePortal: false,
                 //
                 // The page keeps its scrollbar while a popover, menu or dropdown dialog is open,
                 // so the page does not jump as it opens and closes.
@@ -476,7 +478,7 @@ export const graftTheme: Theme = createTheme({
         },
         MuiPopper: {
             defaultProps: {
-                disablePortal: true,
+                disablePortal: false,
             },
         },
         //
@@ -773,19 +775,27 @@ export const graftTheme: Theme = createTheme({
             },
         },
         //
-        // Every tooltip points at its control with an arrow and waits a moment before it shows,
-        // so moving the pointer across a toolbar does not flash a tooltip at each button.
+        // Every tooltip is a solid slate panel, blue-grey and cooler than the page, so it stands
+        // apart from the page in both themes and keeps its text on a steady colour. It waits a
+        // moment before it shows, so moving the pointer across a toolbar does not flash a tooltip
+        // at each button. It mounts at the end of the page rather than beside its control, so a
+        // control in a box that cuts off what overflows it never cuts off its tooltip.
         //
         MuiTooltip: {
             defaultProps: {
-                arrow: true,
+                arrow: false,
                 enterDelay: 400,
                 enterNextDelay: 150,
+                slotProps: {
+                    popper: {
+                        disablePortal: false,
+                    },
+                },
             },
             styleOverrides: {
                 //
-                // A tooltip mounts next to the control it labels, so it sets every text style of
-                // its own instead of taking the control's, such as a heading's capitals.
+                // A tooltip sets every text style of its own instead of taking the control's,
+                // such as a heading's capitals.
                 //
                 tooltip: {
                     //
@@ -794,20 +804,18 @@ export const graftTheme: Theme = createTheme({
                     //
                     width: "max-content",
                     maxWidth: "280px",
-                    backgroundColor: "var(--color-text)",
-                    color: "var(--color-bg)",
+                    backgroundColor: "var(--color-tooltip)",
+                    border: "1px solid var(--color-tooltip-border)",
+                    color: "var(--color-text)",
                     fontFamily: "var(--font-sans)",
                     fontSize: "var(--text-sm)",
                     fontWeight: "var(--weight-medium)",
                     textTransform: "none",
                     letterSpacing: "normal",
                     lineHeight: "var(--leading-tight)",
-                    padding: "var(--space-1) var(--space-2)",
-                    borderRadius: "var(--radius-md)",
+                    padding: "var(--space-2) var(--space-3)",
+                    borderRadius: "calc(var(--radius-lg) * 2)",
                     boxShadow: "var(--shadow-overlay)",
-                },
-                arrow: {
-                    color: "var(--color-text)",
                 },
             },
         },
@@ -932,8 +940,12 @@ export const graftTheme: Theme = createTheme({
                 label: {
                     padding: 0,
                 },
+                //
+                // The root's padding above the text moves the badge's content down half of it, so
+                // the icon is raised by the whole step to sit in the middle of the badge.
+                //
                 icon: {
-                    margin: 0,
+                    margin: "calc(var(--space-1) / -2) 0 0",
                     fontSize: "var(--icon-sm)",
                 },
                 deleteIcon: {

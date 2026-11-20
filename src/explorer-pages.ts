@@ -29,6 +29,7 @@ import { CommitExplorerPage } from "./pages/commit-explorer";
 import { GitCommandsPanelPage } from "./pages/git-commands-panel";
 import { DiffPage } from "./pages/diff";
 import { ChangesPage } from "./pages/changes";
+import { DirectoryBrowserPage } from "./pages/directory-browser";
 
 //
 // One page in the explorer.
@@ -111,6 +112,13 @@ export const explorerPages: IExplorerPage[] = [
         title: "Diff",
         keywords: ["changes", "unified", "side by side", "split", "hunk", "patch", "word"],
         component: DiffPage,
+        group: "app",
+    },
+    {
+        id: "directory-browser",
+        title: "Directory browser",
+        keywords: ["open", "repository", "repo", "directories", "browse", "home", "path"],
+        component: DirectoryBrowserPage,
         group: "app",
     },
     {

@@ -118,3 +118,26 @@ html {
     background: var(--color-panel);
     box-shadow: var(--shadow-raised);
 }
+
+/*
+ * A file's diff slides in quickly from the left when another file is picked on the Commit page.
+ * People who ask for less motion see it appear at once.
+ */
+@keyframes graft-slide-in {
+    from {
+        transform: translateX(calc(var(--space-6) * -1));
+    }
+    to {
+        transform: none;
+    }
+}
+
+.graft-slide-in {
+    animation: graft-slide-in var(--duration-fast) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .graft-slide-in {
+        animation: none;
+    }
+}

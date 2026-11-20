@@ -13,28 +13,30 @@ import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import List from "@mui/material/List";
-import ListItemButton from "@mui/material/ListItemButton";
 import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faChevronDown, faChevronUp, faDownLeftAndUpRightToCenter, faFileLines, faArrowLeft, faArrowRightToBracket, faFolder, faFolderOpen, faFolderTree, faGripLines, faGripLinesVertical, faLayerGroup, faList, faMagnifyingGlass, faSliders, faTableColumns, type IconDefinition, faUpRightAndDownLeftFromCenter, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faChevronDown, faChevronUp, faDownLeftAndUpRightToCenter, faFileLines, faFolderTree, faGripLines, faGripLinesVertical, faLayerGroup, faList, faMagnifyingGlass, faSliders, faTableColumns, type IconDefinition, faUpRightAndDownLeftFromCenter, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { Tip } from "../../../components/tip";
 import { FilePath } from "../../commit-explorer/components/file-path";
 import { Pane } from "../../commit-explorer/components/pane";
-import { DISCARD_KEYS, DiscardButton, FileDiffCard, FOLD_DIFF_KEY, isFindKey, OptionRow, StageButton, UndoButton, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
+import { countLines, DISCARD_KEYS, DiscardButton, FileDiffCard, FOLD_DIFF_KEY, isFindKey, OptionRow, StageButton, UndoButton, type IFileDiff, type IFileDiffCardHandle } from "../../diff/components/file-diff-card";
 import Popover from "@mui/material/Popover";
 import { noDiscards, withFileDiscarded, withHunkMarked, type IDiscards } from "../../diff/discards";
 import { parseHunks, sectionDiff, type ISectionDiff } from "../../diff/model";
 import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
 import { withViewTransition } from "../../../lib/view-transition";
-import { filePathsInViewOrder, isUnder, parentFolder, treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../../commit-explorer/file-views";
+import { filePathsInViewOrder, isUnder, parentDirectory, treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../../commit-explorer/file-views";
 import { FileIcon } from "../../../components/file-icon";
-import { DIRECTORY_KEYS, directoryKeyAction, FolderToggle, TreeGuides } from "../../../components/tree-guides";
+import { directoryKeyAction } from "../../../components/tree-guides";
+import { collapsedAfterAllKey, TreeBar, TreeDirectoryRow, TreeFileRow } from "../../../components/tree-rows";
 import { LiveToast, ToastStack } from "../../notifications";
 import { COLLAPSE_KEY } from "../../../components/collapse";
+import { PinnableTooltip } from "../../../components/pinnable-tooltip";
+import { FileTip } from "../../../components/file-tip";
 
 //
 // The message of the last commit, which ticking "Amend the last commit" brings into an empty
@@ -67,12 +69,12 @@ export interface IListEntry {
 }
 
 //
-// One row of the file list: a file, or in the tree a folder with the files inside it, each with
-// how many folders deep it sits.
+// One row of the file list: a file, or in the tree a directory with the files inside it, each with
+// how many directories deep it sits.
 //
 type ListItem =
     | { kind: "file"; entry: IListEntry; guides: TreeGuide[] }
-    | { kind: "folder"; path: string; name: string; section: ListSection; guides: TreeGuide[]; files: IFileDiff[] };
+    | { kind: "directory"; path: string; name: string; section: ListSection; guides: TreeGuide[]; files: IFileDiff[] };
 
 //
 // Returns how much of a file is staged: all of it, some of its hunks or lines, or none.
@@ -156,7 +158,7 @@ export function SplitDiff({
     const sections = splitSections(file, staging);
     const currentHunk = currentStop?.kind === "hunk" ? currentStop.hunk : undefined;
     return (
-        <div className="flex min-h-0 flex-1 flex-col" style={{ gap: "var(--space-2)" }}>
+        <div className="graft-slide-in flex min-h-0 flex-1 flex-col" style={{ gap: "var(--space-2)" }}>
             {sections.map(section => (
                 <section key={section.title} aria-label={`${section.title} changes`} className="flex min-h-0 flex-1 flex-col" style={{ gap: "var(--space-1)" }}>
                     <h3 style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)", color: "var(--color-text-muted)" }}>
@@ -213,10 +215,10 @@ function isOwnKeyTarget(target: EventTarget, key: string): boolean {
 }
 
 //
-// Renders a file's label in a list in the chosen view: the full path for full paths, the file
-// name and its folder in two columns for file name and folder, and the file name alone in the
-// tree, where the folders above it say where it is. `tint` gives a slight tinge, as for a staged
-// file.
+// Renders a file's label in a list in the chosen view: the full path for full paths, the file name
+// and its directory in two columns for file name and directory, and the file name alone in the
+// tree, where the directories above it say where it is. `tint` gives a slight tinge, as for a
+// staged file.
 //
 function FileLabel({ path, view, tint }: { path: string; view: FileListView; tint?: string }): ReactNode {
     const slash = path.lastIndexOf("/");
@@ -446,7 +448,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [fileView, setFileView] = useState<FileListView>("tree");
     const [treeRoot, setTreeRoot] = useState("");
     const [rootHistory, setRootHistory] = useState<string[]>([]);
-    const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(new Set());
+    const [collapsedDirectories, setCollapsedDirectories] = useState<ReadonlySet<string>>(new Set());
 
     //
     // The stop the keys are on in a selected directory's stacked diffs.
@@ -468,10 +470,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }, [stackStop]);
 
     //
-    // Collapses the folder `path`, hiding the rows inside it, or expands it again.
+    // Collapses the directory `path`, hiding the rows inside it, or expands it again.
     //
-    function toggleCollapsedFolder(path: string, isCollapsed = !collapsedFolders.has(path)): void {
-        setCollapsedFolders(current => {
+    function toggleCollapsedDirectory(path: string, isCollapsed = !collapsedDirectories.has(path)): void {
+        setCollapsedDirectories(current => {
             const next = new Set(current);
             if (isCollapsed) {
                 next.add(path);
@@ -482,7 +484,15 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             return next;
         });
     }
-    const [selectedFolder, setSelectedFolder] = useState<{ path: string; section: ListSection } | undefined>(undefined);
+
+    //
+    // Returns the path of every directory in the tree from its focused directory down, collapsed
+    // or not, for expand all, collapse all and the A key.
+    //
+    function treeDirectories(): string[] {
+        return treeRows(shownFiles, shownRoot).flatMap(row => (row.kind === "directory" ? [row.path] : []));
+    }
+    const [selectedDirectory, setSelectedDirectory] = useState<{ path: string; section: ListSection } | undefined>(undefined);
     const shownRoot = fileView === "tree" ? treeRoot : "";
 
     //
@@ -551,43 +561,43 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                   ...orderedFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "all").map(file => ({ file, section: "unstaged" as const })),
                   ...orderedFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
               ];
-    const selectedEntry = selectedFolder ? undefined : (entries.find(entry => entry.file.path === selectedPath && entry.section === selectedSection) ?? entries.find(entry => entry.file.path === selectedPath));
+    const selectedEntry = selectedDirectory ? undefined : (entries.find(entry => entry.file.path === selectedPath && entry.section === selectedSection) ?? entries.find(entry => entry.file.path === selectedPath));
 
     //
     // The rows the file list shows, in order, which Up and Down move through: in the tree, each
-    // folder above its files; otherwise one row per file. In the split, the unstaged rows come
+    // directory above its files; otherwise one row per file. In the split, the unstaged rows come
     // before the staged ones.
     //
     function itemsOf(listEntries: IListEntry[], section: ListSection): ListItem[] {
         if (fileView !== "tree") {
             return listEntries.map(entry => ({ kind: "file", entry, guides: [] }));
         }
-        const rows = withoutCollapsed(treeRows(listEntries.map(entry => ({ path: entry.file.path, entry })), shownRoot), collapsedFolders);
+        const rows = withoutCollapsed(treeRows(listEntries.map(entry => ({ path: entry.file.path, entry })), shownRoot), collapsedDirectories);
         const guides = treeGuides(rows);
         return rows.map((row, index) =>
-            row.kind === "folder"
-                ? { kind: "folder", path: row.path, name: row.name, section, guides: guides[index], files: listEntries.filter(entry => isUnder(entry.file.path, row.path)).map(entry => entry.file) }
+            row.kind === "directory"
+                ? { kind: "directory", path: row.path, name: row.name, section, guides: guides[index], files: listEntries.filter(entry => isUnder(entry.file.path, row.path)).map(entry => entry.file) }
                 : { kind: "file", entry: row.file.entry, guides: guides[index] },
         );
     }
     const unstagedItems = itemsOf(entries.filter(entry => entry.section === "unstaged"), "unstaged");
     const stagedItems = itemsOf(entries.filter(entry => entry.section === "staged"), "staged");
     const items: ListItem[] = diffMode === "one" ? itemsOf(entries, "all") : [...unstagedItems, ...stagedItems];
-    const selectedFolderItem = items.find((item): item is Extract<ListItem, { kind: "folder" }> => item.kind === "folder" && selectedFolder?.path === item.path && selectedFolder.section === item.section);
+    const selectedDirectoryItem = items.find((item): item is Extract<ListItem, { kind: "directory" }> => item.kind === "directory" && selectedDirectory?.path === item.path && selectedDirectory.section === item.section);
 
     function isItemSelected(item: ListItem): boolean {
-        return item.kind === "folder" ? selectedFolder?.path === item.path && selectedFolder.section === item.section : item.entry === selectedEntry;
+        return item.kind === "directory" ? selectedDirectory?.path === item.path && selectedDirectory.section === item.section : item.entry === selectedEntry;
     }
 
-    function selectFolder(path: string, section: ListSection): void {
-        setSelectedFolder({ path, section });
+    function selectDirectory(path: string, section: ListSection): void {
+        setSelectedDirectory({ path, section });
         setStackStop(undefined);
         setActivePane(0);
     }
 
     function selectItem(item: ListItem, pane: 0 | 1): void {
-        if (item.kind === "folder") {
-            selectFolder(item.path, item.section);
+        if (item.kind === "directory") {
+            selectDirectory(item.path, item.section);
         }
         else {
             selectFile(item.entry.file.path, item.entry.section, pane);
@@ -595,7 +605,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Shows only the changes inside the folder `path`, with the first row inside it selected.
+    // Shows only the changes inside the directory `path`, with the first row inside it selected.
     //
     function drillInto(path: string): void {
         //
@@ -604,7 +614,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         areaRef.current?.focus();
         setRootHistory(current => [...current, treeRoot]);
         setTreeRoot(path);
-        setSelectedFolder(undefined);
+        setSelectedDirectory(undefined);
         const first = entries.find(entry => isUnder(entry.file.path, path));
         if (first) {
             setSelectedPath(first.file.path);
@@ -613,25 +623,25 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Goes back from a folder the list shows to the view it was opened from, with the folder that
-    // was shown selected.
+    // Goes back from a directory the list shows to the view it was opened from, with the directory
+    // that was shown selected.
     //
     function drillOut(): void {
         if (treeRoot === "") {
             return;
         }
         areaRef.current?.focus();
-        const section = selectedFolder?.section ?? selectedEntry?.section ?? "all";
-        setSelectedFolder({ path: treeRoot, section: diffMode === "one" ? "all" : section });
-        setTreeRoot(rootHistory[rootHistory.length - 1] ?? parentFolder(treeRoot));
+        const section = selectedDirectory?.section ?? selectedEntry?.section ?? "all";
+        setSelectedDirectory({ path: treeRoot, section: diffMode === "one" ? "all" : section });
+        setTreeRoot(rootHistory[rootHistory.length - 1] ?? parentDirectory(treeRoot));
         setRootHistory(current => current.slice(0, -1));
     }
 
     //
-    // Returns true when every file of a folder's row is staged: always on the staged side of the
+    // Returns true when every file of a directory's row is staged: always on the staged side of the
     // split, never on the unstaged side, and in the single list when each file is staged whole.
     //
-    function isFolderStaged(item: Extract<ListItem, { kind: "folder" }>): boolean {
+    function isDirectoryStaged(item: Extract<ListItem, { kind: "directory" }>): boolean {
         if (item.section !== "all") {
             return item.section === "staged";
         }
@@ -639,10 +649,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Stages every file of a folder's row, or unstages them all when the folder is staged.
+    // Stages every file of a directory's row, or unstages them all when the directory is staged.
     //
-    function toggleFolder(item: Extract<ListItem, { kind: "folder" }>): void {
-        const isStaged = isFolderStaged(item);
+    function toggleDirectoryStaged(item: Extract<ListItem, { kind: "directory" }>): void {
+        const isStaged = isDirectoryStaged(item);
         setStagings(current => {
             const next = new Map(current);
             for (const file of item.files) {
@@ -653,9 +663,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     //
-    // Discards every file of a folder's row, or brings them all back when they are all discarded.
+    // Discards every file of a directory's row, or brings them all back when they are all
+    // discarded.
     //
-    function discardFolder(item: Extract<ListItem, { kind: "folder" }>): void {
+    function discardDirectory(item: Extract<ListItem, { kind: "directory" }>): void {
         const isDiscarded = item.files.every(file => discardsOf(file.path).isFile);
         setDiscardsByPath(current => {
             const next = new Map(current);
@@ -667,7 +678,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     }
 
     function selectFile(path: string, section: ListSection, pane: 0 | 1): void {
-        setSelectedFolder(undefined);
+        setSelectedDirectory(undefined);
         if (path !== selectedPath) {
             setCurrentHunk(undefined);
         }
@@ -678,7 +689,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
 
     function moveFile(step: number, pane: 0 | 1): void {
         //
-        // In the file list, Up and Down move through every row, folders too; from the diff they
+        // In the file list, Up and Down move through every row, directories too; from the diff they
         // move from file to file.
         //
         const rows = pane === 0 ? items : items.filter(item => item.kind === "file");
@@ -798,12 +809,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     // in the file list, and in the diff the picked lines, else the current hunk, else the file.
     //
     function discardCurrent(): void {
-        const folder = items.find(item => item.kind === "folder" && isItemSelected(item));
-        if (activePane === 0 && folder?.kind === "folder") {
-            discardFolder(folder);
+        const directory = items.find(item => item.kind === "directory" && isItemSelected(item));
+        if (activePane === 0 && directory?.kind === "directory") {
+            discardDirectory(directory);
             return;
         }
-        if (activePane === 1 && selectedFolderItem && stackStop) {
+        if (activePane === 1 && selectedDirectoryItem && stackStop) {
             const discards = discardsOf(stackStop.path);
             const stop = stackStop.stop;
             setDiscards(stackStop.path, stop?.kind === "hunk" && !discards.isFile ? withHunkMarked(discards, stop.hunk, !discards.hunks.has(stop.hunk)) : withFileDiscarded(discards, !discards.isFile));
@@ -841,8 +852,8 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             // directory's stacked diffs, or the selected file's diff, the unstaged side first in
             // the split.
             //
-            const names = selectedFolderItem
-                ? [stackCardName(stackStop?.path ?? selectedFolderItem.files[0]?.path ?? "")]
+            const names = selectedDirectoryItem
+                ? [stackCardName(stackStop?.path ?? selectedDirectoryItem.files[0]?.path ?? "")]
                 : diffMode === "one"
                   ? [ONE_DIFF_CARD]
                   : ["Unstaged diff", "Staged diff"];
@@ -861,11 +872,11 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             !event.shiftKey &&
             (event.key === "ArrowUp" || event.key === "ArrowDown") &&
             activePane === 1 &&
-            selectedFolderItem &&
+            selectedDirectoryItem &&
             !isOwnKeyTarget(event.target, event.key)
         ) {
             event.preventDefault();
-            setStackStop(stackStopAfterMove(stackStops(selectedFolderItem.files), stackStop, event.key === "ArrowUp" ? -1 : 1, true));
+            setStackStop(stackStopAfterMove(stackStops(selectedDirectoryItem.files), stackStop, event.key === "ArrowUp" ? -1 : 1, true));
             return;
         }
         if (event.ctrlKey || event.altKey || event.metaKey || isOwnKeyTarget(event.target, event.key)) {
@@ -909,7 +920,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             // stacked diffs, or the selected file's diff.
             //
             event.preventDefault();
-            const cards = selectedFolderItem ? (stackStop ? [stackCardName(stackStop.path)] : []) : diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
+            const cards = selectedDirectoryItem ? (stackStop ? [stackCardName(stackStop.path)] : []) : diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
             cards.forEach(card => cardRefs.current.get(card)?.toggleOpen());
             return;
         }
@@ -939,18 +950,25 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             }
             return;
         }
-        const directoryAction = activePane === 0 && fileView === "tree" ? directoryKeyAction(event) : undefined;
+        //
+        // Space stages the selected row here, a directory as well as a file, so only E expands or
+        // collapses a directory.
+        //
+        const directoryAction = activePane === 0 && fileView === "tree" && key !== " " ? directoryKeyAction(event) : undefined;
         if (directoryAction) {
-            const directory = items.find(item => item.kind === "folder" && isItemSelected(item));
+            const directory = items.find(item => item.kind === "directory" && isItemSelected(item));
             event.preventDefault();
             if (directoryAction === "up") {
                 drillOut();
             }
-            else if (directory?.kind === "folder" && directoryAction === "focus") {
+            else if (directory?.kind === "directory" && directoryAction === "focus") {
                 drillInto(directory.path);
             }
-            else if (directory?.kind === "folder" && directoryAction === "toggle") {
-                toggleCollapsedFolder(directory.path);
+            else if (directory?.kind === "directory" && directoryAction === "toggle") {
+                toggleCollapsedDirectory(directory.path);
+            }
+            else if (directoryAction === "all") {
+                setCollapsedDirectories(collapsedAfterAllKey(treeDirectories(), collapsedDirectories));
             }
             return;
         }
@@ -959,15 +977,15 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         }
         event.preventDefault();
         if (activePane === 0) {
-            const folder = items.find(item => item.kind === "folder" && isItemSelected(item));
+            const directory = items.find(item => item.kind === "directory" && isItemSelected(item));
             if (key === "ArrowUp" || key === "ArrowDown") {
                 moveFile(key === "ArrowUp" ? -1 : 1, 0);
             }
-            else if (key === " " && folder?.kind === "folder") {
-                toggleFolder(folder);
+            else if (key === " " && directory?.kind === "directory") {
+                toggleDirectoryStaged(directory);
             }
-            else if (key === "Enter" && folder?.kind === "folder") {
-                drillInto(folder.path);
+            else if (key === "Enter" && directory?.kind === "directory") {
+                drillInto(directory.path);
             }
             else if (key === "Escape") {
                 drillOut();
@@ -975,26 +993,26 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             else if (key === " " && selectedEntry) {
                 toggleEntry(selectedEntry);
             }
-            else if (key === "ArrowRight" && folder?.kind === "folder") {
+            else if (key === "ArrowRight" && directory?.kind === "directory") {
                 setActivePane(1);
-                setStackStop(stackStopAfterMove(stackStops(folder.files), undefined, 1, false));
+                setStackStop(stackStopAfterMove(stackStops(directory.files), undefined, 1, false));
             }
             else if (key === "ArrowRight" && selectedFile) {
                 setActivePane(1);
             }
             return;
         }
-        if (selectedFolderItem) {
+        if (selectedDirectoryItem) {
             //
             // In a directory's stacked diffs, Up and Down step through every file's hunks and runs
             // of unchanged lines, and Space stages or unstages the hunk, opens or folds the run, or
             // stages or unstages a file with neither.
             //
             if (key === "ArrowUp" || key === "ArrowDown") {
-                setStackStop(stackStopAfterMove(stackStops(selectedFolderItem.files), stackStop, key === "ArrowUp" ? -1 : 1, false));
+                setStackStop(stackStopAfterMove(stackStops(selectedDirectoryItem.files), stackStop, key === "ArrowUp" ? -1 : 1, false));
             }
             else if (key === " " && stackStop) {
-                const file = selectedFolderItem.files.find(candidate => candidate.path === stackStop.path);
+                const file = selectedDirectoryItem.files.find(candidate => candidate.path === stackStop.path);
                 const stop = stackStop.stop;
                 if (stop?.kind === "gap") {
                     cardRefs.current.get(stackCardName(stackStop.path))?.toggleGap(stop.gap);
@@ -1074,97 +1092,72 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
 
     //
     // Renders the rows of a list in the chosen view: a row per file and, in the tree, a row per
-    // folder above its files, joined by tree lines while the stage buttons keep the left column.
+    // directory above its files, joined by tree lines while the stage buttons keep the left column.
     //
     function listRows(listItems: ListItem[]): ReactNode {
-        return listItems.map(item => (item.kind === "folder" ? folderRow(item) : fileRow(item.entry, item.guides)));
+        return listItems.map(item => (item.kind === "directory" ? directoryRow(item) : fileRow(item.entry, item.guides)));
     }
 
     //
-    // Renders a folder's row in the tree, selectable and moved through with the keys like a file's:
-    // at the left the button that stages or unstages every file in it, then the folder's name with
-    // the menu of ways to copy its path, and at the right Discard for every file in it on the
-    // selected row and the row under the pointer, or Undo once they are all discarded. Enter or a
-    // double click shows only the changes inside it.
+    // Renders a directory's row in the tree, selectable and moved through with the keys like a
+    // file's: at the left the button that stages or unstages every file in it, then the directory's
+    // name with the menu of ways to copy its path, and at the right Discard for every file in it on
+    // the selected row and the row under the pointer, or Undo once they are all discarded. Enter or
+    // a double click shows only the changes inside it.
     //
-    function folderRow(item: Extract<ListItem, { kind: "folder" }>): ReactNode {
-        const isStaged = isFolderStaged(item);
+    function directoryRow(item: Extract<ListItem, { kind: "directory" }>): ReactNode {
+        const isStaged = isDirectoryStaged(item);
         const isDiscarded = item.files.every(file => discardsOf(file.path).isFile);
         return (
-            <ListItemButton
-                key={`folder:${item.section}:${item.path}`}
-                component="li"
-                aria-label={`Directory ${item.path}`}
-                selected={isItemSelected(item)}
-                className={isDiscarded ? "graft-discarded" : undefined}
-                onClick={() => selectFolder(item.path, item.section)}
-                onDoubleClick={() => drillInto(item.path)}
-                sx={{
-                    gap: "var(--space-2)",
-                    fontSize: "var(--text-sm)",
-                    paddingRight: "var(--space-2)",
-                    paddingLeft: "var(--space-2)",
-                    "& .file-path-menu": { opacity: 0 },
-                    "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
-                    "& .file-discard": { visibility: "hidden" },
-                    "&:hover .file-discard, &.Mui-selected .file-discard, &:focus-within .file-discard": { visibility: "visible" },
-                    "& .folder-open": { display: "none" },
-                    "&:hover .folder-open, &.Mui-selected .folder-open, &:focus-within .folder-open": { display: "inline-flex" },
-                }}
-            >
-                <span data-floating-actions className="flex flex-none items-center" style={{ width: "calc(var(--space-6) + var(--space-1))" }}>
-                    {isDiscarded ? undefined : <StageButton isStaged={isStaged} what="directory" onClick={() => toggleFolder(item)} isProminent />}
-                </span>
-                <TreeGuides guides={item.guides} />
-                <FolderToggle path={item.path} isCollapsed={collapsedFolders.has(item.path)} onToggle={() => toggleCollapsedFolder(item.path)} />
-                <span className="flex min-w-0 flex-1 items-center" style={{ gap: "var(--space-2)", color: isStaged ? "color-mix(in srgb, var(--color-text-muted) 70%, var(--color-success))" : "var(--color-text-muted)" }}>
-                    <FontAwesomeIcon icon={collapsedFolders.has(item.path) ? faFolder : faFolderOpen} style={{ fontSize: "var(--icon-sm)", flex: "none" }} />
-                    <span className="min-w-0 truncate">{item.name}</span>
-                </span>
-                <span className="folder-open">
-                    <Tooltip title={<Tip title="Focus on this directory" detail={`Key: ${DIRECTORY_KEYS.focus.toUpperCase()}, Enter or a double click. ${DIRECTORY_KEYS.up.toUpperCase()} goes back up.`} />}>
-                        <IconButton size="small" aria-label={`Focus on ${item.path}`} onClick={event => {
-                            event.stopPropagation();
-                            drillInto(item.path);
-                        }}>
-                            <FontAwesomeIcon icon={faArrowRightToBracket} />
-                        </IconButton>
-                    </Tooltip>
-                </span>
-                <FilePathMenu path={item.path} kind="directory" />
-                <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
-                    {isDiscarded ? (
-                        <UndoButton what="directory" onClick={() => discardFolder(item)} />
-                    ) : (
-                        <span className="file-discard inline-flex">
-                            <DiscardButton what="directory" onClick={() => discardFolder(item)} />
-                        </span>
-                    )}
-                </span>
-            </ListItemButton>
+            <TreeDirectoryRow
+                key={`directory:${item.section}:${item.path}`}
+                path={item.path}
+                name={item.name}
+                guides={item.guides}
+                isCollapsed={collapsedDirectories.has(item.path)}
+                isSelected={isItemSelected(item)}
+                isHighlighted={false}
+                isOpen={false}
+                icon={undefined}
+                tint={isStaged ? "var(--color-success)" : undefined}
+                isDiscarded={isDiscarded}
+                lead={
+                    <span data-floating-actions className="flex flex-none items-center" style={{ width: "calc(var(--space-6) + var(--space-1))" }}>
+                        {isDiscarded ? undefined : <StageButton isStaged={isStaged} what="directory" onClick={() => toggleDirectoryStaged(item)} isProminent />}
+                    </span>
+                }
+                menu={<FilePathMenu path={item.path} kind="directory" />}
+                trail={
+                    <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
+                        {isDiscarded ? (
+                            <UndoButton what="directory" onClick={() => discardDirectory(item)} />
+                        ) : (
+                            <span className="file-discard inline-flex">
+                                <DiscardButton what="directory" onClick={() => discardDirectory(item)} />
+                            </span>
+                        )}
+                    </span>
+                }
+                rowRef={undefined}
+                onSelect={() => selectDirectory(item.path, item.section)}
+                onToggle={() => toggleCollapsedDirectory(item.path)}
+                onFocus={() => drillInto(item.path)}
+            />
         );
     }
 
     //
-    // Renders the row at the top of a tree shown from a folder: a button that goes back to the
-    // folder above, and the folder's path.
+    // Renders the bar at the top of the tree: the way back up while the tree is focused on a
+    // directory, and the expand all and collapse all buttons. The other views have none.
     //
-    function backRow(): ReactNode {
-        if (shownRoot === "") {
+    function treeBar(): ReactNode {
+        if (fileView !== "tree") {
             return undefined;
         }
         return (
-            <div className="flex flex-none items-center" style={{ gap: "var(--space-2)", padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border)" }}>
-                <Tooltip title={<Tip title="Back to the directory above" detail={`Key: ${DIRECTORY_KEYS.up.toUpperCase()} or Escape`} />}>
-                    <IconButton size="small" aria-label="Back to the directory above" onClick={drillOut}>
-                        <FontAwesomeIcon icon={faArrowLeft} />
-                    </IconButton>
-                </Tooltip>
-                <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: "var(--icon-sm)" }} />
-                <span className="min-w-0 truncate" style={{ color: "var(--color-text)" }}>
-                    {shownRoot}
-                </span>
-            </div>
+            <ul className="flex-none" style={{ margin: 0, padding: 0 }}>
+                <TreeBar focusedPath={shownRoot} onBack={drillOut} onExpandAll={() => setCollapsedDirectories(new Set())} onCollapseAll={() => setCollapsedDirectories(new Set(treeDirectories()))} />
+            </ul>
         );
     }
 
@@ -1177,51 +1170,48 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     function fileRow(entry: IListEntry, guides: TreeGuide[] = [], view: FileListView = fileView): ReactNode {
         const { file, section } = entry;
         const isChecked = section === "all" ? stagedState(stagingOf(file), hunkCountOf(file)) === "all" : section === "staged";
+        const isDiscarded = discardsOf(file.path).isFile;
         return (
-            <ListItemButton
+            <TreeFileRow
                 key={`${section}:${file.path}`}
-                className={discardsOf(file.path).isFile ? "graft-discarded" : undefined}
-                data-discarded={discardsOf(file.path).isFile || undefined}
-                component="li"
-                aria-label={file.path}
-                selected={entry === selectedEntry}
-                onClick={() => selectFile(file.path, section, 0)}
-                sx={{
-                    gap: "var(--space-2)",
-                    fontSize: "var(--text-sm)",
-                    paddingRight: "var(--space-2)",
-                    paddingLeft: "var(--space-2)",
-                    "& .file-path-menu": { opacity: 0 },
-                    "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
+                path={file.path}
+                label={
                     //
-                    // Discard shows on the selected row and the row under the pointer, and is out of
-                    // reach on the rest, so a click on another row cannot hit it.
+                    // A staged file's path takes a slight green tinge.
                     //
-                    "& .file-discard": { visibility: "hidden" },
-                    "&:hover .file-discard, &.Mui-selected .file-discard, &:focus-within .file-discard": { visibility: "visible" },
-                }}
-            >
-                <span data-floating-actions className="flex flex-none items-center" style={{ width: "calc(var(--space-6) + var(--space-1))" }}>
-                    {discardsOf(file.path).isFile ? undefined : <StageButton isStaged={isChecked} what="file" onClick={() => toggleEntry(entry)} isProminent />}
-                </span>
-                {/* The tree's lines sit after the stage button, which keeps the left column. */}
-                <TreeGuides guides={guides} />
-                <FileIcon path={file.path} />
-                <span className="min-w-0 flex-1">
-                    {/* A staged file's path takes a slight green tinge. */}
                     <FileLabel path={file.path} view={view} tint={isChecked ? "var(--color-success)" : undefined} />
-                </span>
-                <FilePathMenu path={file.path} />
-                <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
-                    {discardsOf(file.path).isFile ? (
-                        <UndoButton what="file" onClick={() => setDiscards(file.path, noDiscards())} />
-                    ) : (
-                        <span className="file-discard inline-flex">
-                            <DiscardButton what="file" onClick={() => setDiscards(file.path, withFileDiscarded(discardsOf(file.path), true))} />
-                        </span>
-                    )}
-                </span>
-            </ListItemButton>
+                }
+                icon={<FileIcon path={file.path} />}
+                guides={guides}
+                isSelected={entry === selectedEntry}
+                isOpen={false}
+                isDiscarded={isDiscarded}
+                lead={
+                    <span data-floating-actions className="flex flex-none items-center" style={{ width: "calc(var(--space-6) + var(--space-1))" }}>
+                        {isDiscarded ? undefined : <StageButton isStaged={isChecked} what="file" onClick={() => toggleEntry(entry)} isProminent />}
+                    </span>
+                }
+                extra={undefined}
+                wrapLabel={label => (
+                    <PinnableTooltip enterDelayMs={500} maxWidth="calc(var(--space-8) * 12)" tip={pinButton => <FileTip file={{ ...file, linesAdded: countLines(file.diff).added, linesDeleted: countLines(file.diff).deleted }} pinButton={pinButton} />}>
+                        {label}
+                    </PinnableTooltip>
+                )}
+                menu={<FilePathMenu path={file.path} />}
+                trail={
+                    <span data-floating-actions className="flex flex-none items-center" style={{ marginLeft: "var(--space-2)" }}>
+                        {isDiscarded ? (
+                            <UndoButton what="file" onClick={() => setDiscards(file.path, noDiscards())} />
+                        ) : (
+                            <span className="file-discard inline-flex">
+                                <DiscardButton what="file" onClick={() => setDiscards(file.path, withFileDiscarded(discardsOf(file.path), true))} />
+                            </span>
+                        )}
+                    </span>
+                }
+                rowRef={undefined}
+                onSelect={() => selectFile(file.path, section, 0)}
+            />
         );
     }
 
@@ -1327,7 +1317,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 </p>
                             ) : (
                                 <div className="flex h-full flex-col">
-                                {backRow()}
+                                {treeBar()}
                                 <div className={panelStack === "vertical" ? "flex min-h-0 flex-1 flex-col" : "flex min-h-0 flex-1 flex-row"} style={{ gap: "var(--space-2)", padding: "var(--space-2)" }}>
                                     {shownFiles.length === 0 ? (
                                         <p style={{ padding: "var(--space-4) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", textAlign: "center" }}>No changed file matches the search.</p>
@@ -1417,15 +1407,17 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 </div>
 
                 <div className={maximised === 0 || maximised === 2 ? "hidden" : "flex min-h-[420px] min-w-0 flex-1 flex-col lg:min-h-0"} style={{ gap: "var(--space-2)" }} onPointerDown={() => setActivePane(1)}>
-                    {selectedFolderItem ? (
+                    {selectedDirectoryItem ? (
                         //
-                        // A selected directory shows the diffs of all its files stacked, each with its own
-                        // button that collapses or expands it, the column scrolling as a whole.
+                        // A selected directory shows the diffs of all its files stacked, each with
+                        // its own button that collapses or expands it, the column scrolling as a
+                        // whole.
                         //
-                        <div ref={stackRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" role="region" aria-label={`Diffs in ${selectedFolderItem.path}`} style={{ gap: "var(--space-3)" }}>
-                            {selectedFolderItem.files.map(file => (
+                        <div ref={stackRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" role="region" aria-label={`Diffs in ${selectedDirectoryItem.path}`} style={{ gap: "var(--space-3)" }}>
+                            {selectedDirectoryItem.files.map(file => (
                                 //
-                                // Each card keeps its full height, so the column scrolls through them.
+                                // Each card keeps its full height, so the column scrolls through
+                                // them.
                                 //
                                 <div key={file.path + (file.diff ?? "")} className="flex-none" data-stack-path={file.path}>
                                 <FileDiffCard
@@ -1456,6 +1448,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     ) : selectedFile ? (
                         diffMode === "split" && hunkCountOf(selectedFile) > 0 ? (
                             <SplitDiff
+                                key={selectedFile.path}
                                 file={selectedFile}
                                 staging={stagingOf(selectedFile)}
                                 onStagingChange={staging => setStaging(selectedFile.path, staging)}
@@ -1476,7 +1469,10 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                 }}
                             />
                         ) : (
-                            <div className="min-h-0 flex-1">
+                            //
+                            // The diff slides in from the left when another file is picked.
+                            //
+                            <div key={selectedFile.path} className="graft-slide-in min-h-0 flex-1">
                                 <FileDiffCard
                                     isFoldable={false}
                                     key={selectedFile.path + (selectedFile.diff ?? "")}

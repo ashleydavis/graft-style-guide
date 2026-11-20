@@ -5,32 +5,37 @@
 // whole message, who wrote and made it and when, its refs, hash and parents.
 //
 
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListSubheader from "@mui/material/ListSubheader";
+import IconButton from "@mui/material/IconButton";
+import Popover from "@mui/material/Popover";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faArrowRightToBracket, faFolder, faFolderOpen, faFolderTree, faList, faMessage, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
-import IconButton from "@mui/material/IconButton";
-import { Tip } from "../../../components/tip";
+import { faCodeCommit, faFolderTree, faHardDrive, faList, faMessage, faSliders, faTableColumns, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { RefBadge } from "../../badges";
-import { COMMIT_SUMMARY_PATH, FOLDER_PREFIX } from "../explorer-state";
+import { COMMIT_SUMMARY_PATH, DIRECTORY_PREFIX } from "../explorer-state";
 import { refBadge } from "./commit-pane";
 import { CopyButton } from "../../../components/copy-button";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { StatusLetter } from "../../tree";
-import type { IChangedFile, ICommit } from "../data";
+import type { CommitDiffKind, IChangedFile, ICommit } from "../data";
 import { treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../file-views";
 import { FileIcon } from "../../../components/file-icon";
 import { matchesSearch, SearchModeBox, SearchModeButton, type ISearchMode } from "../../../components/search-box";
-import { DIRECTORY_KEYS, FolderToggle, TreeGuides } from "../../../components/tree-guides";
+import { TreeBar, TreeDirectoryRow, TreeFileRow } from "../../../components/tree-rows";
 import { FilePath } from "./file-path";
 import { LineCounts } from "./line-counts";
 import { Pane } from "./pane";
+import { DIFF_PANE_WIDTH_MIN } from "./file-pane";
+import { OptionRow } from "../../diff/components/file-diff-card";
+import { Tip } from "../../../components/tip";
 import { scrollSelectionIntoView } from "../scroll";
+import { PinnableTooltip } from "../../../components/pinnable-tooltip";
+import { FileTip } from "../../../components/file-tip";
 
 //
 // Formats a date with its time for the details, as in "14 Nov 2026, 16:42", in the browser's own
@@ -95,17 +100,12 @@ export interface IFileRowProps {
     file: IChangedFile;
 
     //
-    // How many folders deep the row sits, which indents it.
-    //
-    depth: number;
-
-    //
     // The row's tree lines, in the tree view.
     //
     guides?: TreeGuide[];
 
     //
-    // What the row shows between the status letter and the line counts.
+    // What the row shows between the file icon and the path menu.
     //
     label: ReactNode;
 
@@ -131,45 +131,36 @@ export interface IFileRowProps {
 }
 
 //
-// Renders one changed file's row: its status letter, its label, indented by its depth, and its
-// line counts.
+// Renders one changed file's row with the shared tree row: its icon, its label, the path menu, its
+// status letter and its line counts.
 //
-export function FileRow({ file, depth, guides = [], label, isSelected, isOpen, selectedRef, onSelectFile }: IFileRowProps): ReactNode {
+export function FileRow({ file, guides = [], label, isSelected, isOpen, selectedRef, onSelectFile }: IFileRowProps): ReactNode {
     return (
-        <ListItemButton
-            component="li"
-            ref={isSelected ? selectedRef : undefined}
-            selected={isSelected}
-            aria-current={isOpen ? "true" : undefined}
-            aria-label={file.path}
-            onClick={() => onSelectFile(file.path)}
-            sx={{
-                gap: "var(--space-2)",
-                fontSize: "var(--text-sm)",
-                paddingLeft: `calc(var(--space-3) + var(--space-4) * ${depth})`,
-                boxShadow: isOpen ? "inset 2px 0 0 var(--color-select-item)" : "none",
-                //
-                // The path menu shows on the row under the pointer, the selected row and a row
-                // with the keyboard in it, so the rest of the list stays quiet. Its space is kept,
-                // so the line counts never shift.
-                //
-                "& .file-path-menu": {
-                    opacity: 0,
-                    transition: "opacity var(--duration-fast) var(--ease-standard)",
-                },
-                "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": {
-                    opacity: 1,
-                },
-            }}
-        >
-            <TreeGuides guides={guides} />
-            <FileIcon path={file.path} />
-            {/* The label cuts itself short with an ellipsis before the path menu beside it. */}
-            <span className="min-w-0 flex-1 truncate">{label}</span>
-            <FilePathMenu path={file.path} />
-            <StatusLetter status={file.status} />
-            <LineCounts added={file.linesAdded} deleted={file.linesDeleted} />
-        </ListItemButton>
+        <TreeFileRow
+            path={file.path}
+            label={label}
+            icon={<FileIcon path={file.path} />}
+            guides={guides}
+            isSelected={isSelected}
+            isOpen={isOpen}
+            isDiscarded={false}
+            lead={undefined}
+            extra={file.isUntracked ? <span style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)" }}>untracked</span> : undefined}
+            wrapLabel={label => (
+                <PinnableTooltip enterDelayMs={500} maxWidth="calc(var(--space-8) * 12)" tip={pinButton => <FileTip file={file} pinButton={pinButton} />}>
+                    {label}
+                </PinnableTooltip>
+            )}
+            menu={<FilePathMenu path={file.path} />}
+            trail={
+                <>
+                    <StatusLetter status={file.status} />
+                    <LineCounts added={file.linesAdded} deleted={file.linesDeleted} />
+                </>
+            }
+            rowRef={isSelected ? selectedRef : undefined}
+            onSelect={() => onSelectFile(file.path)}
+        />
     );
 }
 
@@ -181,6 +172,21 @@ export interface ICommitDetailsPaneProps {
     // The open commit.
     //
     commit: ICommit;
+
+    //
+    // The commit's files, compared with its parent or with the files on disk as `diffKind` says.
+    //
+    files: IChangedFile[];
+
+    //
+    // What the files are compared with.
+    //
+    diffKind: CommitDiffKind;
+
+    //
+    // Called with what the files are to be compared with, picked in the options dropdown.
+    //
+    onChangeDiffKind: (kind: CommitDiffKind) => void;
 
     //
     // The path of the selected changed file, drawn on the selected background, or undefined.
@@ -219,29 +225,39 @@ export interface ICommitDetailsPaneProps {
     onSelectFile: (path: string) => void;
 
     //
-    // The folder the tree shows its files from, or empty for the whole commit.
+    // The directory the tree shows its files from, or empty for the whole commit.
     //
     treeRoot: string;
 
     //
-    // Called with a folder's path to show only the files inside it.
+    // Called with a directory's path to show only the files inside it.
     //
     onDrillIn: (path: string) => void;
 
     //
-    // Called by the back row to go back to the view the folder was opened from.
+    // Called by the back button to go back to the view the directory was focused from.
     //
     onDrillOut: () => void;
 
     //
-    // The paths of the collapsed folders, whose rows inside the tree hides.
+    // The paths of the collapsed directories, whose rows inside the tree hides.
     //
-    collapsedFolders: ReadonlySet<string>;
+    collapsedDirectories: ReadonlySet<string>;
 
     //
-    // Called with a folder's path by its collapse button.
+    // Called with a directory's path by its +/- button.
     //
-    onToggleFolder: (path: string) => void;
+    onToggleDirectory: (path: string) => void;
+
+    //
+    // Called by the expand all button above the tree.
+    //
+    onExpandAll: () => void;
+
+    //
+    // Called by the collapse all button above the tree.
+    //
+    onCollapseAll: () => void;
 
     //
     // The file list's search mode, whose query keeps only the files whose path holds it.
@@ -275,16 +291,101 @@ export interface ICommitDetailsPaneProps {
 }
 
 //
-// Renders the pane, headed "Commit" and the short hash. The commit's row comes first, then the
-// changed files, and the keys move through both as one list. The changed files list by full path, by file
-// name and folder in two columns, or as a tree of folders, as the switch above them picks. The
-// selected file scrolls into view when the keys move the selection.
+// Renders the commit details pane's options button and, while it is open, its dropdown with how the
+// files are listed, laid out like the diff card's options: what the option does on the left and
+// its control on the right.
 //
-export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, fileView, onChangeFileView, onSelectFile, treeRoot, onDrillIn, onDrillOut, collapsedFolders, onToggleFolder, fileSearch, onClose }: ICommitDetailsPaneProps): ReactNode {
-    const files = commit.files.filter(file => matchesSearch(file.path, fileSearch.query));
+export function FileListOptions({ fileView, onChangeFileView, diffKind, onChangeDiffKind }: { fileView: FileListView; onChangeFileView: (view: FileListView) => void; diffKind: CommitDiffKind; onChangeDiffKind: (kind: CommitDiffKind) => void }): ReactNode {
+    const [anchor, setAnchor] = useState<HTMLElement | undefined>(undefined);
+    return (
+        <>
+            <Tooltip title={<Tip title="Commit options" detail="What the files are compared with and how they are listed." />}>
+                <IconButton size="small" aria-label="Commit options" aria-haspopup="dialog" aria-expanded={anchor !== undefined} onClick={event => setAnchor(event.currentTarget)}>
+                    <FontAwesomeIcon icon={faSliders} />
+                </IconButton>
+            </Tooltip>
+            <Popover
+                open={anchor !== undefined}
+                anchorEl={anchor}
+                onClose={() => setAnchor(undefined)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                slotProps={{ paper: { role: "dialog", "aria-label": "Commit options" } }}
+            >
+                <div className="flex flex-col" style={{ gap: "var(--space-3)", padding: "var(--space-4)", width: "min(calc(var(--space-8) * 11), calc(100vw - var(--space-8)))" }}>
+                    <OptionRow
+                        label="Compare with"
+                        detail="The commit's parent, for the changes the commit made, or the files on disk now."
+                        control={
+                            <ToggleButtonGroup
+                                size="small"
+                                exclusive
+                                value={diffKind}
+                                onChange={(_event, kind: CommitDiffKind | null) => {
+                                    if (kind) {
+                                        onChangeDiffKind(kind);
+                                    }
+                                }}
+                                aria-label="Compare with"
+                                sx={{ "& .MuiToggleButton-root": { padding: "var(--space-1) var(--space-2)", fontSize: "var(--icon-sm)" } }}
+                            >
+                                <Tooltip title={<Tip title="Changes made by this commit" detail="Compares the commit with its parent." />}>
+                                    <ToggleButton value="commit" aria-label="Changes made by this commit">
+                                        <FontAwesomeIcon icon={faCodeCommit} />
+                                    </ToggleButton>
+                                </Tooltip>
+                                <Tooltip title={<Tip title="Changes from this commit to the files on disk" detail="Compares the commit with the working tree as it is now." />}>
+                                    <ToggleButton value="commitToDisk" aria-label="Changes from this commit to the files on disk">
+                                        <FontAwesomeIcon icon={faHardDrive} />
+                                    </ToggleButton>
+                                </Tooltip>
+                            </ToggleButtonGroup>
+                        }
+                    />
+                    <OptionRow
+                        label="List files as"
+                        detail="Full paths, file names beside their directories, or a tree of directories."
+                        control={
+                            <ToggleButtonGroup
+                                size="small"
+                                exclusive
+                                value={fileView}
+                                onChange={(_event, view: FileListView | null) => {
+                                    if (view) {
+                                        onChangeFileView(view);
+                                    }
+                                }}
+                                aria-label="List files as"
+                                sx={{ "& .MuiToggleButton-root": { padding: "var(--space-1) var(--space-2)", fontSize: "var(--icon-sm)" } }}
+                            >
+                                {fileViews.map(view => (
+                                    <Tooltip key={view.value} title={view.label}>
+                                        <ToggleButton value={view.value} aria-label={view.label}>
+                                            <FontAwesomeIcon icon={view.icon} />
+                                        </ToggleButton>
+                                    </Tooltip>
+                                ))}
+                            </ToggleButtonGroup>
+                        }
+                    />
+                </div>
+            </Popover>
+        </>
+    );
+}
+
+//
+// Renders the pane, headed "Commit" and the short hash, with the file search and options buttons
+// in its header. The commit's row comes first, then the changed files, and the keys move through
+// both as one list. The changed files list by full path, by file name and directory in two
+// columns, or as a tree of directories, as the options dropdown picks. The selected file scrolls
+// into view when the keys move the selection.
+//
+export function CommitDetailsPane({ commit, files: allFiles, diffKind, onChangeDiffKind, selectedPath, openPath, isActive, width, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, fileView, onChangeFileView, onSelectFile, treeRoot, onDrillIn, onDrillOut, collapsedDirectories, onToggleDirectory, onExpandAll, onCollapseAll, fileSearch, onClose }: ICommitDetailsPaneProps): ReactNode {
+    const files = allFiles.filter(file => matchesSearch(file.path, fileSearch.query));
     const selectedRef = useRef<HTMLLIElement>(null);
-    const totalAdded = commit.files.reduce((total, file) => total + file.linesAdded, 0);
-    const totalDeleted = commit.files.reduce((total, file) => total + file.linesDeleted, 0);
+    const totalAdded = allFiles.reduce((total, file) => total + file.linesAdded, 0);
+    const totalDeleted = allFiles.reduce((total, file) => total + file.linesDeleted, 0);
 
     useEffect(() => {
         scrollSelectionIntoView(selectedRef.current);
@@ -320,15 +421,30 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                     </code>
                 </span>
             }
+            headerExtra={
+                <>
+                    {allFiles.length > 0 ? <SearchModeButton mode={fileSearch} what="the files" /> : undefined}
+                    <FileListOptions fileView={fileView} onChangeFileView={onChangeFileView} diffKind={diffKind} onChangeDiffKind={onChangeDiffKind} />
+                </>
+            }
             onClose={onClose}
         >
+            {fileSearch.isOpen ? (
+                //
+                // The file search box sits under the header and stays there while the files
+                // scroll under it.
+                //
+                <div className="sticky top-0" style={{ zIndex: 1 }}>
+                    <SearchModeBox mode={fileSearch} label="Search the files" placeholder="Search the file paths, then Enter" result={`${files.length} of ${allFiles.length}`} />
+                </div>
+            ) : undefined}
             <List aria-label="Commit" sx={{ padding: "var(--space-1) var(--space-1) 0" }}>
                 <ListItemButton
                     component="li"
                     ref={selectedPath === COMMIT_SUMMARY_PATH ? selectedRef : undefined}
                     selected={selectedPath === COMMIT_SUMMARY_PATH}
                     aria-current={openPath === COMMIT_SUMMARY_PATH ? "true" : undefined}
-                    aria-label="Commit message"
+                    aria-label="Commit details"
                     onClick={() => onSelectFile(COMMIT_SUMMARY_PATH)}
                     sx={{
                         gap: "var(--space-2)",
@@ -338,11 +454,8 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                 >
                     <FontAwesomeIcon icon={faMessage} style={{ fontSize: "var(--icon-sm)", color: "var(--color-text-muted)" }} />
                     <span className="min-w-0 flex-1 truncate" style={{ fontWeight: "var(--weight-medium)" }}>
-                        {commit.title}
+                        Commit details
                     </span>
-                    <code className="flex-none" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>
-                        {commit.hash.slice(0, 7)}
-                    </code>
                 </ListItemButton>
             </List>
             <List
@@ -350,42 +463,14 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                 sx={{ padding: "0 var(--space-1) var(--space-2)" }}
                 subheader={
                     <ListSubheader component="div" className="flex items-center" sx={{ gap: "var(--space-2)", paddingTop: "var(--space-3)", paddingBottom: "var(--space-2)" }}>
-                        <span className="flex-1">Files changed ({commit.files.length})</span>
-                        {commit.files.length > 0 ? <LineCounts added={totalAdded} deleted={totalDeleted} /> : undefined}
-                        {commit.files.length > 0 ? <SearchModeButton mode={fileSearch} what="the files" /> : undefined}
-                        {commit.files.length > 0 ? (
-                            <ToggleButtonGroup
-                                size="small"
-                                exclusive
-                                value={fileView}
-                                onChange={(_event, view: FileListView | null) => {
-                                    if (view) {
-                                        onChangeFileView(view);
-                                    }
-                                }}
-                                aria-label="List files as"
-                                sx={{ "& .MuiToggleButton-root": { padding: "var(--space-1) var(--space-2)", fontSize: "var(--icon-sm)" } }}
-                            >
-                                {fileViews.map(view => (
-                                    <Tooltip key={view.value} title={view.label}>
-                                        <ToggleButton value={view.value} aria-label={view.label}>
-                                            <FontAwesomeIcon icon={view.icon} />
-                                        </ToggleButton>
-                                    </Tooltip>
-                                ))}
-                            </ToggleButtonGroup>
-                        ) : undefined}
+                        <span className="flex-1">Files changed ({allFiles.length})</span>
+                        {allFiles.length > 0 ? <LineCounts added={totalAdded} deleted={totalDeleted} /> : undefined}
                     </ListSubheader>
                 }
             >
-                {fileSearch.isOpen ? (
-                    <li style={{ listStyle: "none", margin: "0 calc(var(--space-1) * -1)" }}>
-                        <SearchModeBox mode={fileSearch} label="Search the files" placeholder="Search the file paths, then Enter" result={`${files.length} of ${commit.files.length}`} />
-                    </li>
-                ) : undefined}
-                {commit.files.length === 0 ? (
+                {allFiles.length === 0 ? (
                     <li style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
-                        No files changed. A merge commit's changes are in its parents.
+                        {diffKind === "commit" ? "No files changed. A merge commit's changes are in its parents." : "The files on disk are the same as in this commit."}
                     </li>
                 ) : files.length === 0 ? (
                     <li style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
@@ -393,68 +478,36 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                     </li>
                 ) : fileView === "tree" ? (
                     [
-                        treeRoot !== "" ? (
-                            <li
-                                key="back"
-                                className="flex items-center"
-                                style={{ gap: "var(--space-2)", padding: "var(--space-1) var(--space-2)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border)" }}
-                            >
-                                <Tooltip title={<Tip title="Back to the directory above" detail={`Key: ${DIRECTORY_KEYS.up.toUpperCase()} or Escape`} />}>
-                                    <IconButton size="small" aria-label="Back to the directory above" onClick={onDrillOut}>
-                                        <FontAwesomeIcon icon={faArrowLeft} />
-                                    </IconButton>
-                                </Tooltip>
-                                <FontAwesomeIcon icon={faFolderOpen} style={{ fontSize: "var(--icon-sm)" }} />
-                                <span className="min-w-0 truncate" style={{ color: "var(--color-text)" }}>
-                                    {treeRoot}
-                                </span>
-                            </li>
-                        ) : undefined,
-                        ...withoutCollapsed(treeRows(files, treeRoot), collapsedFolders).map((row, index, rows) => {
-                        const guides = treeGuides(rows)[index];
-                        return row.kind === "folder" ? (
-                            <ListItemButton
-                                key={`folder-${row.path}`}
-                                component="li"
-                                aria-label={`Directory ${row.path}`}
-                                ref={selectedPath === `${FOLDER_PREFIX}${row.path}` ? selectedRef : undefined}
-                                selected={selectedPath === `${FOLDER_PREFIX}${row.path}`}
-                                onClick={() => onSelectFile(`${FOLDER_PREFIX}${row.path}`)}
-                                onDoubleClick={() => onDrillIn(row.path)}
-                                sx={{
-                                    gap: "var(--space-2)",
-                                    fontSize: "var(--text-sm)",
-                                    color: "var(--color-text-muted)",
-                                    "& .file-path-menu": { opacity: 0 },
-                                    "&:hover .file-path-menu, &.Mui-selected .file-path-menu, &:focus-within .file-path-menu": { opacity: 1 },
-                                    "& .folder-open": { display: "none" },
-                                    "&:hover .folder-open, &.Mui-selected .folder-open, &:focus-within .folder-open": { display: "inline-flex" },
-                                }}
-                            >
-                                <TreeGuides guides={guides} />
-                                <FolderToggle path={row.path} isCollapsed={collapsedFolders.has(row.path)} onToggle={() => onToggleFolder(row.path)} />
-                                <FontAwesomeIcon icon={collapsedFolders.has(row.path) ? faFolder : faFolderOpen} style={{ fontSize: "var(--icon-sm)", flex: "none" }} />
-                                <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                                <span className="folder-open">
-                                    <Tooltip title={<Tip title="Focus on this directory" detail={`Key: ${DIRECTORY_KEYS.focus.toUpperCase()}, Enter or a double click. ${DIRECTORY_KEYS.up.toUpperCase()} goes back up.`} />}>
-                                        <IconButton
-                                            size="small"
-                                            aria-label={`Focus on ${row.path}`}
-                                            onClick={event => {
-                                                event.stopPropagation();
-                                                onDrillIn(row.path);
-                                            }}
-                                        >
-                                            <FontAwesomeIcon icon={faArrowRightToBracket} />
-                                        </IconButton>
-                                    </Tooltip>
-                                </span>
-                                <FilePathMenu path={row.path} kind="directory" />
-                            </ListItemButton>
-                        ) : (
-                            <FileRow key={row.file.path} {...rowState(row.file)} file={row.file} depth={0} guides={guides} label={<span className="truncate">{row.name}</span>} />
-                        );
-                    }),
+                        <TreeBar key="bar" focusedPath={treeRoot} onBack={onDrillOut} onExpandAll={onExpandAll} onCollapseAll={onCollapseAll} />,
+                        ...withoutCollapsed(treeRows(files, treeRoot), collapsedDirectories).map((row, index, rows) => {
+                            const guides = treeGuides(rows)[index];
+                            if (row.kind === "directory") {
+                                const rowPath = `${DIRECTORY_PREFIX}${row.path}`;
+                                return (
+                                    <TreeDirectoryRow
+                                        key={`directory-${row.path}`}
+                                        path={row.path}
+                                        name={row.name}
+                                        guides={guides}
+                                        isCollapsed={collapsedDirectories.has(row.path)}
+                                        isSelected={selectedPath === rowPath}
+                                        isHighlighted={false}
+                                        isOpen={openPath === rowPath}
+                                        icon={undefined}
+                                        tint={undefined}
+                                        isDiscarded={false}
+                                        lead={undefined}
+                                        menu={<FilePathMenu path={row.path} kind="directory" />}
+                                        trail={undefined}
+                                        rowRef={selectedPath === rowPath ? selectedRef : undefined}
+                                        onSelect={() => onSelectFile(rowPath)}
+                                        onToggle={() => onToggleDirectory(row.path)}
+                                        onFocus={() => onDrillIn(row.path)}
+                                    />
+                                );
+                            }
+                            return <FileRow key={row.file.path} {...rowState(row.file)} file={row.file} guides={guides} label={row.name} />;
+                        }),
                     ]
                 ) : (
                     files.map(file =>
@@ -463,7 +516,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                                 key={file.path}
                                 {...rowState(file)}
                                 file={file}
-                                depth={0}
+                               
                                 label={
                                     <span className="grid min-w-0" style={{ gridTemplateColumns: "minmax(0, 2fr) minmax(0, 3fr)", gap: "var(--space-3)" }}>
                                         <span className="truncate">{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
@@ -474,7 +527,7 @@ export function CommitDetailsPane({ commit, selectedPath, openPath, isActive, wi
                                 }
                             />
                         ) : (
-                            <FileRow key={file.path} {...rowState(file)} file={file} depth={0} label={<FilePath path={file.path} />} />
+                            <FileRow key={file.path} {...rowState(file)} file={file} label={<FilePath path={file.path} />} />
                         ),
                     )
                 )}
@@ -533,7 +586,7 @@ export interface ICommitInfoPaneProps {
 export function CommitInfoPane({ commit, isActive, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, onClose }: ICommitInfoPaneProps): ReactNode {
     const isSamePerson = commit.authorName === commit.committerName && commit.authorDate.getTime() === commit.committerDate.getTime();
     return (
-        <div style={isCollapsed ? { flex: "none", height: "100%" } : { flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
+        <div style={isCollapsed ? { flex: "none", height: "100%" } : { flex: "1 1 0%", minWidth: DIFF_PANE_WIDTH_MIN, height: "100%" }}>
         <Pane
             label="Full commit details"
             width="100%"

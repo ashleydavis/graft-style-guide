@@ -1,7 +1,7 @@
 //
 // The preview for the tree guide choice: a file tree three levels deep in the style of each
 // option. A indents with no lines, as the theme draws it now, and B draws a guide line down
-// each open folder's contents.
+// each open directory's contents.
 //
 
 import type { ReactNode } from "react";
@@ -14,8 +14,8 @@ import { faChevronDown, faFile, faFolderOpen } from "@fortawesome/free-solid-svg
 import { fileTree, StatusLetter, type ITreeNode } from "../../tree";
 
 //
-// Renders `nodes` and the contents of every folder below them. With `showGuides` each folder's
-// contents sit beside a guide line in the border colour.
+// Renders `nodes` and the contents of every directory below them. With `showGuides` each
+// directory's contents sit beside a guide line in the border colour.
 //
 export function GuideRows({ nodes, showGuides }: { nodes: ITreeNode[]; showGuides: boolean }): ReactNode {
     return nodes.map(node => (

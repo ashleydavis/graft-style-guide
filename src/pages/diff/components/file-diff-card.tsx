@@ -419,8 +419,8 @@ const STAGE_SIZE = "calc(var(--icon-md) + var(--space-3))";
 const COMPACT_STAGE_SIZE = "calc(var(--icon-md) * 0.65 + var(--space-2))";
 
 //
-// The stage button on a hunk, picked lines or a file or folder row: larger than the Discard button
-// on the same row, so it is the easier of the two to hit.
+// The stage button on a hunk, picked lines or a file or directory row: larger than the Discard
+// button on the same row, so it is the easier of the two to hit.
 //
 const DIFF_STAGE_SIZE = "calc(var(--icon-md) * 0.85 + var(--space-2))";
 
@@ -464,7 +464,8 @@ export function StageButton({
                 aria-label={label}
                 //
                 // A square button. Staged, it has a slight green tinge on its background, a little
-                // stronger under the pointer; unstaged, it takes the stage button colours, a pale grey square in light and a black one in dark, with the control border.
+                // stronger under the pointer; unstaged, it takes the stage button colours, a pale
+                // grey square in light and a black one in dark, with the control border.
                 //
                 sx={{
                     ...(isCompact ? ACTION_BUTTON_SIZE : {}),
@@ -749,15 +750,15 @@ function isOwnKeyTarget(target: EventTarget): boolean {
 // stageable change the button that stages or unstages the whole file, the path (the old path, an
 // arrow and the new path for a renamed file) with its menu of ways to copy the path or open the
 // file, the change details and diff options buttons, and the collapse, maximise and close buttons
-// where the card has them. The options keys work while the keys are on the card. In the
-// line selection mode lines are picked as hunks are: a click picks a line, Shift a run and Ctrl or
-// Cmd adds a line, Up and Down move the pick, and a bar above the diff stages, unstages or discards
-// the picked lines. Each hunk of a stageable change has its own Stage or Unstage button at its top right. A
-// card that answers its own keys takes the focus: Up and Down step through its hunks, marking the
-// current one, and Space stages or unstages the current hunk, or the file when none is current. The header wraps onto a second line on a narrow
-// screen. A file with no lines to show says what changed in its place: a rename with no changes, a
-// binary file's sizes or a mode change. A diff of more than LARGE_DIFF_LINES changed lines waits
-// behind a button.
+// where the card has them. The options keys work while the keys are on the card. In the line
+// selection mode lines are picked as hunks are: a click picks a line, Shift a run and Ctrl or Cmd
+// adds a line, Up and Down move the pick, and a bar above the diff stages, unstages or discards the
+// picked lines. Each hunk of a stageable change has its own Stage or Unstage button at its top
+// right. A card that answers its own keys takes the focus: Up and Down step through its hunks,
+// marking the current one, and Space stages or unstages the current hunk, or the file when none is
+// current. The header wraps onto a second line on a narrow screen. A file with no lines to show
+// says what changed in its place: a rename with no changes, a binary file's sizes or a mode change.
+// A diff of more than LARGE_DIFF_LINES changed lines waits behind a button.
 //
 export function FileDiffCard({
     file,

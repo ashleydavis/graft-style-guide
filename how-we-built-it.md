@@ -311,6 +311,21 @@ More across the explorers:
 
 The rest of the work, in order, is in `todo.md`.
 
+## Bringing back the diff tool's refinements
+
+The diff tool's viewer took the style guide's styles and refined them while it was built against real repositories. Those refinements came back here, with mock data where the viewer reads from its backend.
+
+- **Slate tooltips.** Tooltips are a solid slate panel with a thin border and no arrow, a little roomier and rounder than before, from five new tokens such as `--color-tooltip`. They mount at the end of the page, so a pane that cuts off its overflow never cuts off a tooltip. Each light or dark example panel hands its class to the popups it opens, so a tooltip, menu or dropdown from the dark panel stays dark.
+- **Tooltips to copy from.** A tooltip that lists fields, such as a commit's title, author, date and hash or a file's path, shows each under a dotted line with a copy button. A pin button, or P, keeps it on screen; P or Escape closes it. Hovering a file in any tree or list shows its status, its lines added and deleted and its path.
+- **Badges.** Badge icons sit in the middle of the badge. In the commit list the badges have a column of their own, with a "..." dropdown for the ones that do not fit.
+- **One tree.** Every tree (the commit's files, the Commit page's staged and unstaged files, the Tree page and the new directory browser) draws the same rows. A directory opens and closes with a small +/- box on its tree line, or Space or E; A opens or closes them all, and a bar above each tree has expand all and collapse all buttons. A click only selects a row.
+- **Directory browser.** A new page browses a made-up home directory, with the Git icon on repositories and a search that shows its results as a tree.
+- **Commit list header.** The commit list has a header with a search button and an options button. The search shows its box with the button or Ctrl+F, Enter applies it and it matches descriptions too. The options show or hide the graph, badges, author, date and hash columns, remembered between visits.
+- **Commit details header.** The file search and an options button, whose dropdown picks how the files are listed, moved into the header, out of the list.
+- **Pane widths.** The commit list is 850 pixels wide. A file diff or the full commit details take all the width left, never less than 840 pixels on a desktop screen and the screen's width on a phone. A maximised pane fills the whole row.
+- **How the commit explorer behaves.** A click on a file opens its diff and gives the diff the keys. In a diff, Up and Down scroll and Shift with Up or Down opens the previous or next file. Space presses a button as Enter does. An applied commit search lists only the matching commits, without the graph's lanes. The commit details pane starts 450 pixels wide, its first row reads "Commit details", and its options can compare the commit with the files on disk, which lists the files changed since and an untracked file, from example data. A long history is read a page at a time as the list scrolls, with a short wait that mocks waiting on Git. The explorer fills the window's height and its title bar shows only the repository and branch. The commit list keeps its width, and the row of panes scrolls sideways when an open diff needs the room.
+- **Small things.** Explorer tooltips open to the right of their row. The Commit page's diff slides in from the left when another file is picked, unless less motion is asked for. A directory's path menu opens it in the editor too. "Folder" is now "directory" everywhere.
+
 ## Picking it up again
 
 - Open this folder in Claude Code. Claude starts the dev server and opens the explorer in Chrome.

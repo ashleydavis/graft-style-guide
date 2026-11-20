@@ -30,6 +30,7 @@ export function OverviewPage(): ReactNode {
                         ["--amber-400", "--amber-600", "--amber-650", "--amber-700"],
                         ["--blue-100", "--blue-300", "--blue-400", "--blue-500", "--blue-500-a08", "--blue-500-a14", "--blue-500-a16", "--blue-500-a26", "--blue-600", "--blue-700", "--blue-900"],
                         ["--cyan-400", "--cyan-600", "--cyan-650", "--cyan-700"],
+                        ["--slate-200", "--slate-300", "--slate-350", "--slate-400", "--slate-600", "--slate-650", "--slate-700", "--slate-750"],
                         ["--pink-400", "--pink-600"],
                         ["--black", "--black-40", "--black-60"],
                     ].map(names => (
@@ -88,6 +89,11 @@ export function OverviewPage(): ReactNode {
                         "--color-lane-4",
                         "--color-lane-5",
                         "--color-lane-6",
+                        "--color-tooltip",
+                        "--color-tooltip-border",
+                        "--color-tooltip-muted",
+                        "--color-tooltip-button",
+                        "--color-tooltip-button-hover",
                     ].map(name => (
                         <Swatch key={name} name={name} />
                     ))}

@@ -1,6 +1,6 @@
 //
 // The icon in front of a file's name or path, picked by the file's extension or name, the way the
-// folder icon stands in front of a directory.
+// directory icon stands in front of a directory.
 //
 
 import type { ReactNode } from "react";
@@ -112,8 +112,8 @@ export function fileIconFor(path: string): IconDefinition {
 }
 
 //
-// Renders the icon for the file at `path`, the size of the folder icon in front of a directory and
-// in the muted text colour.
+// Renders the icon for the file at `path`, the size of the directory icon in front of a directory
+// and in the muted text colour.
 //
 export function FileIcon({ path }: { path: string }): ReactNode {
     return <FontAwesomeIcon icon={fileIconFor(path)} aria-hidden="true" style={{ fontSize: "var(--icon-sm)", flex: "none", color: "var(--color-text-muted)" }} />;

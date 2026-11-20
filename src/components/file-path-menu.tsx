@@ -18,7 +18,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faChevronDown, faCopy, faFile, faFolder, faFolderOpen, faPenToSquare, faRoute, faTerminal, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
 //
-// The folder the example repository sits in, which the full path starts with.
+// The directory the example repository sits in, which the full path starts with.
 //
 export const exampleRepoRoot = "/home/you/projects/graft";
 
@@ -42,9 +42,9 @@ interface IPathMenuItem {
 // Returns the items of a path menu for a path of `kind`, with a divider between the copy items
 // and the open items. A file can be copied as its full path, its path from the repository root or
 // its name, and shown in the file manager or opened in the editor. A directory can be copied as its
-// full path, its path from the repository root or its name, and opened in the file manager. The
-// directory a command runs in can be copied as its full path, as a cd command into it or as its
-// name, and opened in the file manager.
+// full path, its path from the repository root or its name, and opened in the file manager or the
+// editor. The directory a command runs in can be copied as its full path, as a cd command into it
+// or as its name, and opened in the file manager or the editor.
 //
 function menuItems(kind: PathKind, fullPath: string, path: string, name: string): (IPathMenuItem | "divider")[] {
     if (kind === "working-directory") {
@@ -54,6 +54,7 @@ function menuItems(kind: PathKind, fullPath: string, path: string, name: string)
             { label: "Copy directory name", icon: faFolder, copies: name },
             "divider",
             { label: directoryManagerLabel(), icon: faFolderOpen },
+            { label: "Open in editor", icon: faPenToSquare },
         ];
     }
     if (kind === "directory") {
@@ -63,6 +64,7 @@ function menuItems(kind: PathKind, fullPath: string, path: string, name: string)
             { label: "Copy directory name", icon: faFolder, copies: name },
             "divider",
             { label: directoryManagerLabel(), icon: faFolderOpen },
+            { label: "Open in editor", icon: faPenToSquare },
         ];
     }
     return [

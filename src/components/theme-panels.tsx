@@ -4,6 +4,7 @@
 //
 
 import type { ReactNode } from "react";
+import { ThemeProvider, type Theme } from "@mui/material/styles";
 import { modeThemes, useExplorerSettings } from "../lib/explorer-mode";
 import { PanelThemeContext } from "../lib/panel-theme";
 
@@ -27,7 +28,62 @@ export function ThemePanels({ children }: { children: ReactNode }): ReactNode {
 }
 
 //
-// Renders one themed panel on its theme's background, with no border or label.
+// Returns `outer`, the page's MUI theme, with `panelTheme`, "light" or "dark", as the class of
+// every tooltip, popper, popover and menu root. A menu is a popover that sets its own class, so it
+// needs the class given to it as well. Popups mount at the end of the page, outside the panel,
+// so the class is what makes the role tokens inside a popup resolve to its panel's theme rather
+// than the page's.
+//
+export function panelPopupTheme(outer: Theme, panelTheme: string): Theme {
+    const components = outer.components ?? {};
+    const tooltipProps = components.MuiTooltip?.defaultProps ?? {};
+    const tooltipSlotProps = tooltipProps.slotProps ?? {};
+    const popperSlotProps = typeof tooltipSlotProps.popper === "object" ? tooltipSlotProps.popper : {};
+    return {
+        ...outer,
+        components: {
+            ...components,
+            MuiTooltip: {
+                ...components.MuiTooltip,
+                defaultProps: {
+                    ...tooltipProps,
+                    slotProps: {
+                        ...tooltipSlotProps,
+                        popper: {
+                            ...popperSlotProps,
+                            className: panelTheme,
+                        },
+                    },
+                },
+            },
+            MuiPopper: {
+                ...components.MuiPopper,
+                defaultProps: {
+                    ...components.MuiPopper?.defaultProps,
+                    className: panelTheme,
+                },
+            },
+            MuiPopover: {
+                ...components.MuiPopover,
+                defaultProps: {
+                    ...components.MuiPopover?.defaultProps,
+                    className: panelTheme,
+                },
+            },
+            MuiMenu: {
+                ...components.MuiMenu,
+                defaultProps: {
+                    ...components.MuiMenu?.defaultProps,
+                    className: panelTheme,
+                },
+            },
+        },
+    };
+}
+
+//
+// Renders one themed panel on its theme's background, with no border or label. Its popups take
+// the panel's theme through panelPopupTheme.
 //
 export function ThemePanel({ theme, children }: { theme: string; children: ReactNode }): ReactNode {
     return (
@@ -39,7 +95,9 @@ export function ThemePanel({ theme, children }: { theme: string; children: React
                 borderRadius: "var(--radius-lg)",
             }}
         >
-            <PanelThemeContext.Provider value={theme}>{children}</PanelThemeContext.Provider>
+            <ThemeProvider theme={(outer: Theme) => panelPopupTheme(outer, theme)}>
+                <PanelThemeContext.Provider value={theme}>{children}</PanelThemeContext.Provider>
+            </ThemeProvider>
         </div>
     );
 }

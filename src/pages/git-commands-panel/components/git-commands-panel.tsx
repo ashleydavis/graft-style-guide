@@ -15,7 +15,7 @@ import { isSearchKey, matchesSearch, SearchModeBox, SearchModeButton, useSearchM
 //
 export interface IGitCommandsPanelProps {
     //
-    // The folder of the repository the commands run in, as the `cd` into it shows it.
+    // The directory of the repository the commands run in, as the `cd` into it shows it.
     //
     repoPath: string;
 
@@ -71,7 +71,7 @@ export function CommandBlock({ command }: { command: string }): ReactNode {
 }
 
 //
-// Renders the panel: a heading with a line on what the panel is for, the folder the commands run
+// Renders the panel: a heading with a line on what the panel is for, the directory the commands run
 // in with a button that copies the `cd` into it, then each command, or a note that the page ran
 // none.
 //

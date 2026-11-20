@@ -5,7 +5,7 @@
 
 import type { ReactNode } from "react";
 import { Section } from "../../components/section";
-import { commitFiles, nestedFolderFiles, zoomChange } from "../diff/examples";
+import { commitFiles, nestedDirectoryFiles, zoomChange } from "../diff/examples";
 import { ChangesArea } from "./components/changes-area";
 
 //
@@ -24,7 +24,7 @@ export function ChangesPage(): ReactNode {
                 title="Directories inside directories"
                 description="Changes three and four directories deep, in the tree view."
             >
-                <ChangesArea startFiles={nestedFolderFiles} />
+                <ChangesArea startFiles={nestedDirectoryFiles} />
             </Section>
             <Section title="Nothing to commit" description="A working tree with no changes.">
                 <ChangesArea startFiles={[]} />

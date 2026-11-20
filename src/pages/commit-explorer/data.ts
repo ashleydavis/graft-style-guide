@@ -35,7 +35,19 @@ export interface IChangedFile {
     // The file's diff in the commit, as `git diff-tree -p` writes it from the first `@@` line.
     //
     diff: string;
+
+    //
+    // True for a file on disk that Git does not track yet, which shows only when a commit is
+    // compared with the files on disk.
+    //
+    isUntracked?: boolean;
 }
+
+//
+// What a commit's files are compared with: the commit's parent, for the changes the commit made,
+// or the files on disk now.
+//
+export type CommitDiffKind = "commit" | "commitToDisk";
 
 //
 // One commit of the example repository.
@@ -486,4 +498,54 @@ export function changedFile(history: IHistory, hash: string, path: string): ICha
         throw new Error(`Commit ${hash} changed no file ${path}. The explorer opens only the paths in the commit's file list, so look at where the path came from.`);
     }
     return file;
+}
+
+//
+// A file on disk that Git does not track yet, which every example repository has, so comparing a
+// commit with the files on disk shows how an untracked file is listed.
+//
+const untrackedNotes: IChangedFile = {
+    path: "notes/ideas.md",
+    status: "A",
+    linesAdded: 3,
+    linesDeleted: 0,
+    diff: ["@@ -0,0 +1,3 @@", "+# Ideas", "+", "+- Show the branch each commit was made on."].join("\n"),
+    isUntracked: true,
+};
+
+//
+// Returns the files that differ between the commit of `history` with the hash and the files on
+// disk, as example data for comparing a commit with the files on disk: every file the commit or a
+// newer commit changed, each with the newest change made to it, and an untracked file. A path the
+// newer commits changed more than once adds up their line counts.
+//
+export function filesToDisk(history: IHistory, hash: string): IChangedFile[] {
+    const index = history.commits.findIndex(commit => commit.hash === hash);
+    if (index < 0) {
+        throw new Error(`The example repository ${history.name} has no commit ${hash}. The explorer opens only the hashes in its commit list, so look at where the hash came from.`);
+    }
+    const byPath = new Map<string, IChangedFile>();
+    for (const commit of history.commits.slice(0, index + 1)) {
+        for (const file of commit.files) {
+            const newer = byPath.get(file.path);
+            if (newer) {
+                byPath.set(file.path, { ...newer, linesAdded: newer.linesAdded + file.linesAdded, linesDeleted: newer.linesDeleted + file.linesDeleted });
+            }
+            else {
+                byPath.set(file.path, file);
+            }
+        }
+    }
+    return [...byPath.values(), untrackedNotes];
+}
+
+//
+// Returns the files of the commit of `history` with the hash, compared as `kind` says: the files
+// the commit changed, or the files that differ from it on disk now.
+//
+export function commitFiles(history: IHistory, hash: string, kind: CommitDiffKind): IChangedFile[] {
+    if (kind === "commit") {
+        return commitByHash(history, hash).files;
+    }
+    return filesToDisk(history, hash);
 }

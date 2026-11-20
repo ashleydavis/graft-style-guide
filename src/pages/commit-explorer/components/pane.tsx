@@ -65,6 +65,12 @@ export interface IPaneProps {
     fillsHeight?: boolean;
 
     //
+    // True for a pane that takes all the width the panes to its left leave free, never less than
+    // `shrinksTo`, so no free space is left at the right of the explorer.
+    //
+    fillsWidth?: boolean;
+
+    //
     // Called by the maximise button, absent for a pane with no maximise button.
     //
     onToggleMaximise?: () => void;
@@ -108,11 +114,11 @@ export interface IPaneProps {
 }
 
 //
-// Renders the pane: an outlined card whose border turns the accent colour and gains an accent
-// ring while the pane is active. A collapse button and a maximise button sit in the header, or beside
+// Renders the pane: an outlined card whose border turns the accent colour and gains an accent ring
+// while the pane is active. A collapse button and a maximise button sit in the header, or beside
 // the toolbar of a pane with no header; a maximised pane fills its explorer and a collapsed pane
-// shows as a narrow strip with its title and a restore button. The header sits on the panel colour above a divider, with the
-// title cut short when it is wider than the pane.
+// shows as a narrow strip with its title and a restore button. The header sits on the panel colour
+// above a divider, with the title cut short when it is wider than the pane.
 //
 export function Pane({
     label,
@@ -124,6 +130,7 @@ export function Pane({
     toolbar,
     isMaximised = false,
     fillsHeight = false,
+    fillsWidth = false,
     onToggleMaximise,
     onClose,
     isCollapsed = false,
@@ -152,10 +159,15 @@ export function Pane({
             className="flex flex-col"
             sx={{
                 viewTransitionName: transitionName(id),
-                flex: isMaximised ? "1 1 auto" : shrinksTo ? `0 1 ${width}` : "none",
-                width: isMaximised ? "auto" : width,
+                //
+                // A maximised pane grows from nothing to take every bit of the row, so its own
+                // content never sets its width. Other panes keep their width and leave room at the
+                // right for the next pane to show.
+                //
+                flex: isMaximised || fillsWidth ? "1 1 0%" : shrinksTo ? `0 1 ${width}` : "none",
+                width: isMaximised ? "100%" : fillsWidth ? "auto" : width,
                 minWidth: isMaximised ? 0 : shrinksTo,
-                maxWidth: isMaximised ? "none" : "calc(100vw - var(--space-8) * 2)",
+                maxWidth: isMaximised || fillsWidth ? "100%" : "calc(100vw - var(--space-8) * 2)",
                 maxHeight: "100%",
                 height: fillsHeight ? "100%" : undefined,
                 overflow: "hidden",

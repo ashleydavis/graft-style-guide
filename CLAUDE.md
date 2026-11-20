@@ -13,6 +13,7 @@ Load [ux-rules.md](ux-rules.md) in full at the start of every session, and follo
 - Check text and control contrast against WCAG 2.2 AA by computing the ratio, and report the figure.
 - `graft.css` needs no build step. No JSON token files.
 - Every component gets its own explorer page under `src/pages/`, listed in `src/explorer-pages.ts`, and every token appears on the overview page. Explorer code uses role tokens only, never a literal colour or size. Every page fits a 390px-wide phone in portrait and landscape with no sideways scrolling; `src/test/e2e/mobile.test.ts` checks each page in `src/explorer-pages.ts`.
+- Graft is desktop only for now, but the explorer supports mobile too. A size rule from the developer, such as a minimum width, applies on desktop; finding a layout that works on mobile is Claude's job.
 - Build components from MUI components wherever MUI has one, styled to this style guide through MUI's own customisation (theme `styleOverrides`, `variants`, `defaultProps`). Where that fails, use Tailwind classes. Where Tailwind fails, use raw CSS.
 - A component outside MUI's set is built in React, HTML and TypeScript, styled with Tailwind first and raw CSS where Tailwind fails.
 - A component made of other components follows the same order for each part: styled MUI components first, then Tailwind, then raw CSS.

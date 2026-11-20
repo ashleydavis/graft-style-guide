@@ -433,10 +433,10 @@ export const longBranchHistory: IHistory = buildHistory("graft-settings", "main"
 ]);
 
 //
-// A settings feature whose files sit three and four folders deep beside files at the top of the
-// repo, so the commit's file list shows folders inside folders in the tree view.
+// A settings feature whose files sit three and four directories deep beside files at the top of the
+// repo, so the commit's file list shows directories inside directories in the tree view.
 //
-export const nestedFoldersHistory: IHistory = buildHistory("graft-nested", "main", [
+export const nestedDirectoriesHistory: IHistory = buildHistory("graft-nested", "main", [
     {
         id: "settings",
         title: "Add the settings page",

@@ -41,8 +41,16 @@ Every text and control colour meets WCAG 2.2 AA in both themes: 4.5 to 1 for tex
 | `--color-lane-1` to `--color-lane-6` | `--color-panel` | 3 | 3.9 or more | 6.4 or more |
 | `--color-lane-1` to `--color-lane-6` | `--color-selected` | 3 | 3.3 or more | 4.9 or more |
 | `--color-text-disabled` | `--color-disabled` | none | 4.4 | 3.1 |
+| `--color-text` | `--color-tooltip` | 4.5 | 14.4 | 12.0 |
+| `--color-tooltip-muted` | `--color-tooltip` | 4.5 | 6.2 | 5.8 |
+| `--color-text` as an icon | `--color-tooltip-button`, `--color-tooltip-button-hover` | 3 | 9.9 or more | 7.6 or more |
+| `--color-tooltip-button` as a button fill | `--color-tooltip` | 3 | 1.2 | 1.3 |
+| `--color-tooltip-border` | `--color-tooltip` | none | 1.5 | 1.6 |
+| `--color-success`, `--color-warning`, `--color-danger`, `--color-info` as text | `--color-tooltip` | 4.5 | 4.7 or more | 4.5 or more |
 
 - `--color-conflict` is for markers and lines only. In light it is under 4.5 to 1, so it is never the colour of words.
 - `--color-diff-added-line` on `--color-diff-added` in light is 3.0009 to 1, just over 3 to 1.
 - `--color-hover` and `--color-selected` are see-through, so the figures for them are taken over `--color-panel`, where rows sit.
 - WCAG sets no contrast for disabled controls. The figure for `--color-text-disabled` is for reference.
+- `--color-tooltip-button` is under 3 to 1 on `--color-tooltip` in both themes, so a tooltip's copy and pin buttons are told apart by their icons, which pass, and not by their fill.
+- `--color-tooltip-border` edges the tooltip panel and is decorative, so it has no contrast to meet.

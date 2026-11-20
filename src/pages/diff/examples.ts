@@ -180,10 +180,11 @@ function addedFile(path: string, ...lines: string[]): IFileDiff {
 }
 
 //
-// The changes of a settings feature spread over folders inside folders, three and four levels deep,
-// beside files at the top of the repo, so the tree view shows folders nested in folders.
+// The changes of a settings feature spread over directories inside directories, three and four
+// levels deep, beside files at the top of the repo, so the tree view shows directories nested in
+// directories.
 //
-export const nestedFolderFiles: IFileDiff[] = [
+export const nestedDirectoryFiles: IFileDiff[] = [
     addedFile("backend/src/lib/config/read.zig", "pub fn read(path: []const u8) !Config {", "    return toml.parse(Config, path);", "}"),
     addedFile("backend/src/lib/config/write.zig", "pub fn write(path: []const u8, config: Config) !void {", "    try toml.write(path, config);", "}"),
     addedFile("backend/src/tasks/settings-task.zig", "pub fn run(args: Args) !Result {", "    return .{ .config = try config.read(args.path) };", "}"),

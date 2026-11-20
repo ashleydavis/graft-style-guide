@@ -1,6 +1,7 @@
 //
 // The tooltip page: the short label that appears beside an icon button or a cut-off value when
-// the pointer rests on it or the keyboard reaches it, built from MUI's Tooltip.
+// the pointer rests on it or the keyboard reaches it, built from MUI's Tooltip, and the pinnable
+// tooltip that lists fields to copy.
 //
 
 import type { ReactNode } from "react";
@@ -9,6 +10,9 @@ import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowDown, faArrowsRotate, faArrowUp, faBoxArchive } from "@fortawesome/free-solid-svg-icons";
 import { Section } from "../../components/section";
+import { PinnableTooltip } from "../../components/pinnable-tooltip";
+import { codeField, CopyTip, textField } from "../../components/copy-tip";
+import { FileTip } from "../../components/file-tip";
 
 //
 // Renders a tooltip held open below its button, so its look can be judged without hovering.
@@ -17,7 +21,7 @@ import { Section } from "../../components/section";
 export function OpenTooltip({ title, children }: { title: ReactNode; children: ReactNode }): ReactNode {
     return (
         <div style={{ padding: "0 var(--space-6) calc(var(--space-8) + var(--space-3))" }}>
-            <Tooltip open title={title} placement="bottom" arrow>
+            <Tooltip open title={title} placement="bottom">
                 <span className="inline-block">{children}</span>
             </Tooltip>
         </div>
@@ -81,12 +85,36 @@ export function TooltipPage(): ReactNode {
             <Section title="On hover and focus" description="Buttons with tooltips.">
                 <div className="flex flex-wrap" style={{ gap: "var(--space-2)" }}>
                     {toolbarButtons.map(button => (
-                        <Tooltip key={button.label} title={<TooltipWithShortcut label={button.label} shortcut={button.shortcut} />} arrow>
+                        <Tooltip key={button.label} title={<TooltipWithShortcut label={button.label} shortcut={button.shortcut} />}>
                             <IconButton aria-label={button.label}>
                                 <FontAwesomeIcon icon={button.icon} />
                             </IconButton>
                         </Tooltip>
                     ))}
+                </div>
+            </Section>
+
+            <Section title="Fields drawn open" description="A tooltip that lists fields, each under a dotted line with a button that copies it.">
+                {/* The fields' tooltip is taller than a one-line tooltip, so it gets more room below. */}
+                <div style={{ paddingBottom: "calc(var(--space-8) * 2.5)" }}>
+                    <OpenTooltip title={<CopyTip fields={[textField("Author", "Ada Lovelace"), codeField("Commit hash", "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678")]} action={undefined} />}>
+                        <code style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)" }}>a1b2c3d</code>
+                    </OpenTooltip>
+                </div>
+            </Section>
+
+            <Section title="Pinnable fields" description="Hover a value for its fields. The pin button, or P, keeps the tooltip open so its fields can be copied. The close button, P or Escape closes it.">
+                <div className="flex flex-wrap items-center" style={{ gap: "var(--space-4)" }}>
+                    <PinnableTooltip enterDelayMs={400} maxWidth="calc(var(--space-8) * 16)" tip={pinButton => <CopyTip fields={[codeField("Commit hash", "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"), codeField("Short hash", "a1b2c3d")]} action={pinButton} />}>
+                        <code tabIndex={0} style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)" }}>
+                            a1b2c3d
+                        </code>
+                    </PinnableTooltip>
+                    <PinnableTooltip enterDelayMs={400} maxWidth="calc(var(--space-8) * 12)" tip={pinButton => <FileTip file={{ path: "src/graph/lanes.ts", oldPath: "src/lanes.ts", status: "R", linesAdded: 12, linesDeleted: 3 }} pinButton={pinButton} />}>
+                        <span tabIndex={0} style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)" }}>
+                            lanes.ts
+                        </span>
+                    </PinnableTooltip>
                 </div>
             </Section>
 

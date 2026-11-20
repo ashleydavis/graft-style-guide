@@ -33,7 +33,7 @@ On a screen narrower than 1024 pixels, such as a phone or an upright tablet, the
 bun run build
 ```
 
-Each build deletes `docs/` and writes the static site to it fresh, and the built files are committed. GitHub Pages publishes it from the `main` branch's `docs/` folder at https://ashleydavis.github.io/graft-style-guide/. The site also serves the tokens on their own at `graft.css`.
+Each build deletes `docs/` and writes the static site to it fresh, and the built files are committed. GitHub Pages publishes it from the `main` branch's `docs/` directory at https://ashleydavis.github.io/graft-style-guide/. The site also serves the tokens on their own at `graft.css`.
 
 The built JavaScript and CSS files have a hash of their content in their names. A new deployment's `index.html` points at the new names, so browsers fetch the new files instead of using cached ones.
 

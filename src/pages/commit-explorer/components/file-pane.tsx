@@ -13,6 +13,13 @@ import { CollapsedRail } from "../../../components/collapse";
 import { Pane } from "./pane";
 
 //
+// The least width a diff pane takes: 840 pixels on a desktop screen, so a diff's lines have room
+// beside the panes to its left, and the screen's width less the explorer's margins on a phone,
+// where 840 pixels would not fit.
+//
+export const DIFF_PANE_WIDTH_MIN = "min(840px, calc(100vw - var(--space-8) * 2))";
+
+//
 // What the file pane shows and reports.
 //
 export interface IFilePaneProps {
@@ -79,16 +86,17 @@ export interface IFilePaneProps {
 
 //
 // Renders the card in a column as tall as the explorer's panes, with the diff scrolling inside it.
-// The column grows to fill the width the panes to its left leave, and long lines start wrapped, so
-// the diff uses the room there is and scrolls sideways only when wrapping is switched off. A
-// commit is history, already made, so the card has no Stage or Unstage buttons.
+// The column takes all the width the panes to its left leave, never less than DIFF_PANE_WIDTH_MIN,
+// and long lines start wrapped, so the diff uses the room there is and scrolls sideways only when
+// wrapping is switched off. A commit is history, already made, so the card has no Stage or Unstage
+// buttons.
 //
 export function FilePane({ file, isActive, currentHunk, currentGap, cardRef, isMaximised, onToggleMaximise, isCollapsed, onToggleCollapse, onSelectHunk, onSelectGap, onClose }: IFilePaneProps): ReactNode {
     if (isCollapsed) {
         return <CollapsedRail label="File diff" title={file.path.slice(file.path.lastIndexOf("/") + 1)} side="left" isActive={isActive} onRestore={onToggleCollapse} />;
     }
     return (
-        <div style={{ flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
+        <div style={{ flex: "1 1 0%", minWidth: DIFF_PANE_WIDTH_MIN, height: "100%" }}>
             <FileDiffCard
                 isFoldable={false}
                 file={{ path: file.path, status: file.status, diff: file.diff, oldFileLines: exampleOldFile(file.path, file.status, file.diff) }}
@@ -194,7 +202,7 @@ export function DirectoryPane({ path, files, isActive, isMaximised, onToggleMaxi
         target?.scrollIntoView({ block: "nearest" });
     }, [currentStop]);
     return (
-        <div style={isCollapsed ? { flex: "none", height: "100%" } : { flex: "1 1 600px", minWidth: "min(360px, calc(100vw - var(--space-8) * 2))", height: "100%" }}>
+        <div style={isCollapsed ? { flex: "none", height: "100%" } : { flex: "1 1 0%", minWidth: DIFF_PANE_WIDTH_MIN, height: "100%" }}>
             <Pane
                 label="Directory diffs"
                 width="100%"

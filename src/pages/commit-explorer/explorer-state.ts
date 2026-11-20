@@ -59,10 +59,11 @@ export interface IExplorerItems {
 export const COMMIT_SUMMARY_PATH = ":commit";
 
 //
-// What a folder's row in the tree stands for among the commit details pane's paths: this prefix
-// and the folder's path. Selecting it opens no pane to the right.
+// What a directory's row in the tree stands for among the commit details pane's paths: this prefix
+// and the directory's path. Selecting it with a click or the arrow keys opens no pane to the right;
+// Enter opens the diffs of every file inside it.
 //
-export const FOLDER_PREFIX = ":folder:";
+export const DIRECTORY_PREFIX = ":directory:";
 
 //
 // The explorer as it first shows: the commit pane alone, active, with nothing selected.
@@ -165,7 +166,7 @@ export function closeCommitDetailsPane(state: IExplorerState): IExplorerState {
 //
 // Works out the explorer after the key: Up and Down move the selection in the active pane, and in
 // the commit details pane also open the newly selected file's diff, so stepping through the files
-// shows each one with the keys staying on the file list. Left
+// shows each one with the keys staying on the file list. A directory is only selected. Left
 // and Right make the pane to the left or right active when there is one, Enter opens the selected
 // item and makes its pane active, and Escape closes the rightmost pane. Any other key changes
 // nothing.
@@ -178,6 +179,9 @@ export function stateAfterKey(state: IExplorerState, key: string, items: IExplor
         }
         if (state.activePaneIndex === 1) {
             const path = itemAfterMove(items.filePaths, state.selectedPath, step);
+            if (path?.startsWith(DIRECTORY_PREFIX)) {
+                return { ...state, selectedPath: path };
+            }
             return { ...state, selectedPath: path, openPath: path };
         }
         return state;
