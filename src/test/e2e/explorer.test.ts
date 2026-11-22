@@ -1013,15 +1013,14 @@ test.describe("Changes and commit", () => {
         await expect(area.getByRole("checkbox", { name: "No verify" })).toBeVisible();
     });
 
-    test("the split view lists staged and unstaged files apart and shows the diff in two sections", async ({ page }) => {
+    test("the split view lists staged and unstaged files apart and shows the selected row's side of the diff", async ({ page }) => {
         await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await showStagedAndUnstaged(page, area);
         await expect(area.getByText("Staged (3)")).toBeVisible();
         await expect(area.getByText("Unstaged (7)")).toBeVisible();
-        await expect(area.getByRole("region", { name: "Staged changes", exact: true })).toBeVisible();
-        await expect(area.getByRole("region", { name: "Unstaged changes" })).toBeVisible();
-        await area.getByRole("region", { name: "Unstaged changes" }).getByRole("button", { name: "Stage this hunk" }).last().click();
+        await expect(area.getByRole("region", { name: "Unstaged diff" })).toBeVisible();
+        await area.getByRole("region", { name: "Unstaged diff" }).getByRole("button", { name: "Stage this hunk" }).last().click();
         await expect(area.getByText("Unstaged (6)")).toBeVisible();
     });
 
@@ -1259,12 +1258,13 @@ test.describe("Diff options and picking lines", () => {
         await expect(diff.locator('[data-picked="true"]')).toHaveCount(1);
         await diff.getByRole("button", { name: "Stage this line", exact: true }).click();
         await showStagedAndUnstaged(page, area);
-        const staged = area.getByRole("region", { name: "Staged diff", exact: true });
-        await expect(staged.locator('[data-line="added"]')).toHaveCount(1);
-        await expect(staged).toContainText("tmp/");
         const unstaged = area.getByRole("region", { name: "Unstaged diff" });
         await expect(unstaged.locator('[data-line="added"]')).toHaveCount(1);
         await expect(unstaged.locator('[data-line="deleted"]')).toHaveCount(1);
+        await area.getByRole("region", { name: "Staged files", exact: true }).getByRole("button", { name: ".gitignore", exact: true }).getByText(".gitignore").click();
+        const staged = area.getByRole("region", { name: "Staged diff", exact: true });
+        await expect(staged.locator('[data-line="added"]')).toHaveCount(1);
+        await expect(staged).toContainText("tmp/");
     });
 
     test("discarding picked lines fades them and Undo brings them back", async ({ page }) => {
@@ -1410,7 +1410,7 @@ test.describe("Nothing to commit", () => {
 });
 
 test.describe("Collapsing panes", () => {
-    test("the Changes and Commit panes collapse to their sides and come back, by button and by C", async ({ page }) => {
+    test("the Changes pane collapses to its side and the Commit pane to its header, by button and by C", async ({ page }) => {
         await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         const files = area.getByRole("region", { name: "Changed files" });
@@ -1424,8 +1424,17 @@ test.describe("Collapsing panes", () => {
         await expect(files).toHaveAttribute("data-collapsed", "true");
         await page.keyboard.press("c");
         await expect(files).not.toHaveAttribute("data-collapsed", "true");
-        await commit.getByRole("button", { name: "Collapse the pane" }).click();
-        await expect(commit).toHaveAttribute("data-collapsed", "true");
+        const summary = commit.getByRole("textbox", { name: "Summary" });
+        await commit.getByRole("button", { name: "Collapse the commit message" }).click();
+        await expect(summary).toBeHidden();
+        await commit.getByRole("button", { name: "Show the commit message" }).click();
+        await expect(summary).toBeVisible();
+        await area.focus();
+        await page.keyboard.press("c");
+        await expect(summary).toBeHidden();
+        await page.keyboard.press("ArrowLeft");
+        await page.keyboard.press("ArrowRight");
+        await expect(summary).toBeFocused();
     });
 
     test("every commit explorer pane collapses to the left and C restores the active one", async ({ page }) => {
@@ -1464,43 +1473,63 @@ test.describe("Staged and Unstaged panels", () => {
         await expect(staged).toHaveCount(1);
     });
 
-    test("each panel shows its files beside its own diff, stacked in the Changes pane with Commit at the right", async ({ page }) => {
+    test("the panels stack their file lists over the Commit pane, and one diff to their right shows the selected row's side", async ({ page }) => {
         await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
         await showStagedAndUnstaged(page, area);
         const staged = area.getByRole("region", { name: "Staged files", exact: true });
         const unstaged = area.getByRole("region", { name: "Unstaged files" });
-        await expect(area.getByRole("region", { name: "File diff", exact: true })).toHaveCount(0);
-        const stagedBox = await staged.boundingBox();
-        const unstagedBox = await unstaged.boundingBox();
-        const commitBox = await area.getByRole("region", { name: "Commit", exact: true }).boundingBox();
-        expect(stagedBox).not.toBeNull();
-        expect(unstagedBox).not.toBeNull();
-        expect(commitBox).not.toBeNull();
-        if (!stagedBox || !unstagedBox || !commitBox) {
-            return;
-        }
-        expect(stagedBox.y).toBeGreaterThanOrEqual(unstagedBox.y + unstagedBox.height);
-        expect(commitBox.x).toBeGreaterThanOrEqual(unstagedBox.x + unstagedBox.width);
-        for (const panel of [staged, unstaged]) {
-            const listBox = await panel.getByRole("list").first().boundingBox();
-            const diffBox = await panel.getByRole("region", { name: /changes$/ }).boundingBox();
-            expect(listBox).not.toBeNull();
+        const unstagedDiff = area.getByRole("region", { name: "Unstaged diff" });
+        await expect(unstagedDiff).toHaveCount(1);
+        await expect(area.getByRole("region", { name: "Staged diff", exact: true })).toHaveCount(0);
+        //
+        // The diff slides in from the left, so its position is read again until the slide ends.
+        //
+        await expect(async () => {
+            const stagedBox = await staged.boundingBox();
+            const unstagedBox = await unstaged.boundingBox();
+            const diffBox = await unstagedDiff.boundingBox();
+            const commitBox = await area.getByRole("region", { name: "Commit", exact: true }).boundingBox();
+            const changesBox = await area.getByRole("region", { name: "Changed files", exact: true }).boundingBox();
+            expect(stagedBox).not.toBeNull();
+            expect(unstagedBox).not.toBeNull();
             expect(diffBox).not.toBeNull();
-            if (!listBox || !diffBox) {
+            expect(commitBox).not.toBeNull();
+            expect(changesBox).not.toBeNull();
+            if (!stagedBox || !unstagedBox || !diffBox || !commitBox || !changesBox) {
                 return;
             }
-            expect(diffBox.x).toBeGreaterThanOrEqual(listBox.x + listBox.width);
-        }
-        const unstagedDiff = unstaged.getByRole("region", { name: "Unstaged changes" });
-        const unstagedText = await unstagedDiff.innerText();
-        const stagedRows = staged.locator("li[aria-label]:not([aria-label^=\"Directory \"])");
-        const lastStaged = stagedRows.last();
+            expect(stagedBox.y).toBeGreaterThanOrEqual(unstagedBox.y + unstagedBox.height);
+            expect(commitBox.y).toBeGreaterThanOrEqual(stagedBox.y + stagedBox.height);
+            expect(commitBox.x).toBe(changesBox.x);
+            expect(commitBox.width).toBe(changesBox.width);
+            expect(diffBox.x).toBeGreaterThanOrEqual(commitBox.x + commitBox.width);
+        }).toPass();
+        const lastStaged = staged.locator("li[aria-label]:not([aria-label^=\"Directory \"])").last();
         const lastStagedPath = await lastStaged.getAttribute("aria-label");
         expect(lastStagedPath).not.toBeNull();
         await lastStaged.click();
-        await expect(staged.getByRole("region", { name: "Staged changes" })).toContainText((lastStagedPath ?? "").split("/").pop() ?? "");
-        await expect.poll(async () => await unstagedDiff.innerText()).toBe(unstagedText);
+        const stagedDiff = area.getByRole("region", { name: "Staged diff", exact: true });
+        await expect(stagedDiff).toContainText((lastStagedPath ?? "").split("/").pop() ?? "");
+        await expect(unstagedDiff).toHaveCount(0);
+    });
+
+    test("the handle between the left column and the diff widens both panes in the column and a double-click resets it", async ({ page }) => {
+        await openPage(page, "/page/changes", { components: "light" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        const changes = area.getByRole("region", { name: "Changed files", exact: true });
+        const commit = area.getByRole("region", { name: "Commit", exact: true });
+        const handle = area.getByRole("separator", { name: "Resize the Changes and Commit panes" });
+        const before = await changes.boundingBox();
+        expect(before).not.toBeNull();
+        await handle.focus();
+        for (let step = 0; step < 5; step += 1) {
+            await page.keyboard.press("ArrowRight");
+        }
+        await expect.poll(async () => (await changes.boundingBox())?.width).toBe((before?.width ?? 0) + 80);
+        await expect.poll(async () => (await commit.boundingBox())?.width).toBe((before?.width ?? 0) + 80);
+        await handle.dblclick();
+        await expect.poll(async () => (await changes.boundingBox())?.width).toBe(before?.width);
     });
 
     test("Right from the diff moves into the commit message, and Escape and Left come back", async ({ page }) => {
@@ -2026,6 +2055,21 @@ test.describe("Search in large content", () => {
     });
 });
 
+test.describe("Icons page", () => {
+    test("lists every solid and brands icon and the search narrows them by name", async ({ page }) => {
+        await openPage(page, "/page/icons", { components: "light" });
+        const solid = page.getByRole("region", { name: "Solid icons" });
+        const brands = page.getByRole("region", { name: "Brands icons" });
+        await expect(solid.getByRole("button", { name: "Copy faAnglesDown", exact: true })).toHaveCount(1);
+        await expect(brands.getByRole("button", { name: "Copy faGithub", exact: true })).toHaveCount(1);
+        await page.getByRole("textbox", { name: "Search icons" }).fill("angles");
+        await expect(solid.getByRole("button", { name: "Copy faAnglesDown", exact: true })).toBeVisible();
+        await expect(solid.getByRole("button", { name: "Copy faPlus", exact: true })).toHaveCount(0);
+        await expect(brands).toHaveCount(0);
+        await expect(page.getByText(/^\d+ of \d+ icons match\.$/)).toBeVisible();
+    });
+});
+
 test.describe("Split pages and the sidebar groups", () => {
     test("the sidebar lists app features and basic components under their headings", async ({ page }) => {
         await openPage(page, "/page/overview", { components: "light" });
@@ -2233,13 +2277,17 @@ test.describe("Shared tree rows", () => {
         await expect(page.getByRole("list", { name: "Changed files" }).first().getByRole("button", { name: "Expand src/graph" }).locator("svg")).toHaveAttribute("data-icon", "plus");
     });
 
-    test("the Commit page's tree has the bar and A expands or collapses every directory", async ({ page }) => {
+    test("the Commit page's options expand or collapse every directory, and so does A", async ({ page }) => {
         await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).nth(1);
         const list = area.getByRole("region", { name: "Changed files" });
-        await area.getByRole("button", { name: "Collapse all" }).click();
+        await expect(list.getByRole("button", { name: "Collapse all" })).toHaveCount(0);
+        await area.getByRole("button", { name: "Changes options" }).click();
+        const options = page.getByRole("dialog", { name: "Changes options" });
+        await options.getByRole("button", { name: "Collapse all" }).click();
         await expect(list.getByRole("button", { name: "backend/src/lib/config/read.zig", exact: true })).toHaveCount(0);
-        await area.getByRole("button", { name: "Expand all" }).click();
+        await options.getByRole("button", { name: "Expand all" }).click();
+        await page.keyboard.press("Escape");
         await expect(list.getByRole("button", { name: "backend/src/lib/config/read.zig", exact: true })).toHaveCount(1);
         await list.getByRole("button", { name: "Directory backend/src", exact: true }).click();
         await page.keyboard.press("a");

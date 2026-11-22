@@ -448,7 +448,7 @@ export function CommitDetailsPane({ commit, files: allFiles, diffKind, onChangeD
                     </li>
                 ) : fileView === "tree" ? (
                     [
-                        <TreeBar key="bar" focusedPath={treeRoot} onBack={onDrillOut} onExpandAll={onExpandAll} onCollapseAll={onCollapseAll} />,
+                        <TreeBar key="bar" focusedPath={treeRoot} onBack={onDrillOut} onExpandAll={onExpandAll} onCollapseAll={onCollapseAll} hasAllButtons />,
                         ...withoutCollapsed(treeRows(files, treeRoot), collapsedDirectories).map((row, index, rows) => {
                             const guides = treeGuides(rows)[index];
                             if (row.kind === "directory") {

@@ -16,7 +16,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Drawer from "@mui/material/Drawer";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAnglesLeft, faAnglesRight, faBars, faChevronDown, faChevronRight, faCircleInfo, faGear, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faBars, faChevronDown, faChevronLeft, faChevronRight, faCircleInfo, faGear, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import { explorerPages, PAGE_GROUPS, type IExplorerPage } from "../explorer-pages";
 import { setExplorerSettings, useExplorerSettings, type ComponentMode, type ExplorerTheme, type SidebarState } from "../lib/explorer-mode";
 
@@ -250,7 +250,7 @@ export function ExplorerLayout(): ReactNode {
                 </div>
                 <Tooltip title="Minimise sidebar">
                     <IconButton aria-label="Minimise sidebar" size="small" onClick={() => setSidebar("minimised")}>
-                        <FontAwesomeIcon icon={faAnglesLeft} />
+                        <FontAwesomeIcon icon={faChevronLeft} />
                     </IconButton>
                 </Tooltip>
             </div>
@@ -335,7 +335,7 @@ export function ExplorerLayout(): ReactNode {
     const restoreButton = (
         <Tooltip title={narrow ? "Show the page list" : "Restore sidebar"} placement="right">
             <IconButton aria-label="Restore sidebar" onClick={() => setSidebar("open")}>
-                <FontAwesomeIcon icon={narrow ? faBars : faAnglesRight} />
+                <FontAwesomeIcon icon={narrow ? faBars : faChevronRight} />
             </IconButton>
         </Tooltip>
     );

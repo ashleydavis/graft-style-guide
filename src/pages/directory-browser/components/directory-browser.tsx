@@ -545,9 +545,9 @@ export function DirectoryBrowser({ onPick }: { onPick: (path: string) => void })
                     }}
                 >
                     {isSearching ? (
-                        <TreeBar focusedPath="" onBack={() => undefined} onExpandAll={() => setSearchCollapsed(new Set())} onCollapseAll={() => setSearchCollapsed(new Set(searchRows.map(row => row.entry.path)))} />
+                        <TreeBar focusedPath="" onBack={() => undefined} onExpandAll={() => setSearchCollapsed(new Set())} onCollapseAll={() => setSearchCollapsed(new Set(searchRows.map(row => row.entry.path)))} hasAllButtons />
                     ) : (
-                        <TreeBar focusedPath="" onBack={() => undefined} onExpandAll={expandAll} onCollapseAll={collapseAll} />
+                        <TreeBar focusedPath="" onBack={() => undefined} onExpandAll={expandAll} onCollapseAll={collapseAll} hasAllButtons />
                     )}
                     {rows.map(row => {
                         const isSelected = row.entry.path === selected?.path;

@@ -293,7 +293,7 @@ export function FileTree(): ReactNode {
             <SearchToolbar mode={search} what="the files" title="Changed files" placeholder="Search by path" result={`${shownFiles.length} of ${treeFiles(fileTree, "").length}`} />
             {rows.length === 0 ? <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>No files match the search.</p> : undefined}
             <List ref={listRef} aria-label="Changed files" tabIndex={0} onKeyDown={onKeyDown} sx={{ padding: "0 0 var(--space-1)", outline: "none", "&:focus-visible": { boxShadow: "inset 0 0 0 var(--focus-ring-width) var(--color-focus)" } }}>
-                <TreeBar focusedPath={treeRoot} onBack={focusParent} onExpandAll={() => setCollapsedDirectories(new Set())} onCollapseAll={() => setCollapsedDirectories(new Set(directories))} />
+                <TreeBar focusedPath={treeRoot} onBack={focusParent} onExpandAll={() => setCollapsedDirectories(new Set())} onCollapseAll={() => setCollapsedDirectories(new Set(directories))} hasAllButtons />
                 {rows.map((row, index) => {
                     if (row.kind === "directory") {
                         return (

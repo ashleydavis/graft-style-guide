@@ -344,13 +344,19 @@ export interface ITreeBarProps {
     // Called by the collapse all button.
     //
     onCollapseAll(): void;
+
+    //
+    // True when the bar holds the expand all and collapse all buttons; false where the pane's
+    // header holds them instead, so the bar shows only while the tree is focused on a directory.
+    //
+    hasAllButtons: boolean;
 }
 
 //
 // Renders the bar above a tree: the back button and the focused directory while the tree is
 // focused on one, then the expand all and collapse all buttons at the right.
 //
-export function TreeBar({ focusedPath, onBack, onExpandAll, onCollapseAll }: ITreeBarProps): ReactNode {
+export function TreeBar({ focusedPath, onBack, onExpandAll, onCollapseAll, hasAllButtons }: ITreeBarProps): ReactNode {
     const allKey = DIRECTORY_KEYS.all.toUpperCase();
     return (
         <li
@@ -372,16 +378,20 @@ export function TreeBar({ focusedPath, onBack, onExpandAll, onCollapseAll }: ITr
             ) : (
                 <span className="flex-1" />
             )}
-            <Tooltip title={<Tip title="Expand all" detail={`Key: ${allKey} expands every directory when all are collapsed and collapses them all otherwise.`} />}>
-                <IconButton size="small" aria-label="Expand all" onClick={onExpandAll}>
-                    <FontAwesomeIcon icon={faPlus} />
-                </IconButton>
-            </Tooltip>
-            <Tooltip title={<Tip title="Collapse all" detail={`Key: ${allKey} expands every directory when all are collapsed and collapses them all otherwise.`} />}>
-                <IconButton size="small" aria-label="Collapse all" onClick={onCollapseAll}>
-                    <FontAwesomeIcon icon={faMinus} />
-                </IconButton>
-            </Tooltip>
+            {hasAllButtons ? (
+                <>
+                    <Tooltip title={<Tip title="Expand all" detail={`Key: ${allKey} expands every directory when all are collapsed and collapses them all otherwise.`} />}>
+                        <IconButton size="small" aria-label="Expand all" onClick={onExpandAll}>
+                            <FontAwesomeIcon icon={faPlus} />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title={<Tip title="Collapse all" detail={`Key: ${allKey} expands every directory when all are collapsed and collapses them all otherwise.`} />}>
+                        <IconButton size="small" aria-label="Collapse all" onClick={onCollapseAll}>
+                            <FontAwesomeIcon icon={faMinus} />
+                        </IconButton>
+                    </Tooltip>
+                </>
+            ) : undefined}
         </li>
     );
 }

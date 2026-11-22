@@ -17,7 +17,7 @@ import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faChevronDown, faChevronRight, faFileImage, faFileShield, faTableColumns, faSliders, faBars, faCircleInfo, faObjectGroup, faListCheck, faTriangleExclamation, faPlus, faMinus, faXmark, faExpand, faCompress, faMagnifyingGlass, faChevronUp, faTrashCan, faRotateLeft } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faChevronDown, faChevronRight, faFileImage, faFileShield, faTableColumns, faSliders, faBars, faCircleInfo, faObjectGroup, faListCheck, faTriangleExclamation, faAnglesLeft, faAnglesRight, faXmark, faExpand, faCompress, faMagnifyingGlass, faChevronUp, faTrashCan, faRotateLeft } from "@fortawesome/free-solid-svg-icons";
 import { FileIcon } from "../../../components/file-icon";
 import { FilePathMenu } from "../../../components/file-path-menu";
 import { MaximiseButton } from "../../../components/maximise-button";
@@ -434,8 +434,8 @@ const ACTION_BUTTON_SIZE = {
 
 //
 // Renders the button that stages or unstages a whole file, a hunk or picked lines: a square icon
-// button, in the stage button colours while it is unstaged and a minus on a slight green tinge
-// once it is staged, its tooltip naming what it does.
+// button with a double chevron right, in the stage button colours, while it is unstaged and a double
+// chevron left on a slight green tinge once it is staged, its tooltip naming what it does.
 //
 export function StageButton({
     isStaged,
@@ -494,7 +494,7 @@ export function StageButton({
                     onClick();
                 }}
             >
-                <FontAwesomeIcon icon={isStaged ? faMinus : faPlus} />
+                <FontAwesomeIcon icon={isStaged ? faAnglesLeft : faAnglesRight} />
             </IconButton>
         </Tooltip>
     );
@@ -1211,8 +1211,8 @@ export function FileDiffCard({
     const pickedName = selectedLines.size === 1 ? "line" : "selection";
 
     //
-    // The picked lines' buttons: the stage button at the left, a minus when every picked line is
-    // staged, and Discard, or Undo once they are discarded, at the right.
+    // The picked lines' buttons: the stage button at the left, showing unstage when every picked
+    // line is staged, and Discard, or Undo once they are discarded, at the right.
     //
     const pickedChangedIds = [...selectedLines].filter(id => changedIds.has(id));
     const arePickedDiscarded = discards !== undefined && pickedChangedIds.length > 0 && pickedChangedIds.every(id => isLineDiscarded(discards, id));

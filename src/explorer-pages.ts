@@ -10,6 +10,7 @@ import { DialogPage } from "./pages/dialog";
 import { ChoicesPage } from "./pages/choices";
 import { choices } from "./pages/choices/options";
 import { FontsPage } from "./pages/fonts";
+import { IconsPage } from "./pages/icons";
 import { CommitGraphPage } from "./pages/commit-graph";
 import { SelectPage } from "./pages/select";
 import { CheckboxPage, RadioPage, SwitchPage } from "./pages/toggles";
@@ -92,6 +93,12 @@ export const explorerPages: IExplorerPage[] = [
         title: "Fonts",
         keywords: ["type", "typography", "text", "mono", "monospace", "code", "mona", "monaspace"],
         component: FontsPage,
+    },
+    {
+        id: "icons",
+        title: "Icons",
+        keywords: ["icon", "font awesome", "fontawesome", "glyph", "symbol", "brands", "solid"],
+        component: IconsPage,
     },
     {
         id: "commit-explorer",

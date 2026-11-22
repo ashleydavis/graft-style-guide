@@ -8,7 +8,7 @@ import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Tooltip from "@mui/material/Tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAnglesLeft, faAnglesRight } from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { Tip } from "./tip";
 
 //
@@ -29,7 +29,7 @@ export function CollapseButton({ side, onClick }: { side: CollapseSide; onClick:
     return (
         <Tooltip title={<Tip title={`Collapse the pane to the ${side}`} detail={`Key: ${COLLAPSE_KEY}`} />}>
             <IconButton size="small" aria-label="Collapse the pane" onClick={onClick}>
-                <FontAwesomeIcon icon={side === "left" ? faAnglesLeft : faAnglesRight} />
+                <FontAwesomeIcon icon={side === "left" ? faChevronLeft : faChevronRight} />
             </IconButton>
         </Tooltip>
     );
@@ -95,7 +95,7 @@ export function CollapsedRail({ label, title, side, isActive, onRestore, isRespo
         >
             <Tooltip title={<Tip title="Restore the pane" detail={`Key: ${COLLAPSE_KEY}`} />}>
                 <IconButton size="small" aria-label={`Restore ${label.toLowerCase()}`} onClick={onRestore}>
-                    <FontAwesomeIcon icon={side === "left" ? faAnglesRight : faAnglesLeft} />
+                    <FontAwesomeIcon icon={side === "left" ? faChevronRight : faChevronLeft} />
                 </IconButton>
             </Tooltip>
             <span
