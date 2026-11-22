@@ -28,7 +28,7 @@ import { countLines, DISCARD_KEYS, DiscardButton, FileDiffCard, FOLD_DIFF_KEY, i
 import Popover from "@mui/material/Popover";
 import { noDiscards, withFileDiscarded, withHunkMarked, type IDiscards } from "../../diff/discards";
 import { parseHunks, sectionDiff, type ISectionDiff } from "../../diff/model";
-import { emptyStaging, hunkStagedState, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
+import { emptyStaging, initialStaging, isAnythingStaged, isFileStaged, stagedLinesOf, withFileToggled, withHunkToggled, type IStaging } from "../../diff/staging";
 import { withViewTransition } from "../../../lib/view-transition";
 import { filePathsInViewOrder, isUnder, parentDirectory, treeGuides, treeRows, withoutCollapsed, type FileListView, type TreeGuide } from "../../commit-explorer/file-views";
 import { FileIcon } from "../../../components/file-icon";
@@ -99,108 +99,6 @@ export function fileSectionDiff(file: IFileDiff, staging: IStaging, section: "st
 // The name of the card that shows the whole diff, as the runs of unchanged lines in it are named.
 //
 const ONE_DIFF_CARD = "File diff";
-
-//
-// One section of the split view: its title, the name of its card, the positions of the file's
-// hunks it shows, what its file button does and what it says when it has no hunks.
-//
-interface ISplitSection {
-    title: string;
-    card: string;
-    hunks: number[];
-    action: "stage" | "unstage";
-    empty: string;
-}
-
-//
-// Returns the split view's two sections for `file`: the unstaged hunks, then the staged ones.
-//
-export function splitSections(file: IFileDiff, staging: IStaging): ISplitSection[] {
-    const all = Array.from({ length: parseHunks(file.diff ?? "").length }, (_unused, index) => index);
-    return [
-        { title: "Unstaged", card: "Unstaged diff", hunks: all.filter(index => hunkStagedState(staging, index) !== "all"), action: "stage", empty: "Everything in this file is staged." },
-        { title: "Staged", card: "Staged diff", hunks: all.filter(index => hunkStagedState(staging, index) !== "none"), action: "unstage", empty: "Nothing in this file is staged." },
-    ];
-}
-
-
-//
-// Renders a file's change in two sections, its staged hunks above its unstaged ones, each the
-// Diff page's diff card showing only its own hunks. The staged section's buttons unstage and the
-// unstaged section's buttons stage; both change the one staging the file has. A section with no
-// hunks says so.
-//
-export function SplitDiff({
-    file,
-    staging,
-    onStagingChange,
-    isCurrent,
-    currentStop,
-    onSelectHunk,
-    onSelectGap,
-    cardRef,
-    discards,
-    onDiscardsChange,
-    isMaximised,
-    onToggleMaximise,
-}: {
-    file: IFileDiff;
-    staging: IStaging;
-    onStagingChange: (staging: IStaging) => void;
-    isCurrent: boolean;
-    currentStop: DiffStop | undefined;
-    onSelectHunk: (hunkIndex: number) => void;
-    onSelectGap: (card: string, gapIndex: number) => void;
-    cardRef: (card: string) => Ref<IFileDiffCardHandle>;
-    discards: IDiscards;
-    onDiscardsChange: (discards: IDiscards) => void;
-    isMaximised: boolean;
-    onToggleMaximise: () => void;
-}): ReactNode {
-    const sections = splitSections(file, staging);
-    const currentHunk = currentStop?.kind === "hunk" ? currentStop.hunk : undefined;
-    return (
-        <div className="graft-slide-in flex min-h-0 flex-1 flex-col" style={{ gap: "var(--space-2)" }}>
-            {sections.map(section => (
-                <section key={section.title} aria-label={`${section.title} changes`} className="flex min-h-0 flex-1 flex-col" style={{ gap: "var(--space-1)" }}>
-                    <h3 style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-bold)", color: "var(--color-text-muted)" }}>
-                        {section.title} ({section.hunks.length} {section.hunks.length === 1 ? "change" : "changes"})
-                    </h3>
-                    {section.hunks.length === 0 ? (
-                        <div className="flex flex-1 items-center justify-center" style={{ padding: "var(--space-4)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
-                            {section.empty}
-                        </div>
-                    ) : (
-                        <div className="min-h-0 flex-1">
-                            <FileDiffCard
-                                isFoldable={false}
-                                key={file.path + section.title}
-                                ref={cardRef(section.card)}
-                                file={file}
-                                label={section.card}
-                                section={section.action === "unstage" ? "staged" : "unstaged"}
-                                isCurrent={isCurrent && ((currentHunk !== undefined && section.hunks.includes(currentHunk)) || (currentStop?.kind === "gap" && currentStop.card === section.card))}
-                                currentHunk={currentHunk}
-                                currentGap={currentStop?.kind === "gap" && currentStop.card === section.card ? currentStop.gap : undefined}
-                                onSelectGap={gap => onSelectGap(section.card, gap)}
-                                staging={staging}
-                                onStagingChange={onStagingChange}
-                                answersKeys={false}
-                                onSelectHunk={onSelectHunk}
-                                discards={discards}
-                                onDiscardsChange={onDiscardsChange}
-                                isMaximised={isMaximised}
-                                onToggleMaximise={onToggleMaximise}
-                                initialWrap
-                                fillHeight
-                            />
-                        </div>
-                    )}
-                </section>
-            ))}
-        </div>
-    );
-}
 
 //
 // Returns true when a key pressed with the focus on `target` belongs to the target itself: a text
@@ -447,6 +345,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
     const [panelCollapsed, setPanelCollapsed] = useState<ReadonlySet<"staged" | "unstaged">>(new Set());
     const [panelMaximised, setPanelMaximised] = useState<"staged" | "unstaged" | undefined>(undefined);
     const [panelStack, setPanelStack] = useState<"vertical" | "horizontal">("vertical");
+
+    //
+    // The file last picked in each of the Unstaged and Staged panels, so each panel keeps showing
+    // its own file's diff while the other panel is in use.
+    //
+    const [panelPaths, setPanelPaths] = useState<ReadonlyMap<"staged" | "unstaged", string>>(new Map());
     const [fileView, setFileView] = useState<FileListView>("tree");
     const [treeRoot, setTreeRoot] = useState("");
     const [rootHistory, setRootHistory] = useState<string[]>([]);
@@ -569,6 +473,28 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                   ...orderedFiles.filter(file => stagedState(stagingOf(file), hunkCountOf(file)) !== "none").map(file => ({ file, section: "staged" as const })),
               ];
     const selectedEntry = selectedDirectory ? undefined : (entries.find(entry => entry.file.path === selectedPath && entry.section === selectedSection) ?? entries.find(entry => entry.file.path === selectedPath));
+
+    //
+    // The panel of the split the keys and the selection are in: Staged when the selected row is
+    // under Staged, otherwise Unstaged.
+    //
+    const activePanel: "staged" | "unstaged" = (selectedDirectory?.section ?? selectedEntry?.section) === "staged" ? "staged" : "unstaged";
+    const activePanelCard = activePanel === "staged" ? "Staged diff" : "Unstaged diff";
+
+    //
+    // Returns the file whose diff the `section` panel of the split shows: the selected file in the
+    // active panel; in the other, the file last picked there, else the selected file, else the
+    // panel's first file, as long as the file is still listed in that panel.
+    //
+    function panelFileOf(section: "staged" | "unstaged"): IFileDiff | undefined {
+        const panelEntries = entries.filter(entry => entry.section === section);
+        if (section === activePanel) {
+            return selectedEntry?.section === section ? selectedEntry.file : undefined;
+        }
+        const candidates = [panelPaths.get(section), selectedPath, panelEntries[0]?.file.path];
+        const path = candidates.find(candidate => panelEntries.some(entry => entry.file.path === candidate));
+        return panelEntries.find(entry => entry.file.path === path)?.file;
+    }
 
     //
     // Holds the selected row of the file list, so the list scrolls it into view when the keys move
@@ -701,6 +627,9 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         setSelectedPath(path);
         setSelectedSection(section);
         setActivePane(pane);
+        if (section !== "all") {
+            setPanelPaths(current => new Map(current).set(section, path));
+        }
     }
 
     function moveFile(step: number, pane: 0 | 1): void {
@@ -734,23 +663,24 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
 
     //
     // Returns the selected file's stops in the order Up and Down step through them, its hunks and
-    // the runs of unchanged lines between them: as the one diff draws them, and in the split the
-    // unstaged section's stops before the staged section's.
+    // the runs of unchanged lines between them: as the one diff draws them, and in the split as the
+    // active panel's diff draws its side of the file.
     //
     function stopOrder(): DiffStop[] {
         if (!selectedFile?.diff) {
             return [];
         }
-        if (diffMode === "one" || hunkCountOf(selectedFile) === 0) {
+        if (diffMode === "one") {
             return diffStops(selectedFile.diff, selectedFile.oldFileLines, undefined, ONE_DIFF_CARD);
         }
-        return splitSections(selectedFile, stagingOf(selectedFile)).flatMap(section => {
-            if (section.hunks.length === 0) {
-                return [];
-            }
-            const side = fileSectionDiff(selectedFile, stagingOf(selectedFile), section.action === "unstage" ? "staged" : "unstaged");
-            return diffStops(side.diff, selectedFile.oldFileLines, side.hunkIndexes, section.card);
-        });
+        if (hunkCountOf(selectedFile) === 0) {
+            return diffStops(selectedFile.diff, selectedFile.oldFileLines, undefined, activePanelCard);
+        }
+        const side = fileSectionDiff(selectedFile, stagingOf(selectedFile), activePanel);
+        if (side.hunkIndexes.length === 0) {
+            return [];
+        }
+        return diffStops(side.diff, selectedFile.oldFileLines, side.hunkIndexes, activePanelCard);
     }
 
     function moveHunk(step: number): void {
@@ -783,7 +713,15 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         );
     }
 
+    //
+    // Maximises a pane over the others, or puts it back. In the split each panel's diff sits
+    // inside the Changes pane, so maximising the diff maximises the active panel over the other.
+    //
     function toggleMaximise(pane: 0 | 1 | 2): void {
+        if (diffMode === "split" && pane === 1) {
+            withViewTransition(() => setPanelMaximised(panelMaximised === activePanel ? undefined : activePanel));
+            return;
+        }
         withViewTransition(() => setMaximised(maximised === pane ? undefined : pane));
     }
 
@@ -841,7 +779,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         }
         const discards = discardsOf(selectedFile.path);
         if (activePane === 1) {
-            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
+            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : [activePanelCard];
             if (cards.some(card => cardRefs.current.get(card)?.discardPicked() === true)) {
                 return;
             }
@@ -872,7 +810,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                 ? [stackCardName(stackStop?.path ?? selectedDirectoryItem.files[0]?.path ?? "")]
                 : diffMode === "one"
                   ? [ONE_DIFF_CARD]
-                  : ["Unstaged diff", "Staged diff"];
+                  : [activePanelCard];
             const card = names.map(name => cardRefs.current.get(name)).find(handle => handle);
             if (card) {
                 event.preventDefault();
@@ -936,19 +874,19 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             // stacked diffs, or the selected file's diff.
             //
             event.preventDefault();
-            const cards = selectedDirectoryItem ? (stackStop ? [stackCardName(stackStop.path)] : []) : diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
+            const cards = selectedDirectoryItem ? (stackStop ? [stackCardName(stackStop.path)] : []) : diffMode === "one" ? [ONE_DIFF_CARD] : [activePanelCard];
             cards.forEach(card => cardRefs.current.get(card)?.toggleOpen());
             return;
         }
         if (activePane === 1) {
-            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
+            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : [activePanelCard];
             if (cards.some(card => cardRefs.current.get(card)?.handleLineKey(key, event.shiftKey) === true)) {
                 event.preventDefault();
                 return;
             }
         }
         if (activePane === 1 && !event.shiftKey) {
-            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : ["Staged diff", "Unstaged diff"];
+            const cards = diffMode === "one" ? [ONE_DIFF_CARD] : [activePanelCard];
             const handled = cards.map(card => cardRefs.current.get(card)?.handleOptionKey(key) === true);
             if (handled.includes(true)) {
                 event.preventDefault();
@@ -1231,6 +1169,133 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
         );
     }
 
+    //
+    // Renders the diffs of every file in the directory row `item`, stacked, each with its own
+    // button that collapses or expands it and the column scrolling as a whole: in the diff
+    // column of one diff, and in the panel of the split the directory's row is in.
+    //
+    function directoryStack(item: Extract<ListItem, { kind: "directory" }>): ReactNode {
+        return (
+            <div ref={stackRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" role="region" aria-label={`Diffs in ${item.path}`} style={{ gap: "var(--space-3)" }}>
+                {item.files.map(file => (
+                    //
+                    // Each card keeps its full height, so the column scrolls through
+                    // them.
+                    //
+                    <div key={file.path + (file.diff ?? "")} className="flex-none" data-stack-path={file.path}>
+                    <FileDiffCard
+                        file={file}
+                        label={`File diff ${file.path}`}
+                        ref={cardRef(stackCardName(file.path))}
+                        isCurrent={activePane === 1 && stackStop?.path === file.path}
+                        currentHunk={stackStop?.path === file.path && stackStop.stop?.kind === "hunk" ? stackStop.stop.hunk : undefined}
+                        currentGap={stackStop?.path === file.path && stackStop.stop?.kind === "gap" ? stackStop.stop.gap : undefined}
+                        onSelectHunk={hunk => {
+                            setStackStop({ path: file.path, stop: { kind: "hunk", hunk } });
+                            setActivePane(1);
+                        }}
+                        onSelectGap={gap => {
+                            setStackStop({ path: file.path, stop: { kind: "gap", gap, card: stackCardName(file.path) } });
+                            setActivePane(1);
+                        }}
+                        staging={stagingOf(file)}
+                        onStagingChange={staging => setStaging(file.path, staging)}
+                        answersKeys={false}
+                        discards={discardsOf(file.path)}
+                        onDiscardsChange={discards => setDiscards(file.path, discards)}
+                        initialWrap
+                    />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    //
+    // Renders the right-hand side of a panel of the split: the stacked diffs of the directory
+    // selected in it, or its side of its file's diff, the hunks still unstaged in the Unstaged
+    // panel and the staged ones in the Staged panel. Picking a hunk or a run of unchanged lines
+    // in it selects the panel's file and moves the keys to the diff.
+    //
+    function panelDiff(section: "staged" | "unstaged"): ReactNode {
+        const file = panelFileOf(section);
+        const card = section === "staged" ? "Staged diff" : "Unstaged diff";
+        const isActivePanel = section === activePanel;
+        const isPanelMaximised = panelMaximised === section;
+        let body: ReactNode;
+        if (selectedDirectoryItem && selectedDirectoryItem.section === section) {
+            body = directoryStack(selectedDirectoryItem);
+        }
+        else if (!file) {
+            body = (
+                <div className="flex flex-1 items-center justify-center" style={{ padding: "var(--space-4)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
+                    {section === "staged" ? "Nothing staged yet." : "Select a file to see its diff."}
+                </div>
+            );
+        }
+        else if (!file.diff && !file.binary && !file.oldPath && !file.modeChange) {
+            body = (
+                <div className="flex flex-1 items-center justify-center" style={{ padding: "var(--space-4)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
+                    The file has no changes to show.
+                </div>
+            );
+        }
+        else {
+            body = (
+                //
+                // The diff slides in from the left when another file is picked.
+                //
+                <div key={file.path} className="graft-slide-in min-h-0 flex-1">
+                    <FileDiffCard
+                        isFoldable={false}
+                        key={file.path + (file.diff ?? "")}
+                        ref={cardRef(card)}
+                        file={file}
+                        label={card}
+                        section={hunkCountOf(file) > 0 ? section : undefined}
+                        isCurrent={isActivePanel && activePane === 1}
+                        currentHunk={isActivePanel ? currentHunk : undefined}
+                        currentGap={isActivePanel && currentStop?.kind === "gap" && currentStop.card === card ? currentStop.gap : undefined}
+                        onSelectGap={gap => {
+                            selectFile(file.path, section, 1);
+                            setCurrentStop({ kind: "gap", gap, card });
+                        }}
+                        onSelectHunk={hunk => {
+                            selectFile(file.path, section, 1);
+                            setCurrentHunk(hunk);
+                        }}
+                        staging={stagingOf(file)}
+                        onStagingChange={staging => setStaging(file.path, staging)}
+                        answersKeys={false}
+                        discards={discardsOf(file.path)}
+                        onDiscardsChange={discards => setDiscards(file.path, discards)}
+                        isMaximised={isPanelMaximised}
+                        onToggleMaximise={() => withViewTransition(() => setPanelMaximised(isPanelMaximised ? undefined : section))}
+                        initialWrap
+                        fillHeight
+                    />
+                </div>
+            );
+        }
+        return (
+            <section
+                aria-label={`${section === "staged" ? "Staged" : "Unstaged"} changes`}
+                data-panel-diff
+                className="flex min-h-[240px] min-w-0 flex-1 flex-col lg:min-h-0"
+                style={{ padding: "var(--space-2)" }}
+                onPointerDown={() => {
+                    if (!isActivePanel && file) {
+                        selectFile(file.path, section, 1);
+                        return;
+                    }
+                    setActivePane(1);
+                }}
+            >
+                {body}
+            </section>
+        );
+    }
+
     return (
         <div
             ref={areaRef}
@@ -1239,11 +1304,12 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
             tabIndex={0}
             onKeyDown={onKeyDown}
             //
-            // On a desktop screen the area fills the window's height less room for the section
-            // heading above it, keeping 480 pixels, or 720 for the split view's two panels, on a
-            // short screen.
+            // On a desktop screen the area fills the window's height less 160 pixels, which holds
+            // the explorer's header and the section heading above it (145 pixels), so the whole
+            // area fits in the window. It keeps 480 pixels, or 720 for the split view's two
+            // panels, on a short screen.
             //
-            className={`flex flex-col ${diffMode === "split" ? "lg:h-[max(720px,calc(100dvh_-_var(--space-8)_*_4))]" : "lg:h-[max(480px,calc(100dvh_-_var(--space-8)_*_4))]"} focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--color-focus)]`}
+            className={`flex flex-col ${diffMode === "split" ? "lg:h-[max(720px,calc(100dvh_-_var(--space-8)_*_5))]" : "lg:h-[max(480px,calc(100dvh_-_var(--space-8)_*_5))]"} focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--color-focus)]`}
             style={{
                 background: "var(--color-bg)",
                 borderRadius: "var(--radius-lg)",
@@ -1260,13 +1326,26 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                               ? "flex min-h-0 flex-1 flex-col"
                               : collapsed.has(0)
                                 ? "flex flex-none flex-col lg:min-h-0"
-                                : diffMode === "split" && panelStack === "horizontal"
-                                  ? "flex min-h-[420px] flex-col lg:min-h-0 lg:w-[480px] lg:flex-none 2xl:w-[600px]"
+                                : diffMode === "split"
+                                  ? "flex min-h-[420px] min-w-0 flex-1 flex-col lg:min-h-0"
                                   : "flex min-h-[420px] flex-col lg:min-h-0 lg:min-w-[320px] lg:flex-[0_1_510px]"
                     }
                     style={{ gap: "var(--space-3)" }}
                 >
-                    <div className="flex min-h-0 flex-1 flex-col" style={{ maxHeight: "100%" }} onPointerDown={() => setActivePane(0)}>
+                    <div
+                        className="flex min-h-0 flex-1 flex-col"
+                        style={{ maxHeight: "100%" }}
+                        onPointerDown={event => {
+                            //
+                            // A press in a panel's diff makes the diff the active pane, which the
+                            // diff's own handler sets, so only a press elsewhere activates the files.
+                            //
+                            if (event.target instanceof Element && event.target.closest("[data-panel-diff]")) {
+                                return;
+                            }
+                            setActivePane(0);
+                        }}
+                    >
                         <Pane
                             label="Changed files"
                             width="100%"
@@ -1340,7 +1419,7 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                                     aria-label={`${title} files`}
                                                     data-collapsed={isPanelCollapsed || undefined}
                                                     data-maximised={panelMaximised === section || undefined}
-                                                    className={isPanelCollapsed ? "flex flex-none flex-col" : panelStack === "vertical" ? "flex min-h-[120px] flex-1 flex-col" : "flex min-w-0 flex-1 flex-col"}
+                                                    className={isPanelCollapsed ? "flex flex-none flex-col" : panelStack === "vertical" ? "flex min-h-[240px] flex-1 flex-col" : "flex min-w-0 flex-1 flex-col"}
                                                     style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}
                                                 >
                                                     <div
@@ -1385,16 +1464,27 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                                             </IconButton>
                                                         </Tooltip>
                                                     </div>
-                                                    <div data-pane-scroll className={isPanelCollapsed ? "hidden" : "min-h-0 flex-1 overflow-auto"}>
-                                                        {sectionEntries.length === 0 ? (
-                                                            <p style={{ padding: "var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", textAlign: "center" }}>
-                                                                {section === "staged" ? "Nothing staged yet." : "Everything is staged."}
-                                                            </p>
-                                                        ) : (
-                                                            <List aria-label={`${title} files`} sx={{ padding: "var(--space-1)" }}>
-                                                                {listRows(section === "staged" ? stagedItems : unstagedItems)}
-                                                            </List>
-                                                        )}
+                                                    {/*
+                                                      * The panel's files on the left and the diff
+                                                      * of its file on the right.
+                                                      */}
+                                                    <div className={isPanelCollapsed ? "hidden" : "flex min-h-0 flex-1 flex-col lg:flex-row"}>
+                                                        <div
+                                                            data-pane-scroll
+                                                            className="max-h-[240px] min-h-0 flex-none overflow-auto lg:max-h-none lg:w-[280px] 2xl:w-[360px]"
+                                                            style={{ borderRight: "1px solid var(--color-border)" }}
+                                                        >
+                                                            {sectionEntries.length === 0 ? (
+                                                                <p style={{ padding: "var(--space-3)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)", textAlign: "center" }}>
+                                                                    {section === "staged" ? "Nothing staged yet." : "Everything is staged."}
+                                                                </p>
+                                                            ) : (
+                                                                <List aria-label={`${title} files`} sx={{ padding: "var(--space-1)" }}>
+                                                                    {listRows(section === "staged" ? stagedItems : unstagedItems)}
+                                                                </List>
+                                                            )}
+                                                        </div>
+                                                        {panelDiff(section)}
                                                     </div>
                                                 </section>
                                             );
@@ -1407,73 +1497,14 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                     </div>
                 </div>
 
-                <div className={maximised === 0 || maximised === 2 ? "hidden" : "flex min-h-[420px] min-w-0 flex-1 flex-col lg:min-h-0"} style={{ gap: "var(--space-2)" }} onPointerDown={() => setActivePane(1)}>
+                <div className={diffMode === "split" || maximised === 0 || maximised === 2 ? "hidden" : "flex min-h-[420px] min-w-0 flex-1 flex-col lg:min-h-0"} style={{ gap: "var(--space-2)" }} onPointerDown={() => setActivePane(1)}>
                     {selectedDirectoryItem ? (
-                        //
-                        // A selected directory shows the diffs of all its files stacked, each with
-                        // its own button that collapses or expands it, the column scrolling as a
-                        // whole.
-                        //
-                        <div ref={stackRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto" role="region" aria-label={`Diffs in ${selectedDirectoryItem.path}`} style={{ gap: "var(--space-3)" }}>
-                            {selectedDirectoryItem.files.map(file => (
-                                //
-                                // Each card keeps its full height, so the column scrolls through
-                                // them.
-                                //
-                                <div key={file.path + (file.diff ?? "")} className="flex-none" data-stack-path={file.path}>
-                                <FileDiffCard
-                                    file={file}
-                                    label={`File diff ${file.path}`}
-                                    ref={cardRef(stackCardName(file.path))}
-                                    isCurrent={activePane === 1 && stackStop?.path === file.path}
-                                    currentHunk={stackStop?.path === file.path && stackStop.stop?.kind === "hunk" ? stackStop.stop.hunk : undefined}
-                                    currentGap={stackStop?.path === file.path && stackStop.stop?.kind === "gap" ? stackStop.stop.gap : undefined}
-                                    onSelectHunk={hunk => {
-                                        setStackStop({ path: file.path, stop: { kind: "hunk", hunk } });
-                                        setActivePane(1);
-                                    }}
-                                    onSelectGap={gap => {
-                                        setStackStop({ path: file.path, stop: { kind: "gap", gap, card: stackCardName(file.path) } });
-                                        setActivePane(1);
-                                    }}
-                                    staging={stagingOf(file)}
-                                    onStagingChange={staging => setStaging(file.path, staging)}
-                                    answersKeys={false}
-                                    discards={discardsOf(file.path)}
-                                    onDiscardsChange={discards => setDiscards(file.path, discards)}
-                                    initialWrap
-                                />
-                                </div>
-                            ))}
-                        </div>
+                        directoryStack(selectedDirectoryItem)
                     ) : selectedFile && !selectedFile.diff && !selectedFile.binary && !selectedFile.oldPath && !selectedFile.modeChange ? (
                         <div className="flex flex-1 items-center justify-center" style={{ color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
                             The file has no changes to show.
                         </div>
                     ) : selectedFile ? (
-                        diffMode === "split" && hunkCountOf(selectedFile) > 0 ? (
-                            <SplitDiff
-                                key={selectedFile.path}
-                                file={selectedFile}
-                                staging={stagingOf(selectedFile)}
-                                onStagingChange={staging => setStaging(selectedFile.path, staging)}
-                                isCurrent={activePane === 1}
-                                currentStop={currentStop}
-                                cardRef={cardRef}
-                                onSelectGap={(card, gap) => {
-                                    setCurrentStop({ kind: "gap", gap, card });
-                                    setActivePane(1);
-                                }}
-                                discards={discardsOf(selectedFile.path)}
-                                onDiscardsChange={discards => setDiscards(selectedFile.path, discards)}
-                                isMaximised={maximised === 1}
-                                onToggleMaximise={() => toggleMaximise(1)}
-                                onSelectHunk={hunk => {
-                                    setCurrentHunk(hunk);
-                                    setActivePane(1);
-                                }}
-                            />
-                        ) : (
                             //
                             // The diff slides in from the left when another file is picked.
                             //
@@ -1506,7 +1537,6 @@ export function ChangesArea({ startFiles }: { startFiles: IFileDiff[] }): ReactN
                                     fillHeight
                                 />
                             </div>
-                        )
                     ) : (
                         <div className="flex flex-1 items-center justify-center" style={{ color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
                             {files.length === 0 ? "Nothing to commit." : "Select a file to see its diff."}

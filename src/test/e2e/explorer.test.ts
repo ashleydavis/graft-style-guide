@@ -1464,6 +1464,45 @@ test.describe("Staged and Unstaged panels", () => {
         await expect(staged).toHaveCount(1);
     });
 
+    test("each panel shows its files beside its own diff, stacked in the Changes pane with Commit at the right", async ({ page }) => {
+        await openPage(page, "/page/changes", { components: "light" });
+        const area = page.getByRole("application", { name: "Changes" }).first();
+        await showStagedAndUnstaged(page, area);
+        const staged = area.getByRole("region", { name: "Staged files", exact: true });
+        const unstaged = area.getByRole("region", { name: "Unstaged files" });
+        await expect(area.getByRole("region", { name: "File diff", exact: true })).toHaveCount(0);
+        const stagedBox = await staged.boundingBox();
+        const unstagedBox = await unstaged.boundingBox();
+        const commitBox = await area.getByRole("region", { name: "Commit", exact: true }).boundingBox();
+        expect(stagedBox).not.toBeNull();
+        expect(unstagedBox).not.toBeNull();
+        expect(commitBox).not.toBeNull();
+        if (!stagedBox || !unstagedBox || !commitBox) {
+            return;
+        }
+        expect(stagedBox.y).toBeGreaterThanOrEqual(unstagedBox.y + unstagedBox.height);
+        expect(commitBox.x).toBeGreaterThanOrEqual(unstagedBox.x + unstagedBox.width);
+        for (const panel of [staged, unstaged]) {
+            const listBox = await panel.getByRole("list").first().boundingBox();
+            const diffBox = await panel.getByRole("region", { name: /changes$/ }).boundingBox();
+            expect(listBox).not.toBeNull();
+            expect(diffBox).not.toBeNull();
+            if (!listBox || !diffBox) {
+                return;
+            }
+            expect(diffBox.x).toBeGreaterThanOrEqual(listBox.x + listBox.width);
+        }
+        const unstagedDiff = unstaged.getByRole("region", { name: "Unstaged changes" });
+        const unstagedText = await unstagedDiff.innerText();
+        const stagedRows = staged.locator("li[aria-label]:not([aria-label^=\"Directory \"])");
+        const lastStaged = stagedRows.last();
+        const lastStagedPath = await lastStaged.getAttribute("aria-label");
+        expect(lastStagedPath).not.toBeNull();
+        await lastStaged.click();
+        await expect(staged.getByRole("region", { name: "Staged changes" })).toContainText((lastStagedPath ?? "").split("/").pop() ?? "");
+        await expect.poll(async () => await unstagedDiff.innerText()).toBe(unstagedText);
+    });
+
     test("Right from the diff moves into the commit message, and Escape and Left come back", async ({ page }) => {
         await openPage(page, "/page/changes", { components: "light" });
         const area = page.getByRole("application", { name: "Changes" }).first();
